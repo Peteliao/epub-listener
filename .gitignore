@@ -1,0 +1,9 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vite
+coverage
+
+# 本地导入的电子书不入库，只保留 public/sample.epub
+/*.epub

@@ -1,0 +1,358 @@
+# 山岚（matcha）多音字覆盖表：每行「词 音素...」，按最长词组匹配生效。
+# 同名条目会整行替换词库原读音；单字只覆盖「得」，助词「地」由整词表与本书自动规则处理。
+# 声调按词库连读惯例标注：3+3 → 2+3，一/不 按后字变调，得/教/背 按语义取音。
+应声 ying4 sheng1
+牛圈 niu2 juan4
+时差 shi2 cha1
+短发 duan3 fa4
+发夹 fa4 jia1
+藏医 zang4 yi1
+抽空 chou1 kong4
+蒙骗 meng1 pian4
+铺开 pu1 kai1
+卷子 juan4 zi
+照片 zhao4 pian4
+相片 xiang4 pian4
+色子 shai3 zi
+尾巴 wei3 ba
+很长 hen3 chang2
+太长 tai4 chang2
+越长 yue4 chang2
+更长 geng4 chang2
+最长 zui4 chang2
+多长 duo1 chang2
+那么长 na4 me chang2
+这么长 zhe4 me chang2
+一样长 yi2 yang4 chang2
+变长 bian4 chang2
+全长 quan2 chang2
+长约 chang2 yue1
+长达 chang2 da2
+长凳 chang2 deng4
+长椅 chang2 yi3
+长桌 chang2 zhuo1
+长裙 chang2 qun2
+长靴 chang2 xue1
+长路 chang2 lu4
+长距离 chang2 ju4 li2
+长睫毛 chang2 jie2 mao2
+长筒 chang2 tong3
+长围巾 chang2 wei2 jin1
+长腿 chang2 tui3
+长得 zhang3 de
+长高 zhang3 gao1
+长满 zhang2 man3
+长胖 zhang3 pang4
+长壮 zhang3 zhuang4
+长霉 zhang3 mei2
+长草 zhang2 cao3
+长知识 zhang3 zhi1 shi2
+长身体 zhang3 shen1 ti3
+长见识 zhang3 jian4 shi2
+长本事 zhang2 ben3 shi4
+长本领 zhang2 ben2 ling3
+长记性 zhang3 ji4 xing4
+长心眼 zhang3 xin1 yan3
+长个子 zhang3 ge4 zi
+长不大 zhang3 bu2 da4
+长起来 zhang2 qi3 lai2
+长出来 zhang3 chu1 lai2
+长一岁 zhang3 yi2 sui4
+长皱纹 zhang3 zhou4 wen2
+长肉 zhang3 rou4
+应了一声 ying4 le yi4 sheng1
+应了一句 ying4 le yi2 ju4
+应道 ying4 dao4
+应下 ying4 xia4
+应下来 ying4 xia4 lai2
+背着 bei1 zhe
+背起 bei1 qi3
+背走 bei1 zou3
+背回 bei1 hui2
+背进 bei1 jin4
+背在 bei1 zai4
+背书包 bei1 shu1 bao1
+背一袋 bei1 yi2 dai4
+背一小袋 bei1 yi4 xiao3 dai4
+背米 bei1 mi3
+背柴 bei1 chai2
+背过身 bei4 guo4 shen1
+背对着 bei4 dui4 zhe
+背靠着 bei4 kao4 zhe
+得问 dei3 wen4
+得先 dei3 xian1
+得去 dei3 qu4
+得走 dei2 zou3
+得看 dei3 kan4
+得说 dei3 shuo1
+得做 dei3 zuo4
+得找 dei2 zhao3
+得回 dei3 hui2
+得让 dei3 rang4
+得给 dei2 gei3
+得等 dei2 deng3
+得花 dei3 hua1
+得靠 dei3 kao4
+得用 dei3 yong4
+得注意 dei3 zhu4 yi4
+得管 dei2 guan3
+得小心 dei2 xiao3 xin1
+得努力 dei2 nu3 li4
+教过 jiao1 guo4
+教了 jiao1 le
+教课 jiao1 ke4
+教学生 jiao1 xue2 sheng1
+教孩子 jiao1 hai2 zi
+教语文 jiao1 yu3 wen2
+教数学 jiao1 shu4 xue2
+教英语 jiao1 ying1 yu3
+教低年级 jiao1 di1 nian2 ji2
+教他 jiao1 ta1
+教我 jiao1 wo3
+教你 jiao1 ni3
+教我们 jiao1 wo3 men
+教你们 jiao1 ni3 men
+教他们 jiao1 ta1 men
+教书法 jiao1 shu1 fa3
+教钢琴 jiao1 gang1 qin2
+猪圈 zhu1 juan4
+圈养 juan4 yang3
+数一数 shu3 yi shu3
+数钱 shu3 qian2
+数日子 shu3 ri4 zi
+晃了一下 huang4 le yi2 xia4
+重来 chong2 lai2
+推倒 tui1 dao3
+为宜 wei2 yi2
+为准 wei2 zhun3
+为重 wei2 zhong4
+为佳 wei2 jia1
+种瓜 zhong4 gua1
+种豆 zhong4 dou4
+藏语 zang4 yu3
+量身高 liang2 shen1 gao1
+中意 zhong4 yi4
+发丝 fa4 si1
+发小 fa4 xiao3
+发梢 fa4 shao1
+系领带 ji4 ling3 dai4
+系扣子 ji4 kou4 zi
+待会 dai1 hui4
+待着 dai1 zhe
+弹奏 tan2 zou4
+蒙古 meng2 gu3
+掉色 diao4 shai3
+踏实 ta1 shi
+麻将 ma2 jiang4
+一辈子 yi2 bei4 zi
+削苹果 xiao1 ping2 guo3
+粘人 nian2 ren2
+得 de
+地里 di4 li3
+满地 man3 di4
+地堡 di4 bao3
+地窨子 di4 yin4 zi
+得闲 de2 xian2
+得计 de2 ji4
+得便 de2 bian4
+变得 bian4 de
+博得 bo2 de2
+取得 qu3 de2
+只得 zhi3 de2
+应得 ying1 de2
+引得 yin3 de2
+所得税 suo3 de2 shui4
+购得 gou4 de2
+赢得 ying2 de2
+难得 nan2 de2
+舍得 she3 de
+过得去 guo4 de qu4
+少不得 shao3 bu4 de
+不记得 bu2 ji4 de
+倏地 shu1 de
+霍地 huo4 de
+蓦地 mo4 de
+忽地 hu1 de
+怎地 zen3 de
+恁地 nen4 de
+突地 tu1 de
+啪地 pa1 de
+了不得 liao3 bu4 de
+使不得 shi3 bu4 de
+免不得 mian3 bu4 de
+哭笑不得 ku1 xiao4 bu4 de
+巴不得 ba1 bu4 de
+怨不得 yuan4 bu4 de
+怪不得 guai4 bu4 de
+恨不得 hen4 bu4 de
+来不得 lai2 bu4 de
+求之不得 qiu2 zhi1 bu4 de
+由不得 you2 bu4 de
+舍不得 she3 bu4 de
+要不得 yao4 bu4 de
+见不得 jian4 bu4 de
+说不得 shuo1 bu4 de
+老虎屁股摸不得 lao2 hu3 pi4 gu3 mo1 bu4 de
+此地无银三百两 ci3 di4 wu2 yin2 san1 bai2 liang3
+得趁早 dei3 chen4 zao3
+得赶紧 dei2 gan2 jin3
+得赶快 dei2 gan3 kuai4
+得抓紧 dei3 zhua1 jin3
+得马上 dei2 ma3 shang4
+得尽快 dei2 jin3 kuai4
+得回去 dei3 hui2 qu4
+得加油 dei3 jia1 you2
+得照顾 dei3 zhao4 gu4
+得坚持 dei3 jian1 chi2
+得准备 dei2 zhun3 bei4
+得相信 dei3 xiang1 xin4
+慢慢地 man4 man4 de
+轻轻地 qing1 qing1 de
+悄悄地 qiao1 qiao1 de
+静静地 jing4 jing4 de
+深深地 shen1 shen1 de
+默默地 mo4 mo4 de
+缓缓地 huan2 huan3 de
+微微地 wei1 wei1 de
+淡淡地 dan4 dan4 de
+紧紧地 jin2 jin3 de
+匆匆地 cong1 cong1 de
+渐渐地 jian4 jian4 de
+久久地 jiu2 jiu3 de
+早早地 zao2 zao3 de
+好好地 hao2 hao3 de
+细细地 xi4 xi4 de
+甜甜地 tian2 tian2 de
+呆呆地 dai1 dai1 de
+傻傻地 sha2 sha3 de
+冷冷地 leng2 leng3 de
+暖暖地 nuan2 nuan3 de
+牢牢地 lao2 lao2 de
+狠狠地 hen2 hen3 de
+偷偷地 tou1 tou1 de
+白白地 bai2 bai2 de
+暗暗地 an4 an4 de
+空空地 kong1 kong1 de
+平平地 ping2 ping2 de
+美美地 mei2 mei3 de
+湿湿地 shi1 shi1 de
+热热地 re4 re4 de
+黑黑地 hei1 hei1 de
+沙沙地 sha1 sha1 de
+草草地 cao2 cao3 de
+死死地 si2 si3 de
+生生地 sheng1 sheng1 de
+大大地 da4 da4 de
+高高地 gao1 gao1 de
+远远地 yuan2 yuan3 de
+小心地 xiao3 xin1 de
+开心地 kai1 xin1 de
+伤心地 shang1 xin1 de
+耐心地 nai4 xin1 de
+细心地 xi4 xin1 de
+安心地 an1 xin1 de
+热心地 re4 xin1 de
+专心地 zhuan1 xin1 de
+诚心地 cheng2 xin1 de
+虚心地 xu1 xin1 de
+真心地 zhen1 xin1 de
+精心地 jing1 xin1 de
+粗心地 cu1 xin1 de
+狠心地 hen3 xin1 de
+用心地 yong4 xin1 de
+关心地 guan1 xin1 de
+放心地 fang4 xin1 de
+认真地 ren4 zhen1 de
+仔细地 zi3 xi4 de
+好奇地 hao4 qi2 de
+惊讶地 jing1 ya4 de
+兴奋地 xing1 fen4 de
+疲惫地 pi2 bei4 de
+无奈地 wu2 nai4 de
+亲切地 qin1 qie4 de
+温柔地 wen1 rou2 de
+大声地 da4 sheng1 de
+小声地 xiao3 sheng1 de
+飞快地 fei1 kuai4 de
+努力地 nu3 li4 de
+高兴地 gao1 xing4 de
+赞许地 zan4 xu3 de
+满意地 man3 yi4 de
+深情地 shen1 qing2 de
+疑惑地 yi2 huo4 de
+犹豫地 you2 yu4 de
+迟疑地 chi2 yi2 de
+零零散散地 ling2 ling2 san2 san3 de
+断断续续地 duan4 duan4 xu4 xu4 de
+迷迷糊糊地 mi2 mi2 hu2 hu2 de
+清清楚楚地 qing1 qing1 chu2 chu3 de
+仔仔细细地 zi2 zi3 xi4 xi4 de
+高高兴兴地 gao1 gao1 xing4 xing4 de
+安安静静地 an1 an1 jing4 jing4 de
+匆匆忙忙地 cong1 cong1 mang2 mang2 de
+急急忙忙地 ji2 ji2 mang2 mang2 de
+认认真真地 ren4 ren4 zhen1 zhen1 de
+# 语境读音：落下来、水准连读、送上去，以及“行”作量词的常见搭配。
+落了 luo4 le
+落下 luo4 xia4
+水准 shui2 zhun3
+上去 shang4 qu4
+第一行 di4 yi1 hang2
+一行字 yi4 hang2 zi4
+一行小字 yi4 hang2 xiao3 zi4
+一行很小的字 yi4 hang2 hen2 xiao3 de zi4
+那一行 na4 yi4 hang2
+这一行 zhe4 yi4 hang2
+下一行 xia4 yi4 hang2
+上一行 shang4 yi4 hang2
+最后一行 zui4 hou4 yi4 hang2
+一行泪 yi4 hang2 lei4
+# 续写章节新增语境：量词“行”、“浅浅的”与“原处”。
+加了一行 jia1 le yi4 hang2
+两行 liang3 hang2
+几行 ji3 hang2
+浅浅的 qian2 qian3 de
+原处 yuan2 chu4
+# 多音字试读.txt 自查补充：“长”读 cháng 但词库会按单字 zhǎng 兜底或整词读错的组合。
+悠长 you1 chang2
+绵长 mian2 chang2
+长骨 chang2 gu3
+加长 jia1 chang2
+相当长 xiang1 dang1 chang2
+略长 lve4 chang2
+长胡子 chang2 hu2 zi
+长头发 chang2 tou2 fa4
+长尾巴 chang2 wei3 ba
+变得长 bian4 de chang2
+显得长 xian3 de chang2
+得长 de chang2
+长长地 chang2 chang2 de
+好长 hao3 chang2
+米长 mi3 chang2
+厘米长 li2 mi3 chang2
+公里长 gong1 li3 chang2
+# 专名：词库整词读音错误（长年三老）或未收录（地名/人名）。
+长葛 chang2 ge3
+长垣 chang2 yuan2
+子长 zi3 chang2
+长沮 chang2 ju3
+长年三老 chang2 nian2 san1 lao3
+行唐 hang2 tang2
+乐陵 lao4 ling2
+仇英 qiu2 ying1
+单田芳 shan4 tian2 fang1
+解缙 xie4 jin4
+区寄 ou1 ji4
+查良镛 zha1 liang2 yong1
+# 其他多音字：词库按单字默认音兜底会读错的常见组合。
+为人民 wei4 ren2 min2
+量一下 liang2 yi2 xia4
+好喝酒 hao4 he1 jiu3
+# 行星与书名：词库把“行星”所在短语读成 háng；《悟空传》的“传”读 zhuàn。
+九大行星 jiu3 da4 xing2 xing1
+大行星 da4 xing2 xing1
+悟空传 wu4 kong1 zhuan4
+# 诗词句尾的「还」读 huán：春风又绿江南岸，明月何时照我还。
+照我还 zhao4 wo3 huan2
+# 「没」在“隐没”里读 mò，不是 méi。
+隐没 yin3 mo4

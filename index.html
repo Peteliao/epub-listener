@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f7f0e4" />
+    <title>书声 · 网页听书 | EPUB/TXT/MOBI/AZW3/FB2 朗读器，中英混读与 iOS 锁屏听书</title>
+    <meta
+      name="description"
+      content="书声是免费纯网页听书工具：导入 EPUB、TXT、MOBI、AZW3、FB2 电子书，逐句朗读并同步高亮；支持系统语音与离线 AI 中英文音色，中英混排可全离线朗读，iPhone 锁屏也能继续听。无需安装 App，书籍与阅读进度只保存在本机。"
+    />
+    <meta
+      name="keywords"
+      content="网页听书,在线听书,电子书朗读,EPUB朗读器,EPUB转语音,TXT转语音,电子书转有声书,MOBI朗读器,AZW3朗读,FB2阅读器,中文TTS,英文TTS,离线语音合成,中英混读,中英混排朗读,iPhone锁屏听书,iOS锁屏朗读,锁屏续读,后台听书,免费听书,书声"
+    />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+    <meta name="author" content="书声" />
+    <link rel="canonical" href="https://peteliao.github.io/epub-listener/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="书声 · 网页听书" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:title" content="书声 · 网页听书 — 把电子书变成有声书，支持中英混读与 iOS 锁屏听书" />
+    <meta
+      property="og:description"
+      content="免费纯网页听书：EPUB / TXT / MOBI / AZW3 / FB2 导入，逐句朗读并同步高亮；离线 AI 中英文音色，中英混读，iPhone 锁屏续读，书籍只保存在本机。"
+    />
+    <meta property="og:url" content="https://peteliao.github.io/epub-listener/" />
+    <meta
+      property="og:image"
+      content="https://peteliao.github.io/epub-listener/og-cover.png"
+    />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="书声网页听书：让文字，读给你听。支持 EPUB、TXT、MOBI、AZW3、FB2、中英混读与 iOS 锁屏听书。"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="书声 · 网页听书 — 把电子书变成有声书，支持中英混读与 iOS 锁屏听书" />
+    <meta
+      name="twitter:description"
+      content="免费纯网页听书：EPUB / TXT / MOBI / AZW3 / FB2 导入，逐句朗读并同步高亮；离线 AI 中英文音色，中英混读，iPhone 锁屏续读，书籍只保存在本机。"
+    />
+    <meta
+      name="twitter:image"
+      content="https://peteliao.github.io/epub-listener/og-cover.png"
+    />
+
+    <meta name="application-name" content="书声" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="书声" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://peteliao.github.io/epub-listener/#website",
+            "url": "https://peteliao.github.io/epub-listener/",
+            "name": "书声 · 网页听书",
+            "description": "免费纯网页听书工具，把 EPUB、TXT、MOBI、AZW3、FB2 电子书变成有声书，支持中英混读与 iOS 锁屏续读。",
+            "inLanguage": "zh-CN"
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://peteliao.github.io/epub-listener/#app",
+            "name": "书声 · 网页听书",
+            "alternateName": ["书声听书", "书声电子书朗读器"],
+            "url": "https://peteliao.github.io/epub-listener/",
+            "description": "免费纯网页听书工具：导入 EPUB、TXT、MOBI、AZW3、FB2 电子书，逐句朗读并同步高亮；支持系统语音与离线 AI 中英文音色、中英混读、iPhone 锁屏续读、睡眠定时和 PWA 离线使用。书籍与阅读进度只保存在本机。",
+            "applicationCategory": "BooksApplication",
+            "applicationSubCategory": "电子书朗读器 / TTS 听书工具",
+            "operatingSystem": "Web",
+            "browserRequirements": "需要支持 WebAssembly、Service Worker 与现代 JavaScript 的浏览器",
+            "inLanguage": "zh-CN",
+            "isAccessibleForFree": true,
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "CNY"
+            },
+            "featureList": [
+              "EPUB、TXT、MOBI、AZW3、FB2 电子书导入",
+              "书架自动读取电子书封面",
+              "逐句朗读与同步高亮",
+              "系统语音与离线 AI 中英文音色",
+              "中文、英文离线音色包同时使用，朗读中英混排",
+              "iPhone / iOS 锁屏续读，锁屏界面可控制播放",
+              "英文音量与语速独立调节，数字、日期与缩写按英文读法归一化",
+              "对话独立断句，数字、单位与日期规范化",
+              "剩余听书时间估算",
+              "睡眠定时与口袋模式",
+              "PWA 添加到主屏幕，离线可用",
+              "书籍与阅读进度仅保存在本机"
+            ],
+            "screenshot": "https://peteliao.github.io/epub-listener/og-cover.png",
+            "sameAs": ["https://github.com/Peteliao/epub-listener"]
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>
+      <main
+        style="max-width: 42rem; margin: 12vh auto; padding: 0 1.5rem; font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; line-height: 1.75; color: #33291f; background: #f7f0e4;"
+      >
+        <h1>书声 · 网页听书</h1>
+        <p>
+          书声是免费纯网页听书工具：导入 EPUB、TXT、MOBI、AZW3、FB2
+          电子书，逐句朗读并同步高亮；支持系统语音与离线 AI
+          中英文音色、中英混读、iPhone 锁屏续读、睡眠定时和 PWA 离线使用。书籍与阅读进度只保存在本机。
+        </p>
+        <p>请启用 JavaScript 后使用导入与朗读功能。</p>
+        <p>
+          <a href="https://github.com/Peteliao/epub-listener">查看项目源码</a>
+        </p>
+      </main>
+    </noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
