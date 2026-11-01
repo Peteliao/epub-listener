@@ -14,7 +14,13 @@ import {
 import { extractBookCover } from '@/core/library/bookCover'
 import { importBookFile, importSampleBook } from '@/core/library/importBook'
 import { IMPORT_ACCEPT } from '@/core/reader/formats/bookFormat'
+import {
+  formatListenDuration,
+  getListeningSnapshot,
+  type ListeningSnapshot,
+} from '@/core/stats/listeningStats'
 import AppIcon from '@/components/AppIcon.vue'
+import ReadingStatsSheet from '@/components/ReadingStatsSheet.vue'
 import { showToast } from '@/ui/toast'
 import { navigateToReader } from '@/ui/nav'
 import { appBuildId, installAvailable, isStandalone, promptInstall } from '@/ui/pwa'
@@ -29,6 +35,8 @@ const busy = ref<'file' | 'sample' | null>(null)
 const pendingDelete = ref<string | null>(null)
 const deleting = ref<string | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const statsOpen = ref(false)
+const listeningStats = ref<ListeningSnapshot>(getListeningSnapshot())
 let backfillRunning = false
 let disposed = false
 
@@ -39,6 +47,14 @@ const isIos =
 const isWeChat = /micromessenger/i.test(navigator.userAgent)
 
 const isBusy = computed(() => busy.value !== null)
+
+const listenStripMeta = computed(() => {
+  const stats = listeningStats.value
+  const parts = [`今日 ${formatListenDuration(stats.todayMs)}`]
+  if (stats.streakDays >= 2) parts.push(`连续 ${stats.streakDays} 天`)
+  else if (stats.bookCount > 0) parts.push(`听过 ${stats.bookCount} 本`)
+  return parts.join(' · ')
+})
 
 const buildLabel = computed(() => {
   if (!import.meta.env.PROD) return '开发模式'
@@ -183,6 +199,7 @@ function percentOf(bookId: string): number {
 }
 
 async function refresh(): Promise<void> {
+  listeningStats.value = getListeningSnapshot()
   const summaries = await listBooks()
   books.value = summaries
   await loadCovers(summaries)
@@ -384,6 +401,27 @@ onBeforeUnmount(() => {
         </p>
       </section>
 
+      <button
+        v-if="listeningStats.totalMs > 0"
+        type="button"
+        class="listen-strip"
+        @click="statsOpen = true"
+      >
+        <span class="listen-strip__icon" aria-hidden="true">
+          <AppIcon name="clock" :size="17" />
+        </span>
+        <span class="listen-strip__copy">
+          <strong>
+            已听 {{ formatListenDuration(listeningStats.totalMs, true) }}
+          </strong>
+          <small>{{ listenStripMeta }}</small>
+        </span>
+        <span class="listen-strip__action">
+          分享
+          <AppIcon name="share" :size="14" />
+        </span>
+      </button>
+
       <section class="shelf" aria-labelledby="shelf-title">
         <header class="shelf__head">
           <h2 id="shelf-title">书架</h2>
@@ -499,6 +537,12 @@ onBeforeUnmount(() => {
       tabindex="-1"
       aria-hidden="true"
       @change="handleFile"
+    />
+
+    <ReadingStatsSheet
+      :open="statsOpen"
+      @close="statsOpen = false"
+      @notice="showToast"
     />
   </div>
 </template>
@@ -790,6 +834,69 @@ onBeforeUnmount(() => {
 
 .hero__features svg {
   color: var(--app-accent);
+}
+
+.listen-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 30px;
+  padding: 13px 14px;
+  border: 1px solid var(--app-line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--app-ui) 58%, transparent);
+  color: inherit;
+  text-align: left;
+  transition: background-color 0.16s ease;
+}
+
+.listen-strip:active {
+  background: color-mix(in srgb, var(--app-ui) 84%, transparent);
+}
+
+.listen-strip__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--app-accent) 9%, transparent);
+  color: var(--app-accent);
+}
+
+.listen-strip__copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.listen-strip__copy strong {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.listen-strip__copy small {
+  font-size: 11px;
+  color: var(--app-muted);
+}
+
+.listen-strip__action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--app-accent);
+}
+
+.listen-strip + .shelf {
+  margin-top: 34px;
 }
 
 .shelf {

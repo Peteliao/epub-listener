@@ -5,6 +5,8 @@
  * apostrophes are straightened because the lexicon stores ASCII entries.
  */
 
+import { stripToneMarkedPinyin } from './pinyinSpeech'
+
 const ONES = [
   'zero',
   'one',
@@ -425,8 +427,121 @@ function convertNumbers(input: string): string {
   )
 }
 
+// A lone letter reaches the model as a clipped one-phone token; its letter-name
+// word keeps the full stressed syllable. "eh" is the bundled lexicon's /eɪ/;
+// "ay" is /aɪ/ and would turn A into "eye".
+const LETTER_NAMES: Record<string, string> = {
+  a: 'eh',
+  b: 'bee',
+  c: 'see',
+  d: 'dee',
+  e: 'ee',
+  f: 'ef',
+  g: 'gee',
+  h: 'aitch',
+  i: 'eye',
+  j: 'jay',
+  k: 'kay',
+  l: 'el',
+  m: 'em',
+  n: 'en',
+  o: 'oh',
+  p: 'pee',
+  q: 'cue',
+  r: 'ar',
+  s: 'ess',
+  t: 'tee',
+  u: 'you',
+  v: 'vee',
+  w: 'double you',
+  x: 'ex',
+  y: 'why',
+  z: 'zee',
+}
+
+// Hyphens and digits mean the letter belongs to a compound (X-ray, A4), and a
+// letter after an apostrophe is a contraction suffix (don't, y'all).
+const ISOLATED_LETTER =
+  /(?<![A-Za-z0-9_\-])(?<![A-Za-z]['’])[A-Za-z](?![A-Za-z0-9_\-])(?!['’][A-Za-z])/g
+
+function expandDottedAcronyms(text: string): string {
+  return text.replace(
+    /(?<![A-Za-z0-9])(?:[A-Za-z]{1,2}\.){2,}/g,
+    (match) => Array.from(match.replace(/\./g, '')).join(' '),
+  )
+}
+
+function isSentenceStart(text: string, index: number): boolean {
+  let cursor = index - 1
+  while (cursor >= 0 && /[\s"'“”‘’(\[]/.test(text[cursor]!)) cursor -= 1
+  if (cursor < 0) return true
+  return /[.!?。！？;:：；]/.test(text[cursor]!)
+}
+
+function hasArticleComplement(text: string, index: number): boolean {
+  const rest = text.slice(index + 1).replace(/^[\s"'“”‘’(\[]+/, '')
+  return /^[A-Za-z0-9$£€¥]/.test(rest)
+}
+
+function startsLetterList(text: string, index: number): boolean {
+  return /^\s*(?:and|or|&)\s+[A-Za-z](?![A-Za-z0-9])/i.test(
+    text.slice(index + 1),
+  )
+}
+
+function keepsAsWord(
+  text: string,
+  letter: string,
+  index: number,
+  inRun: boolean,
+): boolean {
+  if (inRun) return false
+  if (letter === 'I') return true
+  if (letter === 'a') return true
+  if (letter !== 'A') return false
+  if (startsLetterList(text, index)) return false
+  // Uppercase A at a sentence start is normally the article; elsewhere it is
+  // the letter ("plan A", "vitamin A").
+  return isSentenceStart(text, index) && hasArticleComplement(text, index)
+}
+
+function expandIsolatedLetters(input: string): string {
+  const text = expandDottedAcronyms(input)
+  const matches = Array.from(text.matchAll(ISOLATED_LETTER))
+  if (!matches.length) return text
+
+  const inRun = matches.map((match, index) => {
+    const start = match.index ?? 0
+    const previous = matches[index - 1]
+    if (
+      previous &&
+      !/[A-Za-z0-9]/.test(text.slice((previous.index ?? 0) + 1, start))
+    ) {
+      return true
+    }
+    const next = matches[index + 1]
+    return Boolean(
+      next && !/[A-Za-z0-9]/.test(text.slice(start + 1, next.index ?? 0)),
+    )
+  })
+
+  let output = ''
+  let cursor = 0
+  matches.forEach((match, index) => {
+    const start = match.index ?? 0
+    const letter = match[0]
+    output += text.slice(cursor, start)
+    output += keepsAsWord(text, letter, start, inRun[index]!)
+      ? letter
+      : LETTER_NAMES[letter.toLowerCase()]!
+    cursor = start + 1
+  })
+  return output + text.slice(cursor)
+}
+
 function cleanText(input: string): string {
   return input
+    .normalize('NFC')
     .replace(/[\u00a0\u2007\u202f\u3000]/g, ' ')
     .replace(/[\u200b-\u200f\u202a-\u202e\u2060\ufeff]/g, '')
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
@@ -444,18 +559,24 @@ export function normalizeEnglishSpeech(input: string): string {
   let text = cleanText(input)
   if (!text) return ''
 
+  // Kristin cannot voice Mandarin syllables; drop tone-marked pinyin runs
+  // instead of letting the OOV fallback spell them as letter names.
+  text = stripToneMarkedPinyin(text)
   text = expandAbbreviations(text)
   text = expandSymbols(text)
   text = expandTimes(text)
   text = expandDates(text)
   text = expandRanges(text)
   text = convertNumbers(text)
+  // Letters run last so °C and other symbol forms are already words.
+  text = expandIsolatedLetters(text)
 
   // A residual hyphen (well-known, half-brother) is voiced as two words; the
   // lexicon lookup and OOV spelling both handle the parts better that way.
-  return text
+  const result = text
     .replace(/\s*-\s*/g, ' ')
     .replace(/\s+([,.;:!?])/g, '$1')
     .replace(/ {2,}/g, ' ')
     .trim()
+  return /[\p{L}\p{N}]/u.test(result) ? result : ''
 }

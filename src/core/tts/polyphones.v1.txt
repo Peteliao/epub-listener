@@ -356,3 +356,222 @@
 照我还 zhao4 wo3 huan2
 # 「没」在“隐没”里读 mò，不是 méi。
 隐没 yin3 mo4
+# 「着」的四种读音：着重/着火等词库已有，下面补足“动词 + 着”的助词读法。
+# 缺少这些整词时，贪婪匹配会先切出“看/着火”“看/着重”，把助词读错。
+看着 kan4 zhe
+听着 ting1 zhe
+笑着 xiao4 zhe
+说着 shuo1 zhe
+走着 zou3 zhe
+坐着 zuo4 zhe
+站着 zhan4 zhe
+躺着 tang3 zhe
+拿着 na2 zhe
+放着 fang4 zhe
+开着 kai1 zhe
+关着 guan1 zhe
+等着 deng3 zhe
+守着 shou3 zhe
+拉着 la1 zhe
+抱着 bao4 zhe
+牵着 qian1 zhe
+扶着 fu2 zhe
+靠着 kao4 zhe
+哭着 ku1 zhe
+喊着 han3 zhe
+唱着 chang4 zhe
+跳着 tiao4 zhe
+跑着 pao3 zhe
+飞着 fei1 zhe
+流着 liu2 zhe
+亮着 liang4 zhe
+响着 xiang3 zhe
+忙着 mang2 zhe
+忍着 ren3 zhe
+藏着 cang2 zhe
+记着 ji4 zhe
+带着 dai4 zhe
+陪着 pei2 zhe
+围着 wei2 zhe
+顺着 shun4 zhe
+随着 sui2 zhe
+盯着 ding1 zhe
+望着 wang4 zhe
+凝视着 ning2 shi4 zhe
+注视着 zhu4 shi4 zhe
+微笑着 wei1 xiao4 zhe
+借着 jie4 zhe
+趁着 chen4 zhe
+仗着 zhang4 zhe
+凭着 ping2 zhe
+依着 yi1 zhe
+就着 jiu4 zhe
+捧着 peng3 zhe
+握着 wo4 zhe
+刷着 shua1 zhe
+玩着 wan2 zhe
+瞧着 qiao2 zhe
+瞅着 chou3 zhe
+瞪着 deng4 zhe
+含着 han2 zhe
+怀着 huai2 zhe
+对着 dui4 zhe
+冲着 chong4 zhe
+顶着 ding3 zhe
+低着头 di1 zhe tou2
+抬着头 tai2 zhe tou2
+摇着头 yao2 zhe tou2
+点着头 dian3 zhe tou2
+咬着牙 yao3 zhe ya2
+皱着眉 zhou4 zhe mei2
+红着脸 hong2 zhe lian3
+板着脸 ban3 zhe lian3
+打量着 da3 liang4 zhe
+盼着 pan4 zhe
+念着 nian4 zhe
+提着 ti2 zhe
+扛着 kang2 zhe
+拖着 tuo1 zhe
+推着 tui1 zhe
+骑着 qi2 zhe
+躲着 duo3 zhe
+趴着 pa1 zhe
+蹲着 dun1 zhe
+跪着 gui4 zhe
+排着 pai2 zhe
+挤着 ji3 zhe
+摸着 mo1 zhe
+# 样本书里被“着火/着手/着笔/着落”截走的助词组合。
+打着 da3 zhe
+打着了 da3 zhao2 le
+变着 bian4 zhe
+戴着 dai4 zhe
+揉着 rou2 zhe
+咬着 yao3 zhe
+凭借着 ping2 jie4 zhe
+找着什么 zhao3 zhe shen2 me
+有着落 you3 zhuo2 luo4
+闭着 bi4 zhe
+睁着 zheng1 zhe
+眯着 mi1 zhe
+垂着 chui2 zhe
+低着 di1 zhe
+抬着 tai2 zhe
+红着 hong2 zhe
+斜着 xie2 zhe
+侧着 ce4 zhe
+烤着 kao3 zhe
+迎着 ying2 zhe
+闪着 shan3 zhe
+透着 tou4 zhe
+压着 ya1 zhe
+憋着 bie1 zhe
+# “险着”读 zhāo：这一手是步险着。
+险着 xian3 zhao1
+# 19 组多音字回归：逐字核对词库、贪婪分词与语境读音。
+# 好：词库会把“好学生/好学校”截成“好学”，另有几处 hǎo/hào 混淆。
+好学生 hao3 xue2 sheng1
+好学校 hao3 xue2 xiao4
+好问 hao4 wen4
+好管闲事 hao4 guan3 xian2 shi4
+好面子 hao4 mian4 zi
+好赌 hao4 du3
+# 着：火着起来；“着火/着重/看着/险着”词库与覆盖表已正确。
+着起来 zhao2 qi3 lai2
+# 调：词库把“调经”读成 diào，且缺少一批固定读 tiáo 的常用词。
+调经 tiao2 jing1
+调休 tiao2 xiu1
+调酒 tiao2 jiu3
+调酒师 tiao2 jiu3 shi1
+调薪 tiao2 xin1
+调低 tiao2 di1
+调高 tiao2 gao1
+调大 tiao2 da4
+调小 tiao2 xiao3
+调快 tiao2 kuai4
+调慢 tiao2 man4
+调校 tiao2 jiao4
+调速 tiao2 su4
+调压 tiao2 ya1
+调弦 tiao2 xian2
+调减 tiao2 jian3
+调增 tiao2 zeng1
+# 塞：软木塞整体读 sāi；边塞/要塞/闭塞/瓶塞/塞得词库已正确。
+软木塞 ruan3 mu4 sai1
+# 落：词库“落下”是 là，但“落了下来”需要 luò；遗留物品与固定搭配用长词覆盖。
+落下钥匙 la4 xia4 yao4 shi
+落下了钥匙 la4 xia4 le yao4 shi
+落下手机 la4 xia4 shou3 ji1
+落下了手机 la4 xia4 le shou3 ji1
+落下钱包 la4 xia4 qian2 bao1
+落下了钱包 la4 xia4 le qian2 bao1
+落下行李 la4 xia4 xing2 li
+落下了行李 la4 xia4 le xing2 li
+落下书包 la4 xia4 shu1 bao1
+落下了书包 la4 xia4 le shu1 bao1
+落在家里 la4 zai4 jia1 li3
+落在车上 la4 zai4 che1 shang4
+落在后面 la4 zai4 hou4 mian4
+落埋怨 lao4 man2 yuan4
+不落忍 bu4 lao4 ren3
+# 澄：澄清池与“澄清事实”读 chéng；“黄澄澄/澄清石灰水”读 dèng。
+黄澄澄 huang2 deng1 deng1
+澄清石灰水 deng4 qing1 shi2 hui1 shui3
+把水澄清 ba2 shui3 deng4 qing1
+# 爪：词库“爪子”声调错误；“鸡爪子”正确，机械手爪按“手爪”读 zhǎo。
+爪子 zhua3 zi
+机械手爪 ji1 xie4 shou2 zhao3
+# 熨：熨平；熨斗、熨帖词库已正确。
+熨平 yun4 ping2
+# 单：姓氏、单县读 shàn；单于 chán、单靠 dān 词库已正确。
+单老师 shan4 lao3 shi1
+单先生 shan4 xian1 sheng1
+单女士 shan4 nv3 shi4
+单氏 shan4 shi4
+单县 shan4 xian4
+# 六：南京六合、六合区/县读 lù；通用词语“六合”仍保留 liù hé。
+南京六合 nan2 jing1 lu4 he2
+六合区 lu4 he2 qu1
+六合县 lu4 he2 xian4
+# 解：姓氏读 xiè；解释 jiě、押解 jiè 词库已正确。
+解巡捕 xie4 xun2 bu3
+解先生 xie4 xian1 sheng1
+解女士 xie4 nv3 shi4
+解老师 xie4 lao3 shi1
+# 区：姓氏读 ōu；开发区、居民区的“区”读 qū。
+区先生 ou1 xian1 sheng1
+区女士 ou1 nv3 shi4
+区老师 ou1 lao3 shi1
+# 仇：姓氏读 qiú；仇恨、结仇读 chóu。
+仇先生 qiu2 xian1 sheng1
+仇女士 qiu2 nv3 shi4
+仇老师 qiu2 lao3 shi1
+# 峙：繁峙读 shì；对峙仍读 zhì。
+繁峙 fan2 shi4
+繁峙县 fan2 shi4 xian4
+# 度：审时度势、以己度人词库已正确，补足独立的“度势”。
+度势 duo2 shi4
+# 臭：臭味相投读 chòu（词库误读 xiù）；铜臭、乳臭读 xiù。
+臭味相投 chou4 wei4 xiang1 tou2
+铜臭味 tong2 xiu4 wei4
+# 勒：勒痕、勒紧读 lēi；勒马、悬崖勒马读 lè。
+勒痕 lei1 hen2
+勒马 le4 ma3
+勒住马 le4 zhu4 ma3
+# 盛：盛满、盛汤、盛水读 chéng；盛器、盛饭、盛菜词库已正确；盛大、盛老师读 shèng。
+盛满 cheng2 man3
+盛汤 cheng2 tang1
+盛水 cheng2 shui3
+盛老师 sheng4 lao3 shi1
+盛大 sheng4 da4
+# 样本书全量扫描补充：词库明确读错的常用词，以及贪婪分词跨词误切。
+骨头 gu3 tou
+灰蒙蒙 hui1 meng2 meng2
+指缝 zhi3 feng4
+古朴 gu2 pu3
+刨平 pao2 ping2
+摩挲 mo2 suo1
+未成行 wei4 cheng2 xing2
+红白相间 hong2 bai2 xiang1 jian4
+想过重逢 xiang3 guo4 chong2 feng2
+结实累累 jie1 shi lei2 lei2

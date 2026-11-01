@@ -24,8 +24,13 @@ import {
   type ReaderDiagnostics,
   type ReaderState,
 } from '@/core/player/ReaderController'
+import {
+  stopListeningTracking,
+  updateListeningContext,
+} from '@/core/stats/listeningStats'
 import AppIcon from '@/components/AppIcon.vue'
 import PocketOverlay from '@/components/PocketOverlay.vue'
+import ReadingStatsSheet from '@/components/ReadingStatsSheet.vue'
 import ReaderSettingsSheet from '@/components/ReaderSettingsSheet.vue'
 import ReaderTuneSheet from '@/components/ReaderTuneSheet.vue'
 import SleepTimerSheet from '@/components/SleepTimerSheet.vue'
@@ -60,6 +65,7 @@ const loading = ref(true)
 const loadError = ref('')
 const tocOpen = ref(false)
 const settingsOpen = ref(false)
+const statsOpen = ref(false)
 const tuneOpen = ref(false)
 const tuneKind = ref<ReaderTuneKind | null>(null)
 const sleepOpen = ref(false)
@@ -214,6 +220,7 @@ async function boot(): Promise<void> {
   pageTurnRevealed.value = false
   tocOpen.value = false
   settingsOpen.value = false
+  statsOpen.value = false
   sleepOpen.value = false
   cancelSleepTimer()
   state.value = {
@@ -319,6 +326,23 @@ watch(
   { deep: true },
 )
 
+watch(
+  [
+    () => book.value?.id,
+    () => book.value?.title,
+    () => state.value.isPlaying,
+    () => state.value.activeEngine,
+  ],
+  ([bookId, title, playing, engine]) => {
+    if (!bookId || !title) {
+      updateListeningContext(null)
+      return
+    }
+    updateListeningContext({ bookId, title, playing, engine })
+  },
+  { immediate: true },
+)
+
 function togglePlayback(): void {
   controller.value?.toggle()
 }
@@ -357,6 +381,12 @@ function openSettings(): void {
 function closeSettings(): void {
   settingsOpen.value = false
   controller.value?.cancelVoicePreview()
+}
+
+function openStats(): void {
+  settingsOpen.value = false
+  controller.value?.cancelVoicePreview()
+  statsOpen.value = true
 }
 
 function openTune(kind: ReaderTuneKind): void {
@@ -565,6 +595,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  stopListeningTracking()
   stopDiagnostics()
   controller.value?.destroy()
   controller.value = null
@@ -790,6 +821,13 @@ onBeforeUnmount(() => {
       @refresh-voices="refreshSystemVoices"
       @download-ai="downloadAiModel"
       @remove-ai="removeAiModel"
+      @open-stats="openStats"
+    />
+
+    <ReadingStatsSheet
+      :open="statsOpen"
+      @close="statsOpen = false"
+      @notice="showToast"
     />
 
     <ReaderTuneSheet

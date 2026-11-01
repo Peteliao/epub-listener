@@ -1120,28 +1120,34 @@ export class ReaderController {
       !this.englishAiFallback &&
       this.englishPackReady()
 
-    const plan: SpeechChunk[] = segments.map((segment) => ({
-      ...segment,
-      engine:
+    const plan: SpeechChunk[] = []
+
+    for (const segment of segments) {
+      const engine: ChunkEngine =
         useAi && (segment.lang === 'zh' || englishAi || !this.speech.supported)
           ? 'ai'
-          : 'system',
-      nextTexts: [],
-    }))
-
-    for (let i = 0; i < plan.length; i += 1) {
-      const chunk = plan[i]!
-      if (chunk.engine === 'ai') {
-        if (chunk.lang === 'zh') {
+          : 'system'
+      let text = segment.text
+      if (engine === 'ai') {
+        if (segment.lang === 'zh') {
           // Matcha voices any space it receives as a separate "a"-like
           // syllable, so a Chinese run must not carry the gaps left by source
           // markup.
-          chunk.text = chunk.text.replace(/\s+/g, '')
+          text = text.replace(/\s+/g, '')
         } else {
-          chunk.text = normalizeEnglishSpeech(chunk.text)
+          // Tone-marked pinyin is dropped by the normalizer; a pinyin-only
+          // run leaves nothing to synthesize.
+          text = normalizeEnglishSpeech(text)
+          if (!text) continue
         }
-        chunk.text = ensureSpeechEnd(chunk.text, i === plan.length - 1, chunk.lang)
       }
+      plan.push({ ...segment, text, engine, nextTexts: [] })
+    }
+
+    for (let i = 0; i < plan.length; i += 1) {
+      const chunk = plan[i]!
+      if (chunk.engine !== 'ai') continue
+      chunk.text = ensureSpeechEnd(chunk.text, i === plan.length - 1, chunk.lang)
     }
     return plan
   }

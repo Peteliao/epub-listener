@@ -39,6 +39,7 @@ const emit = defineEmits<{
   refreshVoices: []
   downloadAi: [packId: string, voiceId?: string]
   removeAi: [packId: string]
+  openStats: []
 }>()
 
 const isIos = isIOSDevice()
@@ -1104,6 +1105,22 @@ function removeEnglishPack(): void {
         :build-id="buildId"
         @notice="emit('notice', $event)"
       />
+    </section>
+
+    <section class="setting">
+      <div class="voice-head">
+        <div>
+          <h3 class="setting__title">听书统计</h3>
+          <p class="voice-sub">累计时长、连续收听与分享卡</p>
+        </div>
+        <button
+          type="button"
+          class="voice-refresh"
+          @click="emit('openStats')"
+        >
+          查看
+        </button>
+      </div>
     </section>
 
     <div class="setting-footer">

@@ -79,11 +79,26 @@ describe('normalizeEnglishSpeech', () => {
     expect(normalizeEnglishSpeech('Main St.')).toBe('Main Street')
     expect(normalizeEnglishSpeech('St. Paul')).toBe('Saint Paul')
     expect(normalizeEnglishSpeech('e.g. this')).toBe('for example this')
-    expect(normalizeEnglishSpeech('at 5 p.m.')).toBe('at five P M')
+    expect(normalizeEnglishSpeech('at 5 p.m.')).toBe('at five pee em')
     expect(normalizeEnglishSpeech('No. 5')).toBe('Number five')
     expect(normalizeEnglishSpeech('30°C')).toBe('thirty degrees Celsius')
     expect(normalizeEnglishSpeech('3 × 4')).toBe('three times four')
     expect(normalizeEnglishSpeech('salt & pepper')).toBe('salt and pepper')
+  })
+
+  it('reads isolated letters by name', () => {
+    expect(normalizeEnglishSpeech('Plan B')).toBe('Plan bee')
+    expect(normalizeEnglishSpeech('vitamin C')).toBe('vitamin see')
+    expect(normalizeEnglishSpeech('A, B, C.')).toBe('eh, bee, see.')
+    expect(normalizeEnglishSpeech('U.S.')).toBe('you ess')
+    expect(normalizeEnglishSpeech('Ph.D.')).toBe('pee aitch dee')
+    expect(normalizeEnglishSpeech('X-ray')).toBe('X ray')
+  })
+
+  it('keeps articles, pronouns and contractions intact', () => {
+    expect(normalizeEnglishSpeech('A man walked in.')).toBe('A man walked in.')
+    expect(normalizeEnglishSpeech('I saw a cat.')).toBe('I saw a cat.')
+    expect(normalizeEnglishSpeech("don't stop")).toBe("don't stop")
   })
 
   it('spells phone numbers digit by digit', () => {
@@ -106,5 +121,36 @@ describe('normalizeEnglishSpeech', () => {
       'The quick brown fox.',
     )
     expect(normalizeEnglishSpeech('   ')).toBe('')
+  })
+
+  it('skips tone-marked pinyin instead of spelling it out', () => {
+    expect(normalizeEnglishSpeech('zhuó zhòng')).toBe('')
+    expect(normalizeEnglishSpeech('kàn zhe')).toBe('')
+    expect(normalizeEnglishSpeech('nǐ hǎo ma')).toBe('')
+    expect(normalizeEnglishSpeech('xué sheng')).toBe('')
+    expect(normalizeEnglishSpeech('Zhōngguó')).toBe('')
+    expect(normalizeEnglishSpeech("xī'ān")).toBe('')
+    expect(normalizeEnglishSpeech('lǜ sè')).toBe('')
+  })
+
+  it('keeps English around a pinyin annotation', () => {
+    expect(normalizeEnglishSpeech('The word is kàn.')).toBe('The word is.')
+    expect(normalizeEnglishSpeech('Read kàn zhe now.')).toBe('Read now.')
+    expect(normalizeEnglishSpeech('zhuó hello zhòng')).toBe('hello')
+  })
+
+  it('de-accents English loanwords for the lexicon', () => {
+    expect(normalizeEnglishSpeech('A café résumé.')).toBe('A cafe resume.')
+    expect(normalizeEnglishSpeech('naïve déjà vu')).toBe('naive deja vu')
+    expect(normalizeEnglishSpeech('Renée and María')).toBe('Renee and Maria')
+    expect(normalizeEnglishSpeech('Müller’s façade')).toBe("Muller's facade")
+    expect(normalizeEnglishSpeech('sauté, matinée, élite')).toBe(
+      'saute, matinee, elite',
+    )
+  })
+
+  it('leaves unmarked English words alone', () => {
+    expect(normalizeEnglishSpeech('he is a man')).toBe('he is a man')
+    expect(normalizeEnglishSpeech('elite resume')).toBe('elite resume')
   })
 })

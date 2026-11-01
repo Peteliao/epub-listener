@@ -1,7 +1,8 @@
 import { OutputFormat, pinyin, segment } from 'pinyin-pro'
+import { normalizeOverlayText } from './pinyinTones'
 
 // Bump when the rules change so cached per-book overlays are regenerated.
-export const BOOK_LEXICON_VERSION = 2
+export const BOOK_LEXICON_VERSION = 3
 export const MAX_BOOK_OVERLAY_ENTRIES = 2000
 
 const HAN = /\p{Script=Han}/u
@@ -182,7 +183,7 @@ function parseTokens(text: string): Set<string> {
 
 function parseOverlay(source: string): Map<string, string> {
   const entries = new Map<string, string>()
-  for (const line of source.split(/\r?\n/)) {
+  for (const line of normalizeOverlayText(source).split(/\r?\n/)) {
     const trimmed = line.trim()
     if (!trimmed || trimmed.startsWith('#')) continue
     const [word, ...phones] = trimmed.split(/\s+/)

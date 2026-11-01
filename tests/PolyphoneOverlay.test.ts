@@ -76,9 +76,15 @@ const maxPhraseLength = Math.max(
   ...Array.from(effective.keys(), (word) => Array.from(word).length),
 )
 
-function tokenize(text: string): string[] {
+interface TokenSpan {
+  word: string
+  start: number
+  end: number
+}
+
+function tokenizeSpans(text: string): TokenSpan[] {
   const chars = Array.from(text)
-  const result: string[] = []
+  const result: TokenSpan[] = []
   let index = 0
   while (index < chars.length) {
     let matched = ''
@@ -90,14 +96,42 @@ function tokenize(text: string): string[] {
       }
     }
     if (matched) {
-      result.push(matched)
-      index += Array.from(matched).length
+      const end = index + Array.from(matched).length
+      result.push({ word: matched, start: index, end })
+      index = end
     } else {
-      result.push(chars[index])
+      result.push({ word: chars[index], start: index, end: index + 1 })
       index += 1
     }
   }
   return result
+}
+
+function tokenize(text: string): string[] {
+  return tokenizeSpans(text).map((token) => token.word)
+}
+
+function readingAt(text: string, char: string, occurrence = 1): string {
+  const chars = Array.from(text)
+  let seen = 0
+  let target = -1
+  for (let index = 0; index < chars.length; index += 1) {
+    if (chars[index] !== char) continue
+    seen += 1
+    if (seen === occurrence) {
+      target = index
+      break
+    }
+  }
+  if (target < 0) throw new Error(`“${char}”第 ${occurrence} 次未出现在 ${text}`)
+  const token = tokenizeSpans(text).find(
+    (span) => target >= span.start && target < span.end,
+  )
+  const reading = token ? effective.get(token.word) : undefined
+  if (!token || !reading) {
+    throw new Error(`无法确定“${text}”第 ${target + 1} 字的读音`)
+  }
+  return reading.split(' ')[target - token.start]
 }
 
 const ATTESTED_NEUTRALS = new Set([
@@ -272,6 +306,38 @@ describe('polyphone overlay', () => {
     expect(tokenize('月光隐没在云层里')).toContain('隐没')
   })
 
+  it('distinguishes the four readings of 着', () => {
+    expect(effective.get('着重')).toBe('zhuo2 zhong4')
+    expect(effective.get('着火')).toBe('zhao2 huo3')
+    expect(overlay.get('看着')).toBe('kan4 zhe')
+    expect(overlay.get('险着')).toBe('xian3 zhao1')
+    expect(tokenize('他着重强调')).toContain('着重')
+    expect(tokenize('他看着火堆')).toContain('看着')
+    expect(tokenize('他看着火堆')).not.toContain('着火')
+    expect(tokenize('他看着重物')).toContain('看着')
+    expect(tokenize('他点着了火')).toContain('点着')
+    expect(tokenize('这是一步险着')).toContain('险着')
+    expect(tokenize('他借着火光')).toContain('借着')
+    expect(tokenize('她含着眼泪')).toContain('含着')
+    expect(tokenize('孩子们顺着小路走')).toContain('顺着')
+  })
+
+  it('keeps the particle 着 when the following syllable forms a 着-word', () => {
+    expect(tokenize('素秋打着火把')).toContain('打着')
+    expect(tokenize('素秋打着火把')).not.toContain('着火')
+    expect(tokenize('他打着了火')).toContain('打着了')
+    expect(tokenize('变着法子')).toContain('变着')
+    expect(tokenize('戴着手表')).toContain('戴着')
+    expect(tokenize('揉着眼窝')).toContain('揉着')
+    expect(tokenize('咬着笔头')).toContain('咬着')
+    expect(tokenize('凭借着手臂')).toContain('凭借着')
+    expect(tokenize('翻找着什么')).toContain('找着什么')
+    expect(tokenize('事情有着落了')).toContain('有着落')
+    expect(tokenize('睁着眼睛')).toContain('睁着')
+    expect(tokenize('迎着风')).toContain('迎着')
+    expect(tokenize('压着嗓子')).toContain('压着')
+  })
+
   it('keeps the audit-approved 3+3 sandhi readings', () => {
     const expected: Record<string, string> = {
       可以: 'ke2 yi3',
@@ -358,8 +424,222 @@ describe('polyphone overlay', () => {
       '第一行',
       '一行小字',
       '铺开',
+      '看着',
+      '险着',
     ]) {
       expect(overlay.has(word), word).toBe(true)
+    }
+  })
+
+  it('reads the 19-sentence polyphone regression corpus correctly', () => {
+    const cases: Array<{
+      text: string
+      readings: Array<[char: string, occurrence: number, phone: string]>
+    }> = [
+      {
+        text: '小明是个好学生，最大的好奇心就是好读书',
+        readings: [['好', 1, 'hao3'], ['好', 2, 'hao4'], ['好', 3, 'hao4']],
+      },
+      {
+        text: '他着重强调，看着大火着起来却不走，是一步险着。',
+        readings: [
+          ['着', 1, 'zhuo2'],
+          ['着', 2, 'zhe'],
+          ['着', 3, 'zhao2'],
+          ['着', 4, 'zhao1'],
+        ],
+      },
+      {
+        text: '调查显示，适当调整员工的声调培训和工作调动方案非常重要。',
+        readings: [
+          ['调', 1, 'diao4'],
+          ['调', 2, 'tiao2'],
+          ['调', 3, 'diao4'],
+          ['调', 4, 'diao4'],
+        ],
+      },
+      {
+        text: '边塞的要塞交通闭塞，那个瓶塞也被软木塞塞得严实。',
+        readings: [
+          ['塞', 1, 'sai4'],
+          ['塞', 2, 'sai4'],
+          ['塞', 3, 'se4'],
+          ['塞', 4, 'sai1'],
+          ['塞', 5, 'sai1'],
+          ['塞', 6, 'sai1'],
+        ],
+      },
+      {
+        text: '太阳落山时，他才发现自己落下了钥匙，落得个露宿街头的下场。',
+        readings: [['落', 1, 'luo4'], ['落', 2, 'la4'], ['落', 3, 'luo4']],
+      },
+      {
+        text: '澄清池里的水十分澄清，我们必须彻底澄清这个谣言。',
+        readings: [['澄', 1, 'cheng2'], ['澄', 2, 'cheng2'], ['澄', 3, 'cheng2']],
+      },
+      {
+        text: '猫咪伸出爪子挠人，鸡爪子和机械手爪却不是一个概念。',
+        readings: [['爪', 1, 'zhua3'], ['爪', 2, 'zhua3'], ['爪', 3, 'zhao3']],
+      },
+      {
+        text: '妈妈用熨斗熨平了衣服，心里感到十分熨帖。',
+        readings: [['熨', 1, 'yun4'], ['熨', 2, 'yun4'], ['熨', 3, 'yu4']],
+      },
+      {
+        text: '单老师在单县读史书，看到匈奴单于的故事，觉得单靠武力不行。',
+        readings: [
+          ['单', 1, 'shan4'],
+          ['单', 2, 'shan4'],
+          ['单', 3, 'chan2'],
+          ['单', 4, 'dan1'],
+        ],
+      },
+      {
+        text: '安徽六安与南京六合之间，相距六十六公里。',
+        readings: [
+          ['六', 1, 'lu4'],
+          ['六', 2, 'lu4'],
+          ['六', 3, 'liu4'],
+          ['六', 4, 'liu4'],
+        ],
+      },
+      {
+        text: '解巡捕向官府解释，自己从未参与押解犯人的行动。',
+        readings: [['解', 1, 'xie4'], ['解', 2, 'jie3'], ['解', 3, 'jie4']],
+      },
+      {
+        text: '区先生刚搬到这个开发区，对周围的居民区还不熟悉。',
+        readings: [['区', 1, 'ou1'], ['区', 2, 'qu1'], ['区', 3, 'qu1']],
+      },
+      {
+        text: '仇先生劝大家放下仇恨，不要继续结仇。',
+        readings: [['仇', 1, 'qiu2'], ['仇', 2, 'chou2'], ['仇', 3, 'chou2']],
+      },
+      {
+        text: '浙江丽水风景秀丽，是个美丽的城市。',
+        readings: [['丽', 1, 'li2'], ['丽', 2, 'li4'], ['丽', 3, 'li4']],
+      },
+      {
+        text: '山西繁峙县人口繁殖迅速，产业欣欣向荣。',
+        readings: [['峙', 1, 'shi4']],
+      },
+      {
+        text: '做人要有宽广的气度，遇事要审时度势，才能以己度人。',
+        readings: [['度', 1, 'du4'], ['度', 2, 'duo2'], ['度', 3, 'duo2']],
+      },
+      {
+        text: '这水沟散发着恶臭，但他俩却臭味相投，宛如铜臭熏心。',
+        readings: [['臭', 1, 'chou4'], ['臭', 2, 'chou4'], ['臭', 3, 'xiu4']],
+      },
+      {
+        text: '悬崖勒马的勒痕深深印在绳索上，勒紧了战马。',
+        readings: [['勒', 1, 'le4'], ['勒', 2, 'lei1'], ['勒', 3, 'lei1']],
+      },
+      {
+        text: '盛老师端着盛满热汤的盛器，动作十分盛大庄重。',
+        readings: [
+          ['盛', 1, 'sheng4'],
+          ['盛', 2, 'cheng2'],
+          ['盛', 3, 'cheng2'],
+          ['盛', 4, 'sheng4'],
+        ],
+      },
+    ]
+    for (const { text, readings } of cases) {
+      for (const [char, occurrence, phone] of readings) {
+        expect(
+          readingAt(text, char, occurrence),
+          `${text} 第 ${occurrence} 个“${char}”`,
+        ).toBe(phone)
+      }
+    }
+  })
+
+  it('covers the wider polyphone families beyond the regression corpus', () => {
+    const expected: Record<string, string> = {
+      骨头: 'gu3 tou',
+      灰蒙蒙: 'hui1 meng2 meng2',
+      指缝: 'zhi3 feng4',
+      古朴: 'gu2 pu3',
+      刨平: 'pao2 ping2',
+      摩挲: 'mo2 suo1',
+      未成行: 'wei4 cheng2 xing2',
+      红白相间: 'hong2 bai2 xiang1 jian4',
+      想过重逢: 'xiang3 guo4 chong2 feng2',
+      结实累累: 'jie1 shi lei2 lei2',
+      好学生: 'hao3 xue2 sheng1',
+      好学校: 'hao3 xue2 xiao4',
+      好问: 'hao4 wen4',
+      好管闲事: 'hao4 guan3 xian2 shi4',
+      好面子: 'hao4 mian4 zi',
+      好赌: 'hao4 du3',
+      着起来: 'zhao2 qi3 lai2',
+      调经: 'tiao2 jing1',
+      调休: 'tiao2 xiu1',
+      调酒师: 'tiao2 jiu3 shi1',
+      调薪: 'tiao2 xin1',
+      调低: 'tiao2 di1',
+      调高: 'tiao2 gao1',
+      调校: 'tiao2 jiao4',
+      调弦: 'tiao2 xian2',
+      软木塞: 'ruan3 mu4 sai1',
+      落下钥匙: 'la4 xia4 yao4 shi',
+      落下了钥匙: 'la4 xia4 le yao4 shi',
+      落下钱包: 'la4 xia4 qian2 bao1',
+      落在家里: 'la4 zai4 jia1 li3',
+      落埋怨: 'lao4 man2 yuan4',
+      不落忍: 'bu4 lao4 ren3',
+      黄澄澄: 'huang2 deng1 deng1',
+      澄清石灰水: 'deng4 qing1 shi2 hui1 shui3',
+      把水澄清: 'ba2 shui3 deng4 qing1',
+      爪子: 'zhua3 zi',
+      机械手爪: 'ji1 xie4 shou2 zhao3',
+      熨平: 'yun4 ping2',
+      单老师: 'shan4 lao3 shi1',
+      单县: 'shan4 xian4',
+      单氏: 'shan4 shi4',
+      南京六合: 'nan2 jing1 lu4 he2',
+      六合区: 'lu4 he2 qu1',
+      六合县: 'lu4 he2 xian4',
+      解巡捕: 'xie4 xun2 bu3',
+      解老师: 'xie4 lao3 shi1',
+      区先生: 'ou1 xian1 sheng1',
+      区女士: 'ou1 nv3 shi4',
+      仇先生: 'qiu2 xian1 sheng1',
+      仇老师: 'qiu2 lao3 shi1',
+      繁峙县: 'fan2 shi4 xian4',
+      度势: 'duo2 shi4',
+      臭味相投: 'chou4 wei4 xiang1 tou2',
+      铜臭味: 'tong2 xiu4 wei4',
+      勒痕: 'lei1 hen2',
+      勒住马: 'le4 zhu4 ma3',
+      盛满: 'cheng2 man3',
+      盛汤: 'cheng2 tang1',
+      盛水: 'cheng2 shui3',
+      盛老师: 'sheng4 lao3 shi1',
+    }
+    for (const [word, reading] of Object.entries(expected)) {
+      expect(overlay.get(word), word).toBe(reading)
+    }
+  })
+
+  it('avoids cross-word splits found by the sample-book scan', () => {
+    const cases: Array<[text: string, char: string, occurrence: number, phone: string]> = [
+      ['一段风干了数十年的骨头', '骨', 1, 'gu3'],
+      ['灰蒙蒙的天空', '蒙', 1, 'meng2'],
+      ['灰蒙蒙的天空', '蒙', 2, 'meng2'],
+      ['指缝里溢出绝望的呜咽', '缝', 1, 'feng4'],
+      ['那块古朴的木匾', '朴', 1, 'pu3'],
+      ['木匠刨平了', '刨', 1, 'pao2'],
+      ['像在摩挲一块顽石', '摩', 1, 'mo2'],
+      ['那张未成行的车票', '行', 1, 'xing2'],
+      ['红白相间的旧车票', '相', 1, 'xiang1'],
+      ['构想过重逢', '重', 1, 'chong2'],
+      ['结实累累', '累', 1, 'lei2'],
+      ['结实累累', '累', 2, 'lei2'],
+    ]
+    for (const [text, char, occurrence, phone] of cases) {
+      expect(readingAt(text, char, occurrence), text).toBe(phone)
     }
   })
 })

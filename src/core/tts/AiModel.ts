@@ -1,4 +1,5 @@
 import polyphoneOverlay from './polyphones.v1.txt?raw'
+import { normalizeOverlayText } from './pinyinTones'
 
 export type AiPhase =
   | 'unsupported'
@@ -611,7 +612,9 @@ export class AiModelManager {
     const lexiconOverlay =
       pack.model.type === 'matcha' &&
       typeof pack.model.config.lexicon === 'string'
-        ? [polyphoneOverlay, bookOverlay?.trim()].filter(Boolean).join('\n')
+        ? normalizeOverlayText(
+            [polyphoneOverlay, bookOverlay?.trim()].filter(Boolean).join('\n'),
+          )
         : undefined
 
     // The worker hashes each file while streaming it into MEMFS, so the main

@@ -280,6 +280,15 @@ async function init(data) {
   }
 }
 
+// Kristin's base lexicon maps the article "a" to the letter name /eɪ/ and has
+// no entries for two letter names. Patch them in memory so the downloaded
+// pack keeps matching its manifest hash.
+const ENGLISH_LEXICON_PATCH = [
+  'a || ə',
+  'ef || ˈ ɛ f',
+  'aitch || ˈ e ɪ t ʃ',
+].join('\n')
+
 function ensureDir(fs, dir) {
   try {
     fs.mkdir(dir)
@@ -335,15 +344,19 @@ async function writeModelFiles(fs, data, dir) {
       typeof data.model?.config?.lexicon === 'string'
         ? data.model.config.lexicon
         : ''
-    const patch =
+    const matchaPatch =
       data.model?.type === 'matcha' &&
       file.name === lexiconName &&
       typeof data.lexiconOverlay === 'string'
+    const englishPatch = data.lang === 'en' && file.name === lexiconName
 
-    fs.writeFile(
-      `${dir}/${file.name}`,
-      patch ? patchLexicon(buffer, data.lexiconOverlay) : new Uint8Array(buffer),
-    )
+    let content = new Uint8Array(buffer)
+    if (matchaPatch) {
+      content = patchLexicon(buffer, data.lexiconOverlay)
+    } else if (englishPatch) {
+      content = patchLexicon(buffer, ENGLISH_LEXICON_PATCH)
+    }
+    fs.writeFile(`${dir}/${file.name}`, content)
   }
 }
 
@@ -468,10 +481,40 @@ function buildOovWords(fs, data, dir) {
 
 const WORD_PATTERN = /[A-Za-z]+(?:['’][A-Za-z]+)*/g
 
+// Keep in sync with LETTER_NAMES in src/core/text/englishText.ts.
+const LETTER_NAMES = {
+  A: 'eh',
+  B: 'bee',
+  C: 'see',
+  D: 'dee',
+  E: 'ee',
+  F: 'ef',
+  G: 'gee',
+  H: 'aitch',
+  I: 'eye',
+  J: 'jay',
+  K: 'kay',
+  L: 'el',
+  M: 'em',
+  N: 'en',
+  O: 'oh',
+  P: 'pee',
+  Q: 'cue',
+  R: 'ar',
+  S: 'ess',
+  T: 'tee',
+  U: 'you',
+  V: 'vee',
+  W: 'double you',
+  X: 'ex',
+  Y: 'why',
+  Z: 'zee',
+}
+
 /**
  * Piper VITS drops out-of-vocabulary tokens silently, so proper nouns vanish
- * from the audio. Spelling unknown words letter by letter keeps them audible:
- * "Hermione" becomes "H e r m i o n e".
+ * from the audio. Spelling unknown words with their letter names keeps them
+ * audible: "Hermione" becomes "aitch ee ar em eye oh en ee".
  */
 function spellOovWords(text, words) {
   if (!words || words.size === 0) return text
@@ -504,7 +547,7 @@ function spellOovWords(text, words) {
 function spellLetters(word) {
   const letters = word.toUpperCase().match(/[A-Z]/g)
   if (!letters || letters.length === 0) return word
-  return letters.join(' ')
+  return letters.map((letter) => LETTER_NAMES[letter] || letter).join(' ')
 }
 
 async function synthesize(data) {
