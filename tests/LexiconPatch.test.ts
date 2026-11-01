@@ -39,11 +39,10 @@ function parseLexicon(buffer: Buffer): Map<string, string> {
     if (!trimmed) continue
     const space = trimmed.indexOf(' ')
     if (space <= 0) continue
-    // sherpa-onnx ignores duplicated words, so the first entry is effective.
-    // Intended corrections live in src/core/tts/polyphones.v1.txt instead.
-    if (!entries.has(trimmed.slice(0, space))) {
-      entries.set(trimmed.slice(0, space), trimmed.slice(space + 1))
-    }
+    // Matcha assigns each entry into a map, so the last duplicate line is the
+    // one that takes effect. Intended corrections live in
+    // src/core/tts/polyphones.v1.txt and are appended after the patch.
+    entries.set(trimmed.slice(0, space), trimmed.slice(space + 1))
   }
   return entries
 }
@@ -60,28 +59,30 @@ describe('matcha lexicon patch', () => {
     )
   })
 
-  it('contains the corrected polyphone and tone readings', () => {
+  it('reads the base lexicon with Matcha last-duplicate-wins', () => {
     const lexicon = parseLexicon(readFile(lexiconFile))
-    expect(lexicon.get('了解')).toBe('liao2 jie3')
-    expect(lexicon.get('可以')).toBe('ke2 yi3')
-    expect(lexicon.get('大夫')).toBe('dai4 fu1')
+    // These four end with an older reading in the raw file; the curated
+    // overlay pins the intended sandhi/neutral form.
+    expect(lexicon.get('了解')).toBe('liao3 jie3')
+    expect(lexicon.get('可以')).toBe('ke3 yi3')
+    expect(lexicon.get('大夫')).toBe('dai4 fu')
+    expect(lexicon.get('长者')).toBe('zhang3 zhe3')
     expect(lexicon.get('生意')).toBe('sheng1 yi')
-    expect(lexicon.get('难得')).toBe('nan2 de')
+    expect(lexicon.get('难得')).toBe('nan2 de2')
     expect(lexicon.get('长')).toBe('zhang3')
     expect(lexicon.get('长大')).toBe('zhang3 da4')
-    expect(lexicon.get('长者')).toBe('zhang2 zhe3')
     expect(lexicon.get('行长')).toBe('hang2 zhang3')
   })
 
-  it('resolves duplicated entries first-wins, leaving particles to the overlay', () => {
+  it('lets the later duplicate line win, as Matcha does', () => {
     const lexicon = parseLexicon(readFile(lexiconFile))
-    expect(lexicon.get('地')).toBe('di4')
-    expect(lexicon.get('得')).toBe('de2')
-    expect(lexicon.get('舍得')).toBe('she4 de')
-    expect(lexicon.get('过得去')).toBe('guo4 dei3 qu4')
-    expect(lexicon.get('忽地')).toBe('hu1 di4')
-    expect(lexicon.get('突地')).toBe('tu1 di4')
-    expect(lexicon.get('总得')).toBe('zong2 dei3')
+    expect(lexicon.get('地')).toBe('de')
+    expect(lexicon.get('得')).toBe('de')
+    expect(lexicon.get('舍得')).toBe('she3 de')
+    expect(lexicon.get('过得去')).toBe('guo4 de qu4')
+    expect(lexicon.get('忽地')).toBe('hu1 de')
+    expect(lexicon.get('突地')).toBe('tu1 de')
+    expect(lexicon.get('总得')).toBe('zong3 dei3')
   })
 
   it('keeps 过 as guo4 instead of an untrained neutral phone', () => {
@@ -106,11 +107,11 @@ describe('matcha lexicon patch', () => {
 
   it('keeps V+不得 base readings for the overlay to correct', () => {
     const lexicon = parseLexicon(readFile(lexiconFile))
-    expect(lexicon.get('怪不得')).toBe('guai4 bu4 de2')
-    expect(lexicon.get('舍不得')).toBe('she3 bu4 de2')
+    expect(lexicon.get('怪不得')).toBe('guai4 bu4 de')
+    expect(lexicon.get('舍不得')).toBe('she3 bu4 de')
     expect(lexicon.get('算不得')).toBe('suan4 bu4 de')
-    expect(lexicon.get('不记得')).toBe('bu2 ji4 de2')
-    expect(lexicon.get('少不得')).toBe('shao4 bu4 de2')
+    expect(lexicon.get('不记得')).toBe('bu2 ji4 de')
+    expect(lexicon.get('少不得')).toBe('shao3 bu4 de')
   })
 
   it('never uses neutral phones the acoustic model was not trained on', () => {

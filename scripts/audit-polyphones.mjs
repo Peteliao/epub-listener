@@ -64,8 +64,8 @@ function parseLexicon(text) {
     const trimmed = line.trim()
     if (!trimmed) continue
     const [word, ...phones] = trimmed.split(/\s+/)
-    // sherpa-onnx keeps the first duplicate, so the audit must do the same.
-    if (!entries.has(word)) entries.set(word, phones.join(' '))
+    // Matcha assigns each entry into a map, so the last duplicate wins.
+    entries.set(word, phones.join(' '))
   }
   return entries
 }

@@ -38,6 +38,20 @@ const CLOSERS = new Set(['”', '’', '」', '』', '）', '】', '》', '〉',
 const SPEAKABLE = /[\p{L}\p{N}]/gu
 const HAN = /\p{Script=Han}/u
 
+/**
+ * Whether the text closes a sentence. A trailing closing quote or bracket
+ * counts as an ending, because at a block boundary it normally closes a
+ * quoted utterance.
+ */
+export function endsWithSentenceMark(text: string): boolean {
+  let index = text.length - 1
+  while (index >= 0 && /\s/.test(text[index]!)) index -= 1
+  if (index < 0) return false
+  const last = text[index]!
+  if (CLOSERS.has(last) || last === '"' || last === "'") return true
+  return TERMINATORS.has(last) || last === '.'
+}
+
 const QUOTE_PAIRS: Record<string, string> = {
   '“': '”',
   '「': '」',

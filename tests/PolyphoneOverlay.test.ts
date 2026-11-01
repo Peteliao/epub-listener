@@ -45,14 +45,17 @@ function parseOverlay(): Map<string, string> {
   return entries
 }
 
-function parseLexiconFirstWins(): Map<string, string> {
+// Matcha's space-format lexicon is stored with map assignment, so a later
+// line replaces an earlier one for the same word (sherpa-onnx v2.0.0
+// offline-tts-matcha-impl.h). The overlay is appended after duplicated lines
+// are removed, which is why its entries always win.
+function parseLexiconLastWins(): Map<string, string> {
   const entries = new Map<string, string>()
   for (const line of readModelFile(lexiconFile).split(/\r?\n/)) {
     const trimmed = line.trim()
     if (!trimmed) continue
     const [word, ...phones] = trimmed.split(/\s+/)
-    // sherpa-onnx ignores duplicated words, so the first entry is effective.
-    if (!entries.has(word)) entries.set(word, phones.join(' '))
+    entries.set(word, phones.join(' '))
   }
   return entries
 }
@@ -67,7 +70,7 @@ function parseTokens(): Set<string> {
 }
 
 const overlay = parseOverlay()
-const lexicon = parseLexiconFirstWins()
+const lexicon = parseLexiconLastWins()
 const tokens = parseTokens()
 
 const effective = new Map(lexicon)
@@ -177,12 +180,27 @@ describe('polyphone overlay', () => {
     expect(offenders).toEqual([])
   })
 
-  it('never repeats an existing correct reading', () => {
-    const redundant: string[] = []
-    for (const [word, reading] of overlay) {
-      if (lexicon.get(word) === reading) redundant.push(word)
+  it('pins every base duplicate whose later line is stale', () => {
+    // Matcha's map assignment lets the last line win. These words end with an
+    // older reading in lexicon.v3.txt, so the overlay must carry the audited
+    // one explicitly or the runtime silently uses the stale reading.
+    const expected: Record<string, string> = {
+      了解: 'liao2 jie3',
+      可以: 'ke2 yi3',
+      长者: 'zhang2 zhe3',
+      姥姥: 'lao2 lao3',
+      总得: 'zong2 dei3',
+      地表水: 'di4 biao2 shui3',
+      大夫: 'dai4 fu1',
+      见得: 'jian4 de',
     }
-    expect(redundant).toEqual([])
+    for (const [word, reading] of Object.entries(expected)) {
+      expect(effective.get(word), word).toBe(reading)
+    }
+    // 地 defaults to the adverbial particle; noun compounds keep di4.
+    expect(effective.get('地')).toBe('de')
+    expect(effective.get('地图')).toBe('di4 tu2')
+    expect(effective.get('得')).toBe('de')
   })
 
   it('encodes the intended readings for high-frequency polyphones', () => {
@@ -640,6 +658,48 @@ describe('polyphone overlay', () => {
     ]
     for (const [text, char, occurrence, phone] of cases) {
       expect(readingAt(text, char, occurrence), text).toBe(phone)
+    }
+  })
+
+  it('fixes the reported 反差 and 长出气 families', () => {
+    expect(overlay.get('反差')).toBe('fan3 cha1')
+    expect(overlay.get('差分放大器')).toBe('cha1 fen1 fang4 da4 qi4')
+    expect(overlay.get('差失')).toBe('cha1 shi1')
+    expect(overlay.get('差误')).toBe('cha1 wu4')
+    expect(overlay.get('差官')).toBe('chai1 guan1')
+    expect(overlay.get('长出了一口气')).toBe('chang2 chu1 le yi4 kou3 qi4')
+    expect(overlay.get('长出一口气')).toBe('chang2 chu1 yi4 kou3 qi4')
+    expect(overlay.get('长出了口气')).toBe('chang2 chu1 le kou3 qi4')
+    expect(overlay.get('长舒一口气')).toBe('chang2 shu1 yi4 kou3 qi4')
+    expect(overlay.get('长舒了一口气')).toBe('chang2 shu1 le yi4 kou3 qi4')
+    expect(overlay.get('长吐一口气')).toBe('chang2 tu3 yi4 kou3 qi4')
+    expect(overlay.get('长吐了一口气')).toBe('chang2 tu3 le yi4 kou3 qi4')
+    expect(overlay.get('长吁一口气')).toBe('chang2 xu1 yi4 kou3 qi4')
+    expect(overlay.get('长吁了一口气')).toBe('chang2 xu1 le yi4 kou3 qi4')
+
+    expect(readingAt('造就了惊人的历史反差', '差', 1)).toBe('cha1')
+    expect(readingAt('这是一台差分放大器', '差', 1)).toBe('cha1')
+    expect(readingAt('若有差失，乞斩全家', '差', 1)).toBe('cha1')
+    expect(readingAt('这是他的差误', '差', 1)).toBe('cha1')
+    expect(readingAt('差官赶来', '差', 1)).toBe('chai1')
+    expect(readingAt('幽冥王长出了一口气', '长', 1)).toBe('chang2')
+    expect(readingAt('怎奈，秦国始终未能拿到督亢地图', '地', 1)).toBe('di4')
+    expect(tokenize('怎奈，秦国始终未能拿到督亢地图')).toContain('地图')
+    expect(readingAt('他长出一口气', '长', 1)).toBe('chang2')
+    expect(readingAt('他长出了口气', '长', 1)).toBe('chang2')
+    expect(readingAt('她长舒了一口气', '长', 1)).toBe('chang2')
+    expect(readingAt('他长吐一口气', '长', 1)).toBe('chang2')
+    expect(readingAt('老人长吁了一口气', '长', 1)).toBe('chang2')
+
+    for (const [text, word] of [
+      ['幽冥王长出了一口气', '长出了一口气'],
+      ['他长出一口气', '长出一口气'],
+      ['他长出了口气', '长出了口气'],
+      ['她长舒了一口气', '长舒了一口气'],
+      ['他长吐一口气', '长吐一口气'],
+      ['老人长吁了一口气', '长吁了一口气'],
+    ] as const) {
+      expect(tokenize(text)).toContain(word)
     }
   })
 })

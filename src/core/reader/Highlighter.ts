@@ -1,4 +1,4 @@
-import { splitSentences } from '../text/SentenceSplitter'
+import { endsWithSentenceMark, splitSentences } from '../text/SentenceSplitter'
 import { normalizeSpeechText } from '../text/TextNormalizer'
 
 interface CharRef {
@@ -84,6 +84,12 @@ export const BLOCK_TAGS = new Set([
   'DETAILS',
   'SUMMARY',
   'HR',
+])
+
+// Boundaries after these blocks always break a sentence, even without punctuation.
+const HARD_BREAK_TAGS = new Set([
+  'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'LI', 'DT', 'DD', 'TR', 'TD', 'TH', 'PRE',
 ])
 
 const STYLE_ID = 'shusheng-sentence-style'
@@ -360,9 +366,20 @@ export class Highlighter {
 
     const parts: string[] = []
     const chars: Array<CharRef | null> = []
+    // Last visible characters across text nodes, so a closing quote in its own
+    // element still counts as the end of the block.
+    let tail = ''
 
-    const appendBoundary = () => {
-      parts.push('\n')
+    // In hard-wrapped EPUBs a line break can fall inside a word (后/世,
+    // 孟/姜女, 地/图). A newline there splits the sentence into two speech
+    // units, and Matcha also loses the compound reading because 地 alone
+    // resolves to the particle de. Keep the newline only when the block
+    // really ends a sentence; otherwise use a space that
+    // normalizeSpeechText removes between Han characters.
+    const appendBoundary = (tag = '') => {
+      const hard =
+        !tag || HARD_BREAK_TAGS.has(tag) || endsWithSentenceMark(tail)
+      parts.push(hard ? '\n' : ' ')
       chars.push(null)
     }
 
@@ -377,6 +394,7 @@ export class Highlighter {
           // text node and only real block boundaries stay hard breaks.
           const text = data.replace(/[\r\n\t]/g, ' ')
           parts.push(text)
+          tail = (tail + text).trimEnd().slice(-16)
           for (let offset = 0; offset < text.length; offset += 1) {
             chars.push({ node: textNode, offset })
           }
@@ -389,12 +407,12 @@ export class Highlighter {
 
         const tag = element.tagName.toUpperCase()
         if (tag === 'BR') {
-          appendBoundary()
+          appendBoundary(tag)
           continue
         }
 
         walk(element)
-        if (BLOCK_TAGS.has(tag)) appendBoundary()
+        if (BLOCK_TAGS.has(tag)) appendBoundary(tag)
       }
     }
 

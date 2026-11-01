@@ -21,6 +21,23 @@ describe('normalizeSpeechText', () => {
     expect(normalizeSpeechText('作 者：林 深')).toBe('作者：林深')
   })
 
+  it('joins Han text split by a source newline or paragraph boundary', () => {
+    expect(normalizeSpeechText('透过后\n世对他的高歌与唾骂。')).toBe(
+      '透过后世对他的高歌与唾骂。',
+    )
+    expect(normalizeSpeechText('始终吹不尽的是孟\r\n姜女千年哭咒。')).toBe(
+      '始终吹不尽的是孟姜女千年哭咒。',
+    )
+    expect(normalizeSpeechText('怎奈，秦国始终未能拿到督亢\n地图。')).toBe(
+      '怎奈，秦国始终未能拿到督亢地图。',
+    )
+    expect(normalizeSpeechText('200\n年')).toBe('两百年')
+    // Latin line breaks are not Chinese layout artifacts and stay intact.
+    expect(normalizeSpeechText('first line\nsecond line')).toBe(
+      'first line\nsecond line',
+    )
+  })
+
   it('keeps spaces that separate Latin words from Chinese text', () => {
     expect(normalizeSpeechText('打开 MacBook Pro 开始阅读')).toBe(
       '打开 MacBook Pro 开始阅读',
@@ -138,6 +155,16 @@ describe('normalizeSpeechText', () => {
       '热线四零零一二三四五六七',
     )
     expect(normalizeSpeechText('满½杯')).toBe('满二分之一杯')
+  })
+
+  it('reads 2点30分 as 两点半 instead of 二点三十分', () => {
+    expect(normalizeSpeechText('下午2点30分')).toBe('下午两点半')
+    expect(normalizeSpeechText('2点30分出发')).toBe('两点半出发')
+    expect(normalizeSpeechText('2点05分')).toBe('两点零五分')
+    expect(normalizeSpeechText('2点整')).toBe('两点整')
+    expect(normalizeSpeechText('2点半')).toBe('两点半')
+    expect(normalizeSpeechText('12点30分')).toBe('12点30分')
+    expect(normalizeSpeechText('22点30分')).toBe('22点30分')
   })
 
   it('spells out ASCII speed and area units in Chinese text', () => {

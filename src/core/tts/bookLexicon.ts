@@ -166,8 +166,10 @@ function parseLexicon(text: string): Map<string, string> {
     const trimmed = line.trim()
     if (!trimmed) continue
     const [word, ...phones] = trimmed.split(/\s+/)
-    // sherpa-onnx keeps the first duplicate line, so the generator must too.
-    if (!entries.has(word)) entries.set(word, phones.join(' '))
+    // Matcha stores its space-format lexicon with map assignment, so a later
+    // duplicate replaces an earlier one (sherpa-onnx v2.0.0). The generator
+    // must mirror that or it will skip words the runtime still reads wrong.
+    entries.set(word, phones.join(' '))
   }
   return entries
 }

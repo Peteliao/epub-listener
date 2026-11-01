@@ -48,6 +48,50 @@ describe('Highlighter', () => {
     expect(speechText).not.toContain(' ')
   })
 
+  it('joins words split by a <br> line break', () => {
+    const highlighter = build('<p>透过后<br>世对他的高歌与唾骂。</p>')
+
+    expect(highlighter.sentences).toHaveLength(1)
+    expect(highlighter.sentences[0]!.speechText).toBe(
+      '透过后世对他的高歌与唾骂。',
+    )
+  })
+
+  it('joins words split by block boundaries without punctuation', () => {
+    const highlighter = build(
+      '<p>始终吹不尽的是孟</p><p>姜女千年哭咒。</p><p>怎奈，秦国始终未能拿到督亢<br/>地图。</p>',
+    )
+
+    expect(highlighter.sentences.map((sentence) => sentence.speechText)).toEqual([
+      '始终吹不尽的是孟姜女千年哭咒。',
+      '怎奈，秦国始终未能拿到督亢地图。',
+    ])
+  })
+
+  it('joins 地图 when the wrap falls between 地 and 图', () => {
+    const highlighter = build(
+      '<p>怎奈，秦国始终未能拿到督亢地<br/>图，大军只得在城外安营扎寨。</p>',
+    )
+
+    expect(highlighter.sentences).toHaveLength(1)
+    expect(highlighter.sentences[0]!.speechText).toBe(
+      '怎奈，秦国始终未能拿到督亢地图，大军只得在城外安营扎寨。',
+    )
+  })
+
+  it('keeps headings and list items as separate sentences', () => {
+    const highlighter = build(
+      '<h1>第一章</h1><ul><li>第一件事</li><li>第二件事</li></ul><p>他走进屋子，看到桌上有一封没有署名的信。</p>',
+    )
+
+    expect(highlighter.sentences.map((sentence) => sentence.text)).toEqual([
+      '第一章',
+      '第一件事',
+      '第二件事',
+      '他走进屋子，看到桌上有一封没有署名的信。',
+    ])
+  })
+
   it('never merges sentences across block elements', () => {
     const highlighter = build(
       '<p>第一段文字内容足够长一些。</p><p>第二段文字内容也足够长。</p>',

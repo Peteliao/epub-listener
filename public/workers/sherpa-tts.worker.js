@@ -360,8 +360,9 @@ async function writeModelFiles(fs, data, dir) {
   }
 }
 
-// sherpa-onnx ignores duplicate lexicon words (first entry wins), so overrides
-// only take effect after the original lines for those words are removed.
+// Matcha assigns its space-format lexicon into a map, so the last line for a
+// word wins. Overrides only take effect after the original lines for those
+// words are removed; appending them at the end then pins the intended reading.
 function patchLexicon(buffer, overlay) {
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()

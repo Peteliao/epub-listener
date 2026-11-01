@@ -575,3 +575,28 @@
 红白相间 hong2 bai2 xiang1 jian4
 想过重逢 xiang3 guo4 chong2 feng2
 结实累累 jie1 shi lei2 lei2
+# 词库条目错误与“长出/长出气”语义歧义；按字族补齐。
+反差 fan3 cha1
+差分放大器 cha1 fen1 fang4 da4 qi4
+差失 cha1 shi1
+差误 cha1 wu4
+差官 chai1 guan1
+长出了一口气 chang2 chu1 le yi4 kou3 qi4
+长出一口气 chang2 chu1 yi4 kou3 qi4
+长出了口气 chang2 chu1 le kou3 qi4
+长舒一口气 chang2 shu1 yi4 kou3 qi4
+长舒了一口气 chang2 shu1 le yi4 kou3 qi4
+长吐一口气 chang2 tu3 yi4 kou3 qi4
+长吐了一口气 chang2 tu3 le yi4 kou3 qi4
+长吁一口气 chang2 xu1 yi4 kou3 qi4
+长吁了一口气 chang2 xu1 le yi4 kou3 qi4
+# Matcha 对重复词条是后到先得，以下词在基础词典里首条是修正读音、
+# 末条却是旧读音，必须显式钉住，否则实际发音会退回末条。
+了解 liao2 jie3
+可以 ke2 yi3
+长者 zhang2 zhe3
+姥姥 lao2 lao3
+总得 zong2 dei3
+地表水 di4 biao2 shui3
+大夫 dai4 fu1
+见得 jian4 de

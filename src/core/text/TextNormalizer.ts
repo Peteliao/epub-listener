@@ -12,10 +12,13 @@ const CJK_CONTEXT =
   /[\p{Script=Han}\u3000-\u303f\uff01-\uff0f\uff1a-\uff20\uff3b-\uff40\uff5b-\uff65\uffe5]/u
 // Matcha turns a gap between Han characters into an extra syllable ("序 言"
 // comes out like "序托言"). The same happens after a digit ("200 年" gains an
-// extra syllable between 0 and 年), so both kinds of gap are dropped.
-const HAN_GAP = /(\p{Script=Han})[ \t]+(?=\p{Script=Han})/gu
+// extra syllable between 0 and 年), so both kinds of gap are dropped. The
+// reader already spaces hard-wrapped line breaks, but a newline that reaches
+// Matcha is also a breath pause and stops the longest-match lookup, so
+// 地\n图 falls back to single-character 地 and its particle reading de.
+const HAN_GAP = /(\p{Script=Han})\s+(?=\p{Script=Han})/gu
 const DIGIT_HAN_GAP =
-  /(?<=\d)[ \t]+(?=\p{Script=Han})|(?<=\p{Script=Han})[ \t]+(?=\d)/gu
+  /(?<=\d)\s+(?=\p{Script=Han})|(?<=\p{Script=Han})\s+(?=\d)/gu
 // A space that reaches Matcha is emitted as its own token, which the model
 // voices as an "a"-like syllable: “（无关） 为争夺” is heard as 为A争夺.
 // Chinese punctuation never takes spaces, so drop them on either side.
@@ -401,7 +404,7 @@ function normalizeFractions(input: string): string {
 
 // 3:30 → 三点半, 14:05 → 十四点零五分. Colons with seconds are left alone.
 function normalizeTimes(input: string): string {
-  return input.replace(
+  const text = input.replace(
     /(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)(?!:\d{2})/g,
     (match, hour: string, minute: string, offset: number) => {
       if (!isChineseNumberContext(input, offset, offset + match.length)) return match
@@ -410,6 +413,20 @@ function normalizeTimes(input: string): string {
       if (minute === '30') return `${prefix}点半`
       const minutes = Number(minute)
       return `${prefix}点${minutes < 10 ? '零' : ''}${integerToChinese(minute)}分`
+    },
+  )
+
+  // The generic 2→两 rule leaves "2点30分" to number.fst, but the FST reads
+  // the hour as 二. Only the minute-bearing form is a time; "2点5米" is a
+  // decimal and must keep 二, so 分 is required here.
+  return text.replace(
+    /(?<!\d)2\s*点\s*(\d{1,2})\s*分/g,
+    (match, minute: string) => {
+      const value = Number(minute)
+      if (!Number.isFinite(value) || value > 59) return match
+      if (value === 0) return '两点整'
+      if (value === 30) return '两点半'
+      return `两点${value < 10 ? '零' : ''}${integerToChinese(minute)}分`
     },
   )
 }
