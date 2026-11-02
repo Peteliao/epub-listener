@@ -600,3 +600,43 @@
 地表水 di4 biao2 shui3
 大夫 dai4 fu1
 见得 jian4 de
+# 2026-11-02 听音反馈：归还义“还”、年岁义“载”，以及长/溜/奘等。
+# 还 = huan2：短语嵌在“不还/有还”里，不会与副词 hai2 的“还有”冲突。
+有借有还 you3 jie4 you3 huan2
+借了不还 jie4 le bu4 huan2
+欠债不还 qian4 zhai4 bu4 huan2
+欠钱不还 qian4 qian2 bu4 huan2
+借钱不还 jie4 qian2 bu4 huan2
+久借不还 jiu3 jie4 bu4 huan2
+久欠不还 jiu3 qian4 bu4 huan2
+到期不还 dao4 qi1 bu4 huan2
+逾期不还 yu2 qi1 bu4 huan2
+迟迟不还 chi2 chi2 bu4 huan2
+一去不还 yi2 qu4 bu4 huan2
+背约不还 bei4 yue1 bu4 huan2
+# 载 = zai3（年岁/记载）；zai4（装载）的错条一并修正。
+十载 shi2 zai3
+数载 shu4 zai3
+几载 ji2 zai3
+两载 liang2 zai3
+三载 san2 zai3
+五载 wu2 zai3
+千载 qian1 zai3
+一年半载 yi4 nian2 ban4 zai3
+三年五载 san1 nian2 wu2 zai3
+十年八载 shi2 nian2 ba1 zai3
+千秋万载 qian1 qiu1 wan4 zai3
+万载千秋 wan4 zai3 qian1 qiu1
+连载 lian2 zai3
+载入史册 zai3 ru4 shi3 ce4
+卸载 xie4 zai4
+荷载 he4 zai4
+# 以下词基础词典本就正确，钉住以防上下文或后到词条把读音带偏。
+偷偷 tou1 tou1
+偷偷摸摸 tou1 tou1 mo1 mo1
+则填着 ze2 tian2 zhe
+灰尘 hui1 chen2
+长信 chang2 xin4
+地址 di4 zhi3
+一溜烟 yi2 liu4 yan1
+玄奘 xuan2 zang4

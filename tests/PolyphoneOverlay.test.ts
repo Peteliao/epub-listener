@@ -702,4 +702,83 @@ describe('polyphone overlay', () => {
       expect(tokenize(text)).toContain(word)
     }
   })
+
+  it('fixes the readings reported on 2026-11-02', () => {
+    const expected: Record<string, string> = {
+      偷偷: 'tou1 tou1',
+      偷偷摸摸: 'tou1 tou1 mo1 mo1',
+      有借有还: 'you3 jie4 you3 huan2',
+      借了不还: 'jie4 le bu4 huan2',
+      欠债不还: 'qian4 zhai4 bu4 huan2',
+      欠钱不还: 'qian4 qian2 bu4 huan2',
+      借钱不还: 'jie4 qian2 bu4 huan2',
+      久借不还: 'jiu3 jie4 bu4 huan2',
+      久欠不还: 'jiu3 qian4 bu4 huan2',
+      到期不还: 'dao4 qi1 bu4 huan2',
+      逾期不还: 'yu2 qi1 bu4 huan2',
+      迟迟不还: 'chi2 chi2 bu4 huan2',
+      一去不还: 'yi2 qu4 bu4 huan2',
+      背约不还: 'bei4 yue1 bu4 huan2',
+      十载: 'shi2 zai3',
+      数载: 'shu4 zai3',
+      几载: 'ji2 zai3',
+      两载: 'liang2 zai3',
+      三载: 'san2 zai3',
+      五载: 'wu2 zai3',
+      千载: 'qian1 zai3',
+      一年半载: 'yi4 nian2 ban4 zai3',
+      三年五载: 'san1 nian2 wu2 zai3',
+      十年八载: 'shi2 nian2 ba1 zai3',
+      千秋万载: 'qian1 qiu1 wan4 zai3',
+      万载千秋: 'wan4 zai3 qian1 qiu1',
+      连载: 'lian2 zai3',
+      卸载: 'xie4 zai4',
+      荷载: 'he4 zai4',
+      载入史册: 'zai3 ru4 shi3 ce4',
+      则填着: 'ze2 tian2 zhe',
+      灰尘: 'hui1 chen2',
+      长信: 'chang2 xin4',
+      地址: 'di4 zhi3',
+      一溜烟: 'yi2 liu4 yan1',
+      玄奘: 'xuan2 zang4',
+    }
+    for (const [word, reading] of Object.entries(expected)) {
+      expect(overlay.get(word), word).toBe(reading)
+    }
+
+    expect(readingAt('俺老孙定是有借有还的', '还', 1)).toBe('huan2')
+    expect(readingAt('你为何背约不还', '还', 1)).toBe('huan2')
+    expect(readingAt('他欠债不还', '还', 1)).toBe('huan2')
+    expect(readingAt('这钱他迟迟不还', '还', 1)).toBe('huan2')
+    expect(readingAt('他竟一去不还', '还', 1)).toBe('huan2')
+    expect(readingAt('将这封寄往省城的长信', '长', 1)).toBe('chang2')
+    expect(readingAt('忽已过去整整十载', '载', 1)).toBe('zai3')
+    expect(readingAt('分别已数载', '载', 1)).toBe('zai3')
+    expect(readingAt('千载难逢', '载', 1)).toBe('zai3')
+    expect(readingAt('一溜烟出城了', '溜', 1)).toBe('liu4')
+    expect(readingAt('地址是槐树巷十七号', '址', 1)).toBe('zhi3')
+    expect(readingAt('玄奘', '奘', 1)).toBe('zang4')
+    expect(readingAt('下载完成后卸载', '载', 2)).toBe('zai4')
+
+    // The adverb 还 and the carry sense of 载 must not be captured by the
+    // new phrase pins.
+    expect(readingAt('俺你还信不过吗', '还', 1)).toBe('hai2')
+    expect(readingAt('他还有情有义', '还', 1)).toBe('hai2')
+    expect(readingAt('这封信还有下文', '还', 1)).toBe('hai2')
+    expect(tokenize('他还有情有义')).not.toContain('还情')
+
+    expect(tokenize('小白龙偷偷潜入了宫殿')).toContain('偷偷')
+    expect(tokenize('寄件人一栏，则填着半山老屋的门牌')).toContain('则填着')
+    expect(tokenize('灰尘在穿透破瓦漏下的惨白天光里')).toContain('灰尘')
+    expect(tokenize('将这封寄往省城的长信投进了')).toContain('长信')
+    expect(tokenize('忽已过去整整十载')).toContain('十载')
+    expect(tokenize('你为何背约不还')).toContain('背约不还')
+    expect(tokenize('地址是槐树巷十七号')).toContain('地址')
+    expect(tokenize('一溜烟出城了')).toContain('一溜烟')
+    expect(tokenize('玄奘')).toContain('玄奘')
+    expect(tokenize('俺老孙定是有借有还的')).toContain('有借有还')
+    expect(tokenize('三年五载')).toContain('三年五载')
+    expect(tokenize('万载千秋')).toContain('万载千秋')
+    expect(tokenize('下载完成后卸载')).toContain('卸载')
+  })
 })

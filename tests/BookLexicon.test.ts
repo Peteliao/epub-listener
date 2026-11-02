@@ -76,6 +76,36 @@ describe('generateBookLexicon', () => {
     expect(result.entries.map((entry) => entry.word)).not.toContain('校长')
   })
 
+  it('does not override the readings reported on 2026-11-02', () => {
+    const result = generate([
+      '小白龙偷偷潜入了宫殿。',
+      '俺老孙定是有借有还的。',
+      '你为何背约不还。',
+      '寄件人一栏，则填着半山老屋门牌。',
+      '灰尘在穿透破瓦漏下的惨白天光里浮游。',
+      '将这封寄往省城的长信投进了邮筒。',
+      '忽已过去整整十载。',
+      '地址是槐树巷十七号。',
+      '一溜烟出城了。',
+      '玄奘法师。',
+    ])
+    const generated = new Set(result.entries.map((entry) => entry.word))
+    for (const word of [
+      '偷偷',
+      '有借有还',
+      '背约不还',
+      '则填着',
+      '灰尘',
+      '长信',
+      '十载',
+      '地址',
+      '一溜烟',
+      '玄奘',
+    ]) {
+      expect(generated.has(word), word).toBe(false)
+    }
+  })
+
   it('rejects readings that need a neutral phone outside the whitelist', () => {
     const result = generate(['师傅点了点头，没有说话。'])
     expect(result.entries.map((entry) => entry.word)).not.toContain('师傅')
