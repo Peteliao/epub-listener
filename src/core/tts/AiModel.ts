@@ -31,6 +31,7 @@ export interface AiVoiceStatus {
   packId: string
   packName: string
   lang: AiPackLang
+  modelType: AiModelType
   commercialUse: boolean
   licenseLabel: string
 }
@@ -1002,6 +1003,7 @@ export class AiModelManager {
           packId: pack.id,
           packName: pack.name,
           lang: pack.lang === 'en' ? 'en' : 'zh',
+          modelType: pack.model.type,
           commercialUse: pack.license.commercialUse,
           licenseLabel: pack.license.label,
         }
@@ -1146,6 +1148,7 @@ export class AiModelManager {
           packId: pack.id,
           packName: pack.name,
           lang: pack.lang === 'en' ? 'en' : 'zh',
+          modelType: pack.model.type,
           commercialUse: pack.license.commercialUse,
           licenseLabel: pack.license.label,
         })),

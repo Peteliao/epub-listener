@@ -35,6 +35,11 @@ import { bindStageTaps } from '@/core/reader/stageTap'
 import { normalizeEnglishSpeech } from '@/core/text/englishText'
 import { shouldSkipEnglishChunk } from '@/core/text/englishSkip'
 import { isIOSDevice } from '@/core/tts/systemVoice'
+import { buildFeedbackParagraphs } from '@/core/feedback/paragraphs'
+import type {
+  FeedbackSnapshot,
+  FeedbackVoice,
+} from '@/core/feedback/types'
 import { estimateRemainingMs } from './listenTime'
 
 type ChunkEngine = 'ai' | 'system'
@@ -236,6 +241,70 @@ export class ReaderController {
 
   getBookLexiconStatus(): BookLexiconStatus {
     return this.bookLexicon.getStatus()
+  }
+
+  getFeedbackSnapshot(): FeedbackSnapshot | null {
+    const highlighter = this.highlighter
+    if (!highlighter || this.sentenceCount === 0) return null
+    const chapter = this.chapters[this.chapterIndex] ?? null
+    const lexicon = this.bookLexicon.getReportInfo()
+    const targetEngine: TtsEngine =
+      this.activeEngine ??
+      (this.settings.engine === 'sherpa' ? 'sherpa' : 'system')
+
+    let voice: FeedbackVoice
+    if (targetEngine === 'sherpa') {
+      const selected = this.ai.getVoice(this.settings.aiVoiceId)
+      const pack =
+        this.aiStatus.packs.find((item) => item.id === selected?.packId) ?? null
+      voice = {
+        engine: 'sherpa',
+        activeEngine: this.activeEngine,
+        activeLang: this.activeLang,
+        voiceId: selected?.id ?? this.settings.aiVoiceId,
+        voiceLabel: selected?.label ?? '离线 AI 音色',
+        packId: selected?.packId ?? null,
+        packVersion: pack?.version ?? this.aiStatus.version,
+        modelType: selected?.modelType ?? null,
+        overlaySupported: selected?.modelType === 'matcha',
+        autoBookPolyphones: lexicon.enabled,
+        bookLexiconVersion: lexicon.version,
+        curatedHash: lexicon.curatedHash,
+      }
+    } else {
+      const systemVoice =
+        this.speech
+          .getVoices()
+          .find((item) => item.uri === this.settings.voiceURI) ?? null
+      voice = {
+        engine: 'system',
+        activeEngine: this.activeEngine,
+        activeLang: this.activeLang,
+        voiceId: this.settings.voiceURI ?? 'auto',
+        voiceLabel: systemVoice?.name ?? '系统语音',
+        packId: null,
+        packVersion: '',
+        modelType: null,
+        overlaySupported: false,
+        autoBookPolyphones: lexicon.enabled,
+        bookLexiconVersion: lexicon.version,
+        curatedHash: lexicon.curatedHash,
+      }
+    }
+
+    return {
+      chapterIndex: this.chapterIndex,
+      chapterLabel: this.chapterLabel,
+      chapterHref: chapter?.href ?? '',
+      sentenceIndex: this.sentenceIndex,
+      sentenceEndIndex: this.sentenceEndIndex,
+      paragraphs: buildFeedbackParagraphs(
+        highlighter.sentences,
+        this.sentenceIndex,
+        chapter?.href ?? '',
+      ),
+      voice,
+    }
   }
 
   async init(): Promise<ChapterInfo[]> {

@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { BookSummary, StoredBook, StoredProgress } from '@/types'
+import type { PronunciationReport } from '@/core/feedback/types'
 
 export interface StoredBookLexicon {
   bookId: string
@@ -30,10 +31,15 @@ interface LibrarySchema extends DBSchema {
     key: string
     value: Blob | null
   }
+  pronunciationReports: {
+    key: string
+    value: PronunciationReport
+    indexes: { 'by-createdAt': number }
+  }
 }
 
 const DB_NAME = 'shusheng-library'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 let database: Promise<IDBPDatabase<LibrarySchema>> | null = null
 
@@ -50,6 +56,12 @@ function getDatabase(): Promise<IDBPDatabase<LibrarySchema>> {
         }
         if (oldVersion < 3) {
           db.createObjectStore('covers')
+        }
+        if (oldVersion < 4) {
+          const reports = db.createObjectStore('pronunciationReports', {
+            keyPath: 'id',
+          })
+          reports.createIndex('by-createdAt', 'createdAt')
         }
       },
     })
@@ -153,4 +165,26 @@ export async function getBookLexicon(
 export async function saveBookLexicon(entry: StoredBookLexicon): Promise<void> {
   const db = await getDatabase()
   await db.put('bookLexicons', entry)
+}
+
+export async function savePronunciationReport(
+  report: PronunciationReport,
+): Promise<void> {
+  const db = await getDatabase()
+  await db.put('pronunciationReports', report)
+}
+
+export async function listPronunciationReports(): Promise<PronunciationReport[]> {
+  const db = await getDatabase()
+  return db.getAllFromIndex('pronunciationReports', 'by-createdAt')
+}
+
+export async function countPronunciationReports(): Promise<number> {
+  const db = await getDatabase()
+  return db.count('pronunciationReports')
+}
+
+export async function removePronunciationReport(id: string): Promise<void> {
+  const db = await getDatabase()
+  await db.delete('pronunciationReports', id)
 }

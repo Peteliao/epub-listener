@@ -27,6 +27,7 @@ const props = defineProps<{
   isPlaying: boolean
   diagnostics: ReaderDiagnostics | null
   buildId: string
+  reportCount: number
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +41,8 @@ const emit = defineEmits<{
   downloadAi: [packId: string, voiceId?: string]
   removeAi: [packId: string]
   openStats: []
+  openFeedback: []
+  openReports: []
 }>()
 
 const isIos = isIOSDevice()
@@ -1110,6 +1113,41 @@ function removeEnglishPack(): void {
     <section class="setting">
       <div class="voice-head">
         <div>
+          <h3 class="setting__title">读音反馈</h3>
+          <p class="voice-sub">
+            {{
+              reportCount
+                ? `已保存 ${reportCount} 条本机记录`
+                : '听到多音字读错时，标记正确读音'
+            }}
+          </p>
+        </div>
+        <div class="feedback-actions">
+          <button
+            v-if="reportCount"
+            type="button"
+            class="voice-refresh"
+            @click="emit('openReports')"
+          >
+            记录
+          </button>
+          <button
+            type="button"
+            class="voice-refresh"
+            @click="emit('openFeedback')"
+          >
+            标记
+          </button>
+        </div>
+      </div>
+      <p class="setting__note">
+        反馈先保存在本机；可在记录里导出 JSONL，或打开 GitHub 提交。
+      </p>
+    </section>
+
+    <section class="setting">
+      <div class="voice-head">
+        <div>
           <h3 class="setting__title">听书统计</h3>
           <p class="voice-sub">累计时长、连续收听与分享卡</p>
         </div>
@@ -1268,6 +1306,12 @@ function removeEnglishPack(): void {
   font-size: 9.5px;
   letter-spacing: 0.06em;
   color: var(--app-muted);
+}
+
+.feedback-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .voice-head {

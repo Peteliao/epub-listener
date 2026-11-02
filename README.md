@@ -98,6 +98,12 @@ Vue 3 · TypeScript · Vite · Pinia · epub.js · foliate-js · sherpa-onnx (WA
     npm run build
     npm run preview
 
+从「读音反馈记录」导出 JSONL 后，可汇总成读音词典候选：
+
+    npm run reports:overlay -- pronunciation-reports-20261102.jsonl --out=scripts/out/overlay-candidates.txt
+
+脚本只接受 2–4 字词组，单字语境会跳过，避免全局覆盖；合并前请人工复核。
+
 ## 部署
 
 推送到 `main` 后，由 `.github/workflows/deploy.yml` 自动执行测试、构建并发布到 GitHub Pages（仓库 Settings → Pages → Source 需选择 GitHub Actions）。
@@ -120,6 +126,7 @@ Vue 3 · TypeScript · Vite · Pinia · epub.js · foliate-js · sherpa-onnx (WA
 
 - 无后端：所有导入的电子书、阅读进度、设置仅保存在本机
 - 离线朗读（中文与英文）都在本机合成，文本不会发给第三方语音服务
+- 读音反馈默认仅保存在本机。主动点击「去 GitHub 提交」时，应用只预填所选段落、读音标记与音色/版本信息，需要你在 GitHub 页面确认后提交，内容将公开可见
 - 电子书视为不可信输入：阅读 iframe 禁用脚本，图片、样式、字体仅允许 `data:` / `blob:`，默认阻止远程资源
 - 单个文件导入上限 200 MB
 - AI 模型下载后做 SHA-256 完整性校验
@@ -129,6 +136,10 @@ Vue 3 · TypeScript · Vite · Pinia · epub.js · foliate-js · sherpa-onnx (WA
 ### 书籍会上传到服务器吗？
 
 不会。项目没有后端，EPUB、TXT 等书籍、阅读进度和设置只保存在浏览器本机（IndexedDB / localStorage）。
+
+### 读音反馈会上传什么？
+
+反馈记录先写入本机 IndexedDB，不会自动上传。只有点击「去 GitHub 提交」时，才会打开预填好的 issue 页面；其中包含所选段落、标出的字与正确读音、书籍指纹、音色包版本。书名可在提交前取消勾选；提交后内容公开可见。也可以在「读音反馈记录」中复制或导出 JSONL，自行交给开发者汇总。
 
 ### 可以离线听书吗？
 

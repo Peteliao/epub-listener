@@ -21,6 +21,7 @@ type IconName =
   | 'clock'
   | 'theme'
   | 'share'
+  | 'flag'
 
 withDefaults(defineProps<{ name: IconName; size?: number }>(), { size: 20 })
 </script>
@@ -124,6 +125,10 @@ withDefaults(defineProps<{ name: IconName; size?: number }>(), { size: 20 })
       <circle cx="17.6" cy="6" r="2.3" />
       <circle cx="17.6" cy="18" r="2.3" />
       <path d="M8.1 10.9 15.4 7.2M8.1 13.1l7.3 3.7" />
+    </template>
+    <template v-else-if="name === 'flag'">
+      <path d="M6 21V4" />
+      <path d="M6 4.8h11.4l-2.3 3.8 2.3 3.8H6" />
     </template>
   </svg>
 </template>

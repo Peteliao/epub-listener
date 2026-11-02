@@ -15,10 +15,18 @@ import {
   type ReaderTuneKind,
   type StoredBook,
   type VoiceOption,
+  getBookFormat,
 } from '@/types'
 import type { AiModelStatus } from '@/core/tts/AiModel'
 import type { BookLexiconStatus } from '@/core/tts/BookLexiconService'
-import { getBook, getProgress, touchBook } from '@/core/db/LibraryDB'
+import type { FeedbackSnapshot } from '@/core/feedback/types'
+import { computeBookFingerprint } from '@/core/feedback/fingerprint'
+import {
+  countPronunciationReports,
+  getBook,
+  getProgress,
+  touchBook,
+} from '@/core/db/LibraryDB'
 import {
   ReaderController,
   type ReaderDiagnostics,
@@ -30,6 +38,8 @@ import {
 } from '@/core/stats/listeningStats'
 import AppIcon from '@/components/AppIcon.vue'
 import PocketOverlay from '@/components/PocketOverlay.vue'
+import PronunciationFeedbackSheet from '@/components/PronunciationFeedbackSheet.vue'
+import PronunciationReportsSheet from '@/components/PronunciationReportsSheet.vue'
 import ReadingStatsSheet from '@/components/ReadingStatsSheet.vue'
 import ReaderSettingsSheet from '@/components/ReaderSettingsSheet.vue'
 import ReaderTuneSheet from '@/components/ReaderTuneSheet.vue'
@@ -66,6 +76,12 @@ const loadError = ref('')
 const tocOpen = ref(false)
 const settingsOpen = ref(false)
 const statsOpen = ref(false)
+const feedbackOpen = ref(false)
+const reportsOpen = ref(false)
+const feedbackSnapshot = ref<FeedbackSnapshot | null>(null)
+const reportCount = ref(0)
+const bookFingerprint = ref<string | null>(null)
+const fingerprintLoading = ref(false)
 const tuneOpen = ref(false)
 const tuneKind = ref<ReaderTuneKind | null>(null)
 const sleepOpen = ref(false)
@@ -221,8 +237,14 @@ async function boot(): Promise<void> {
   tocOpen.value = false
   settingsOpen.value = false
   statsOpen.value = false
+  feedbackOpen.value = false
+  reportsOpen.value = false
+  feedbackSnapshot.value = null
+  bookFingerprint.value = null
+  fingerprintLoading.value = false
   sleepOpen.value = false
   cancelSleepTimer()
+  refreshReportCount()
   state.value = {
     isPlaying: false,
     isLoading: true,
@@ -249,6 +271,7 @@ async function boot(): Promise<void> {
 
     book.value = stored
     document.title = `${stored.title} · 书声`
+    ensureBookFingerprint(stored)
 
     const [saved] = await Promise.all([
       getProgress(stored.id),
@@ -387,6 +410,56 @@ function openStats(): void {
   settingsOpen.value = false
   controller.value?.cancelVoicePreview()
   statsOpen.value = true
+}
+
+function ensureBookFingerprint(stored: StoredBook): void {
+  if (bookFingerprint.value || fingerprintLoading.value) return
+  fingerprintLoading.value = true
+  void computeBookFingerprint(stored.file, getBookFormat(stored))
+    .then((fingerprint) => {
+      bookFingerprint.value = fingerprint
+    })
+    .finally(() => {
+      fingerprintLoading.value = false
+    })
+}
+
+function refreshReportCount(): void {
+  void countPronunciationReports()
+    .then((count) => {
+      reportCount.value = count
+    })
+    .catch(() => undefined)
+}
+
+function openFeedback(): void {
+  if (!ready.value) return
+  const current = controller.value
+  feedbackSnapshot.value = current?.getFeedbackSnapshot() ?? null
+  if (state.value.isPlaying) current?.pause()
+  tocOpen.value = false
+  settingsOpen.value = false
+  statsOpen.value = false
+  tuneOpen.value = false
+  reportsOpen.value = false
+  feedbackOpen.value = true
+  if (book.value) void ensureBookFingerprint(book.value)
+  refreshReportCount()
+}
+
+function refreshFeedbackSnapshot(): void {
+  feedbackSnapshot.value = controller.value?.getFeedbackSnapshot() ?? null
+}
+
+function openReports(): void {
+  settingsOpen.value = false
+  controller.value?.cancelVoicePreview()
+  feedbackOpen.value = false
+  reportsOpen.value = true
+}
+
+function onFeedbackSaved(): void {
+  refreshReportCount()
 }
 
 function openTune(kind: ReaderTuneKind): void {
@@ -618,6 +691,15 @@ onBeforeUnmount(() => {
       <div class="reader__tools">
         <button
           type="button"
+          class="icon-btn icon-btn--small"
+          aria-label="读音反馈"
+          :disabled="!ready"
+          @click="openFeedback"
+        >
+          <AppIcon name="flag" :size="18" />
+        </button>
+        <button
+          type="button"
           class="icon-btn icon-btn--small sleep-tool"
           :class="{ 'is-active': sleepActive }"
           :aria-label="sleepAriaLabel"
@@ -812,6 +894,7 @@ onBeforeUnmount(() => {
       :is-playing="state.isPlaying"
       :diagnostics="diagnostics"
       :build-id="buildLabel"
+      :report-count="reportCount"
       @close="closeSettings"
       @patch="patchSettings"
       @reset="resetSettings"
@@ -822,12 +905,37 @@ onBeforeUnmount(() => {
       @download-ai="downloadAiModel"
       @remove-ai="removeAiModel"
       @open-stats="openStats"
+      @open-feedback="openFeedback"
+      @open-reports="openReports"
     />
 
     <ReadingStatsSheet
       :open="statsOpen"
       @close="statsOpen = false"
       @notice="showToast"
+    />
+
+    <PronunciationFeedbackSheet
+      :open="feedbackOpen"
+      :snapshot="feedbackSnapshot"
+      :book-id="book?.id ?? ''"
+      :book-title="book?.title ?? ''"
+      :book-format="book ? getBookFormat(book) : 'epub'"
+      :book-size="book?.size ?? 0"
+      :book-fingerprint="bookFingerprint"
+      :fingerprint-loading="fingerprintLoading"
+      :build-id="buildLabel"
+      @close="feedbackOpen = false"
+      @saved="onFeedbackSaved"
+      @notice="showToast"
+      @refresh="refreshFeedbackSnapshot"
+    />
+
+    <PronunciationReportsSheet
+      :open="reportsOpen"
+      @close="reportsOpen = false"
+      @notice="showToast"
+      @changed="reportCount = $event"
     />
 
     <ReaderTuneSheet

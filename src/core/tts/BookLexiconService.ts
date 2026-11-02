@@ -19,6 +19,13 @@ export interface BookLexiconStatus {
   message: string | null
 }
 
+export interface BookLexiconReportInfo {
+  curatedHash: string
+  version: number
+  enabled: boolean
+  entries: number
+}
+
 type CollectText = (signal: AbortSignal) => Promise<string[]>
 
 const curatedHash = hashText(curatedOverlay)
@@ -71,6 +78,15 @@ export class BookLexiconService {
 
   getOverlay(): string {
     return this.enabled ? this.overlay : ''
+  }
+
+  getReportInfo(): BookLexiconReportInfo {
+    return {
+      curatedHash,
+      version: BOOK_LEXICON_VERSION,
+      enabled: this.enabled,
+      entries: this.status.entries,
+    }
   }
 
   subscribe(listener: (status: BookLexiconStatus) => void): () => void {

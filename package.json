@@ -9,7 +9,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "audit:polyphones": "node scripts/audit-polyphones.mjs"
+    "audit:polyphones": "node scripts/audit-polyphones.mjs",
+    "reports:overlay": "node scripts/reports-to-overlay.mjs"
   },
   "dependencies": {
     "epubjs": "^0.3.93",
