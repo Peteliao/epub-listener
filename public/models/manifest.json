@@ -35,7 +35,7 @@
           "vocoder": "vocos-22khz-univ.onnx",
           "lexicon": "lexicon.v3.txt",
           "tokens": "tokens.txt",
-          "noiseScale": 0.667,
+          "noiseScale": 0.5,
           "lengthScale": 1
         },
         "ruleFsts": ["phone.fst", "date.fst", "number.fst"],
