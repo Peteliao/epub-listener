@@ -23,6 +23,7 @@ const SHELL_ASSETS = [
   'icons/apple-touch-icon.png',
   'models/manifest.json',
   'workers/sherpa-tts.worker.js',
+  'workers/hojo-tts.worker.js',
   'sample.epub',
 ].map(toUrl)
 
@@ -236,19 +237,21 @@ async function runtimeCaches() {
 
 function runtimeContentType(url) {
   const path = new URL(url).pathname
-  if (path.endsWith('.js')) return 'text/javascript; charset=utf-8'
+  if (path.endsWith('.js') || path.endsWith('.mjs')) return 'text/javascript; charset=utf-8'
   if (path.endsWith('.wasm')) return 'application/wasm'
   return ''
 }
 
 function withRuntimeType(response, url) {
-  if (!response || response.headers.get('Content-Type')) return response
+  if (!response) return response
   const type = runtimeContentType(url)
-  if (!type) return response
+  if (!type || response.headers.get('Content-Type') === type) return response
+  const headers = new Headers(response.headers)
+  headers.set('Content-Type', type)
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
-    headers: { 'Content-Type': type },
+    headers,
   })
 }
 
@@ -262,6 +265,7 @@ async function matchRuntime(url) {
 }
 
 async function handleTtsRuntime(request) {
+  if (request.cache === 'no-store' || request.cache === 'reload') return fetch(request)
   const hit = await matchRuntime(request.url)
   if (hit) return hit
 
@@ -338,7 +342,7 @@ async function handleRequest(event) {
     return
   }
 
-  if (path.includes('/sherpa/runtime/')) {
+  if (path.includes('/sherpa/runtime/') || path.includes('/hojo/runtime/')) {
     event.respondWith(handleTtsRuntime(request))
     return
   }

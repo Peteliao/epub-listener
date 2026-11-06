@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { AiPackStatus } from '@/core/tts/AiModel'
+import type {
+  AiPackStatus,
+  AiVariantPreference,
+} from '@/core/tts/AiModel'
 import AppIcon from './AppIcon.vue'
 
 const props = withDefaults(
@@ -9,6 +12,8 @@ const props = withDefaults(
     variant?: 'zh' | 'en'
     selected: boolean
     selectedVoiceId?: string | null
+    selectedEnglishVoiceId?: string | null
+    variantPreference?: AiVariantPreference
     pendingVoiceId?: string | null
     pendingVoiceLabel?: string | null
     busy: boolean
@@ -18,6 +23,8 @@ const props = withDefaults(
   {
     variant: 'zh',
     selectedVoiceId: null,
+    selectedEnglishVoiceId: null,
+    variantPreference: 'auto',
     pendingVoiceId: null,
     pendingVoiceLabel: null,
     removableWhenSelected: false,
@@ -26,6 +33,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   select: [voiceId: string]
+  selectEnglish: [voiceId: string]
+  variant: [value: AiVariantPreference]
   download: [voiceId?: string]
   remove: []
   cancelRemove: []
@@ -33,6 +42,13 @@ const emit = defineEmits<{
 }>()
 
 const isEnglish = computed(() => props.variant === 'en')
+const isBilingual = computed(() => props.pack.lang === 'bi')
+const chineseVoices = computed(() =>
+  props.pack.voices.filter((voice) => voice.lang !== 'en'),
+)
+const englishVoices = computed(() =>
+  props.pack.voices.filter((voice) => voice.lang === 'en'),
+)
 
 const title = computed(() =>
   isEnglish.value
@@ -80,6 +96,19 @@ function formatBytes(bytes: number): string {
   if (bytes >= 1000) return `${Math.round(bytes / 1000)} KB`
   return `${bytes} B`
 }
+
+function changeEnglishVoice(event: Event): void {
+  const value = (event.target as HTMLSelectElement).value
+  if (value) emit('selectEnglish', value)
+}
+
+function changeVariant(event: Event): void {
+  const value = (event.target as HTMLSelectElement)
+    .value as AiVariantPreference
+  if (value === 'auto' || value === 'full' || value === 'int8') {
+    emit('variant', value)
+  }
+}
 </script>
 
 <template>
@@ -93,6 +122,7 @@ function formatBytes(bytes: number): string {
         >
           {{ pack.license.commercialUse ? '可商用' : '非商业' }}
         </span>
+        <span v-if="isBilingual" class="voice-pack__badge">中英双语</span>
         <span v-if="selected" class="voice-pack__current">使用中</span>
       </div>
       <span class="pack-state" :data-phase="pack.phase">
@@ -112,7 +142,7 @@ function formatBytes(bytes: number): string {
       :aria-label="`${pack.name}音色`"
     >
       <button
-        v-for="voice in pack.voices"
+        v-for="voice in chineseVoices"
         :key="voice.id"
         type="button"
         class="voice-chip"
@@ -139,6 +169,58 @@ function formatBytes(bytes: number): string {
         </span>
         <span class="voice-chip__desc">{{ voice.description }}</span>
       </button>
+    </div>
+
+    <div v-if="isBilingual" class="pack-options">
+      <label class="pack-option">
+        <span class="pack-option__label">英文声线</span>
+        <span class="pack-select">
+          <select
+            :value="selectedEnglishVoiceId ?? ''"
+            :disabled="busy || !selected"
+            aria-label="英文声线"
+            @change="changeEnglishVoice"
+          >
+            <option
+              v-for="voice in englishVoices"
+              :key="voice.id"
+              :value="voice.id"
+            >
+              {{ voice.label }}
+            </option>
+          </select>
+          <span class="pack-select__caret" aria-hidden="true">⌄</span>
+        </span>
+      </label>
+
+      <label v-if="pack.variants.length > 1" class="pack-option">
+        <span class="pack-option__label">模型规格</span>
+        <span class="pack-select">
+          <select
+            :value="variantPreference"
+            :disabled="busy"
+            aria-label="模型规格"
+            @change="changeVariant"
+          >
+            <option value="auto">自动 · {{ pack.variantLabel }}</option>
+            <option
+              v-for="variant in pack.variants"
+              :key="variant.id"
+              :value="variant.id"
+            >
+              {{ variant.label }} · {{ formatBytes(variant.totalBytes) }}
+            </option>
+          </select>
+          <span class="pack-select__caret" aria-hidden="true">⌄</span>
+        </span>
+      </label>
+
+      <p v-if="!selected" class="pack-option-note">
+        选用本包的中文音色后，英文声线才会随之生效。
+      </p>
+      <p class="pack-option-note">
+        切换规格后需重新下载，已缓存的共用文件会复用。
+      </p>
     </div>
 
     <div v-if="pack.phase === 'downloading'" class="pack-progress">
@@ -477,6 +559,65 @@ function formatBytes(bytes: number): string {
   grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
   gap: 8px;
   margin-top: 11px;
+}
+
+.pack-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 10px;
+  margin-top: 11px;
+}
+
+.pack-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pack-option__label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--app-muted);
+}
+
+.pack-select {
+  position: relative;
+  display: block;
+}
+
+.pack-select select {
+  width: 100%;
+  height: 34px;
+  padding: 0 26px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--app-fg) 11%, transparent);
+  border-radius: 9px;
+  background: var(--app-bg);
+  color: var(--app-fg);
+  font-size: 11.5px;
+  appearance: none;
+}
+
+.pack-select select:disabled {
+  opacity: 0.55;
+}
+
+.pack-select__caret {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--app-muted);
+  pointer-events: none;
+}
+
+.pack-option-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--app-muted);
 }
 
 .voice-chip {

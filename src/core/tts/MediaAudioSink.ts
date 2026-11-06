@@ -9,6 +9,11 @@ export interface MediaSinkHandlers {
   onError?: (message: string) => void
 }
 
+export interface MediaPlaybackOptions {
+  /** Playback speed with pitch preservation; 1 keeps the clip untouched. */
+  rate?: number
+}
+
 export interface MediaSinkDiagnostics {
   mode: AudioSinkMode
   state: AudioSinkState
@@ -81,7 +86,11 @@ export class MediaAudioSink {
     this.handlers = null
   }
 
-  playBuffer(buffer: AudioBuffer, handlers: MediaSinkHandlers): boolean {
+  playBuffer(
+    buffer: AudioBuffer,
+    handlers: MediaSinkHandlers,
+    options?: MediaPlaybackOptions,
+  ): boolean {
     const element = this.ensureElement()
     if (!element || this.mode !== 'media') return false
 
@@ -93,6 +102,7 @@ export class MediaAudioSink {
     try {
       const url = this.clipUrl(buffer)
       element.loop = false
+      this.applyRate(element, options?.rate)
       element.src = url
       const played = element.play()
       if (played && typeof played.catch === 'function') {
@@ -125,6 +135,7 @@ export class MediaAudioSink {
 
     try {
       element.loop = false
+      this.applyRate(element, 1)
       element.src = this.gapUrl(ms)
       const played = element.play()
       if (played && typeof played.catch === 'function') {
@@ -159,6 +170,7 @@ export class MediaAudioSink {
     try {
       this.loopUrl ??= this.silenceUrl(LOOP_SILENCE_MS)
       element.loop = true
+      this.applyRate(element, 1)
       if (element.src !== this.loopUrl) element.src = this.loopUrl
       const played = element.play()
       if (played && typeof played.catch === 'function') {
@@ -347,6 +359,20 @@ export class MediaAudioSink {
     if (this.startWatchdog === null) return
     window.clearTimeout(this.startWatchdog)
     this.startWatchdog = null
+  }
+
+  private applyRate(element: HTMLAudioElement, rate: number | undefined): void {
+    const value = rate && Number.isFinite(rate) && rate > 0 ? rate : 1
+    // The load algorithm resets playbackRate to defaultPlaybackRate, so both
+    // must be set before the new src is assigned.
+    element.defaultPlaybackRate = value
+    element.playbackRate = value
+    const pitched = element as HTMLAudioElement & {
+      preservesPitch?: boolean
+      webkitPreservesPitch?: boolean
+    }
+    if ('preservesPitch' in pitched) pitched.preservesPitch = true
+    pitched.webkitPreservesPitch = true
   }
 
   private pauseElement(): void {

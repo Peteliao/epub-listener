@@ -16,7 +16,7 @@ import type {
 import { WebSpeechDriver } from '@/core/tts/WebSpeechDriver'
 import { AiModelManager, type AiModelStatus } from '@/core/tts/AiModel'
 import { BookLexiconService, type BookLexiconStatus } from '@/core/tts/BookLexiconService'
-import { SherpaDriver, type SherpaStats } from '@/core/tts/SherpaDriver'
+import { SherpaDriver, type SherpaStats, type SherpaSynthesisOptions } from '@/core/tts/SherpaDriver'
 import type { MediaSinkDiagnostics } from '@/core/tts/MediaAudioSink'
 import {
   buildSpeechUnits,
@@ -46,7 +46,7 @@ type ChunkEngine = 'ai' | 'system'
 
 interface SpeechChunk extends LanguageSegment {
   engine: ChunkEngine
-  nextTexts: string[]
+  nextChunks: LanguageSegment[]
 }
 
 const PREFETCH_CHUNKS = 3
@@ -155,6 +155,9 @@ export class ReaderController {
   private sentenceGapActive = false
   private activePlan: SpeechChunk[] | null = null
   private activePlanIndex = 0
+  // Survives resetActivePlan while a replacement voice initializes, so a
+  // second voice change resumes the same chunk instead of the unit opening.
+  private restartPlanIndex = 0
   private activePlanGeneration = 0
   private activeChunk: SpeechChunk | null = null
   private readonly iosDevice = isIOSDevice()
@@ -175,6 +178,9 @@ export class ReaderController {
   private aiLoadedVoiceId: string | null = null
   private aiLoadedOverlay = ''
   private aiLoadedEnglishPackId: string | null = null
+  private aiLoadedEnglishVoiceId: string | null = null
+  private aiRuntimeGeneration = 0
+  private englishAiGeneration = 0
   private englishAiInitPromise: Promise<void> | null = null
   private englishAiFallback = false
   private activeEngine: TtsEngine | null = null
@@ -204,7 +210,10 @@ export class ReaderController {
   constructor(options: ReaderControllerOptions) {
     this.options = options
     this.settings = { ...options.settings }
-    this.ai = new AiModelManager(this.settings.aiVoiceId)
+    this.ai = new AiModelManager(
+      this.settings.aiVoiceId,
+      this.settings.aiEnglishVoiceId,
+    )
     this.aiStatus = this.ai.getStatus()
     this.bookLexicon = new BookLexiconService(this.ai, options.book.id)
     this.bookLexicon.setEnabled(this.settings.autoBookPolyphones)
@@ -328,7 +337,14 @@ export class ReaderController {
 
     this.unsubscribeAi = this.ai.subscribe((status) => {
       this.aiStatus = status
-      if (status.englishPack?.phase === 'ready') this.englishAiFallback = false
+      const englishVoice = status.englishVoice
+      const englishPack = englishVoice
+        ? (status.packs.find((item) => item.id === englishVoice.packId) ??
+          (status.englishPack?.id === englishVoice.packId
+            ? status.englishPack
+            : null))
+        : null
+      if (englishPack?.phase === 'ready') this.englishAiFallback = false
       this.options.onAiStatus?.(status)
       this.emitState()
       this.maybeStartBookLexicon()
@@ -337,7 +353,12 @@ export class ReaderController {
 
     const [opened] = await Promise.all([
       this.session.open(this.options.book.file),
-      this.ai.refresh().catch(() => undefined),
+      (async () => {
+        await this.ai
+          .setVariantPreference(this.settings.aiVariant)
+          .catch(() => undefined)
+        await this.ai.refresh().catch(() => undefined)
+      })(),
     ])
     this.chapters = opened.chapters
 
@@ -472,6 +493,9 @@ export class ReaderController {
       next.englishVolume !== previous.englishVolume ||
       next.englishRate !== previous.englishRate
     const aiVoiceChanged = next.aiVoiceId !== previous.aiVoiceId
+    const aiEnglishVoiceChanged =
+      next.aiEnglishVoiceId !== previous.aiEnglishVoiceId
+    const aiVariantChanged = next.aiVariant !== previous.aiVariant
     const groupingChanged = next.groupSentences !== previous.groupSentences
     const labNoiseChanged = next.labNoiseScale !== previous.labNoiseScale
     const labSilenceChanged = next.labSilenceScale !== previous.labSilenceScale
@@ -483,11 +507,20 @@ export class ReaderController {
     if (aiVoiceChanged) {
       this.handleAiVoiceChange(previous.aiVoiceId, next.aiVoiceId)
     }
+    if (aiEnglishVoiceChanged) {
+      this.ai.selectEnglishVoice(next.aiEnglishVoiceId)
+      this.englishAiFallback = false
+      this.releaseEnglishAi()
+    }
+    if (aiVariantChanged) {
+      if (this.isPlaying) this.pause()
+      void this.ai.setVariantPreference(next.aiVariant)
+      this.releaseAiRuntime()
+    }
     if (englishAiChanged) {
       this.englishAiFallback = false
       if (!next.englishAi) {
-        this.aiSpeech.releaseEnglish()
-        this.aiLoadedEnglishPackId = null
+        this.releaseEnglishAi()
       }
     }
     if (next.autoBookPolyphones !== previous.autoBookPolyphones) {
@@ -531,6 +564,7 @@ export class ReaderController {
       if (
         rateChanged ||
         aiVoiceChanged ||
+        aiEnglishVoiceChanged ||
         groupingChanged ||
         labNoiseChanged ||
         labSilenceChanged ||
@@ -538,7 +572,7 @@ export class ReaderController {
         englishToneChanged ||
         englishAiChanged
       ) {
-        this.speakCurrent()
+        this.speakCurrent(aiEnglishVoiceChanged ? this.restartPlanIndex : 0)
       }
       return
     }
@@ -564,10 +598,13 @@ export class ReaderController {
 
     if (
       this.aiSpeech.initialized &&
-      previousVoice?.packId === nextVoice.packId
+      previousVoice?.engine === nextVoice.engine &&
+      previousVoice.packId === nextVoice.packId
     ) {
       this.aiSpeech.setSpeaker(nextVoice.speakerId)
       this.aiLoadedVoiceId = nextVoice.id
+    } else if (previousVoice?.engine !== nextVoice.engine) {
+      this.releaseAiRuntime()
     }
 
     if (this.isPlaying && this.settings.engine === 'sherpa') {
@@ -604,8 +641,7 @@ export class ReaderController {
       ) {
         this.pause()
       }
-      this.aiSpeech.releaseEnglish()
-      this.aiLoadedEnglishPackId = null
+      this.releaseEnglishAi()
       this.englishAiFallback = false
       await this.ai.remove(packId)
       return
@@ -615,16 +651,22 @@ export class ReaderController {
       (voice) => voice.id === this.settings.aiVoiceId,
     )
     const removesLoaded = this.aiLoadedPackId === pack.id
+    const removesEnglishVoice = this.aiStatus.englishVoice?.packId === pack.id
+    const removingActiveEnglish =
+      removesEnglishVoice && this.activeChunk?.lang === 'en'
     if (
       this.isPlaying &&
       this.activeEngine === 'sherpa' &&
-      (removesSelected || removesLoaded)
+      (removesSelected || removesLoaded || removingActiveEnglish)
     ) {
       this.pause()
     }
 
     this.aiFallback = false
     if (removesLoaded) this.releaseAiRuntime()
+    else if (this.aiLoadedEnglishPackId === pack.id) {
+      this.releaseEnglishAi()
+    }
     await this.ai.remove(packId)
   }
 
@@ -1106,7 +1148,7 @@ export class ReaderController {
     this.highlighter?.setActiveRange(unit.start, unit.end, options)
   }
 
-  private speakCurrent(): void {
+  private speakCurrent(startIndex = 0): void {
     if (!this.isPlaying || this.destroyed) return
 
     const unit = this.currentUnit()
@@ -1125,7 +1167,9 @@ export class ReaderController {
     )
     const hasAiChunks = plan.some((chunk) => chunk.engine === 'ai')
     this.activeEngine = hasAiChunks ? 'sherpa' : 'system'
-    this.activeLang = plan[0]?.lang ?? null
+    const index = Math.min(startIndex, Math.max(0, plan.length - 1))
+    this.restartPlanIndex = index
+    this.activeLang = plan[index]?.lang ?? null
 
     const generation = ++this.playbackGeneration
     this.clearSentenceGap()
@@ -1140,17 +1184,20 @@ export class ReaderController {
       })
     }
 
-    if (useAi) this.speech.cancelActive()
-    else this.aiSpeech.cancel()
+    if (useAi) {
+      this.speech.cancelActive()
+      this.aiSpeech.prepareSpeech()
+    } else {
+      this.aiSpeech.cancel()
+    }
 
-    if (useAi) this.warmEnglishIfNeeded(plan, unit.speechText)
     this.scheduleProgressSave()
     this.emitState()
 
     if (hasAiChunks) {
-      void this.speakWithAi(plan, generation)
+      void this.speakWithAi(plan, generation, index)
     } else {
-      this.runSpeechPlan(plan, 0, generation)
+      this.runSpeechPlan(plan, index, generation)
     }
   }
 
@@ -1160,21 +1207,14 @@ export class ReaderController {
   ): SpeechChunk[] {
     const plan = this.prepareSpeechChunks(segments, useAi)
 
+    const tail = this.upcomingAiChunks(useAi, PREFETCH_CHUNKS)
     for (let i = 0; i < plan.length; i += 1) {
       const chunk = plan[i]!
       if (chunk.engine !== 'ai') continue
-      // Each runtime slot only accepts its own language, so prefetching is
-      // planned per language.
-      const upcoming = plan
-        .slice(i + 1)
-        .filter((item) => item.engine === 'ai' && item.lang === chunk.lang)
-        .map((item) => item.text)
-      const tail = this.upcomingAiTexts(
-        useAi,
-        chunk.lang,
-        PREFETCH_CHUNKS - upcoming.length,
-      )
-      chunk.nextTexts = [...upcoming, ...tail].slice(0, PREFETCH_CHUNKS)
+      const upcoming = plan.slice(i + 1).filter((item) => item.engine === 'ai')
+      chunk.nextChunks = [...upcoming, ...tail]
+        .slice(0, PREFETCH_CHUNKS)
+        .map(({ text, lang }) => ({ text, lang }))
     }
 
     return plan
@@ -1210,7 +1250,7 @@ export class ReaderController {
           if (!text) continue
         }
       }
-      plan.push({ ...segment, text, engine, nextTexts: [] })
+      plan.push({ ...segment, text, engine, nextChunks: [] })
     }
 
     for (let i = 0; i < plan.length; i += 1) {
@@ -1221,13 +1261,12 @@ export class ReaderController {
     return plan
   }
 
-  private upcomingAiTexts(
+  private upcomingAiChunks(
     useAi: boolean,
-    lang: 'zh' | 'en',
     limit: number,
-  ): string[] {
-    const texts: string[] = []
-    if (limit <= 0) return texts
+  ): LanguageSegment[] {
+    const chunks: LanguageSegment[] = []
+    if (limit <= 0) return chunks
 
     const position = this.units.findIndex(
       (unit) => unit.start === this.sentenceIndex,
@@ -1236,7 +1275,7 @@ export class ReaderController {
 
     for (
       let i = from;
-      i < this.units.length && texts.length < limit && i < from + 4;
+      i < this.units.length && chunks.length < limit && i < from + 4;
       i += 1
     ) {
       const unit = this.units[i]!
@@ -1246,25 +1285,32 @@ export class ReaderController {
         useAi,
       )
       for (const chunk of plan) {
-        if (chunk.engine !== 'ai' || chunk.lang !== lang) continue
-        if (texts.includes(chunk.text)) continue
-        texts.push(chunk.text)
-        if (texts.length >= limit) break
+        if (chunk.engine !== 'ai') continue
+        chunks.push({ text: chunk.text, lang: chunk.lang })
+        if (chunks.length >= limit) break
       }
     }
 
-    return texts
+    return chunks
   }
 
   private async speakWithAi(
     plan: SpeechChunk[],
     generation: number,
+    startIndex: number,
   ): Promise<void> {
-    const needsChinese = plan.some(
-      (chunk) => chunk.engine === 'ai' && chunk.lang === 'zh',
+    const remaining = plan.slice(startIndex)
+    const sharedModel = this.ai.getVoice(this.settings.aiVoiceId)?.engine === 'hojo'
+    const needsChinese = remaining.some(
+      (chunk) =>
+        (chunk.engine === 'ai' && chunk.lang === 'zh') ||
+        (sharedModel && chunk.nextChunks.some((next) => next.lang === 'zh')),
     )
-    const needsEnglish = plan.some(
+    const needsEnglish = remaining.some(
       (chunk) => chunk.engine === 'ai' && chunk.lang === 'en',
+    )
+    const upcomingEnglish = remaining.some((chunk) =>
+      chunk.nextChunks.some((next) => next.lang === 'en'),
     )
 
     try {
@@ -1277,7 +1323,7 @@ export class ReaderController {
         return
       }
 
-      if (needsEnglish) {
+      if (needsEnglish || (sharedModel && upcomingEnglish)) {
         try {
           await this.ensureEnglishAiReady()
         } catch (error) {
@@ -1307,7 +1353,7 @@ export class ReaderController {
         }
       }
 
-      this.runSpeechPlan(plan, 0, generation)
+      this.runSpeechPlan(plan, startIndex, generation)
     } catch (error) {
       if (
         generation !== this.playbackGeneration ||
@@ -1321,6 +1367,18 @@ export class ReaderController {
           ? error.message
           : '离线音色启动失败。',
       )
+    }
+  }
+
+  private aiRequest(chunk: LanguageSegment): SherpaSynthesisOptions {
+    return {
+      text: chunk.text,
+      lang: chunk.lang,
+      rate: chunk.lang === 'en'
+        ? this.settings.rate * this.settings.englishRate
+        : this.settings.rate,
+      volume: chunk.lang === 'en' ? this.settings.englishVolume : 1,
+      silenceScale: this.settings.labSilenceScale,
     }
   }
 
@@ -1374,6 +1432,7 @@ export class ReaderController {
 
       this.activePlan = plan
       this.activePlanIndex = index
+      this.restartPlanIndex = index
       this.activePlanGeneration = generation
       this.activeChunk = chunk
       this.activeLang = chunk.lang
@@ -1389,16 +1448,8 @@ export class ReaderController {
       if (chunk.engine === 'ai') {
         this.aiSpeech.speak(
           {
-            text: chunk.text,
-            rate:
-              chunk.lang === 'en'
-                ? this.settings.rate * this.settings.englishRate
-                : this.settings.rate,
-            silenceScale: this.settings.labSilenceScale,
-            nextTexts: chunk.nextTexts,
-            lang: chunk.lang,
-            volume:
-              chunk.lang === 'en' ? this.settings.englishVolume : 1,
+            ...this.aiRequest(chunk),
+            nextChunks: chunk.nextChunks.map((next) => this.aiRequest(next)),
           },
           {
             onStart,
@@ -1488,7 +1539,7 @@ export class ReaderController {
     // reader usually opens well before the first tap on AI playback, and this
     // keeps the first sentence from waiting on pronunciation analysis.
     const voice = this.ai.getVoice(this.settings.aiVoiceId)
-    if (!voice) return
+    if (!voice || voice.modelType !== 'matcha') return
     const pack = this.aiStatus.packs.find((item) => item.id === voice.packId)
     if (!pack || pack.phase !== 'ready') return
     this.bookLexicon.start(this.settings.aiVoiceId, (signal) =>
@@ -1525,45 +1576,52 @@ export class ReaderController {
     this.prewarmTimer = window.setTimeout(() => {
       this.prewarmTimer = null
       void this.prewarmAi()
-    }, PREWARM_DELAY_MS)
+    }, this.settings.engine === 'sherpa' && voice?.engine === 'hojo' ? 0 : PREWARM_DELAY_MS)
   }
 
   private async prewarmAi(): Promise<void> {
     if (this.destroyed || this.isPlaying) return
 
-    const mostlyEnglish = this.chapterMostlyEnglish()
+    const settings = this.settings
+    const voice = this.ai.getVoice(settings.aiVoiceId)
+    const unit = this.currentUnit()
+    const chunks: LanguageSegment[] = []
+    if (settings.engine === 'sherpa' && voice?.engine === 'hojo' && unit) {
+      const segments = splitLanguageSegments(unit.speechText)
+      const first = this.buildSpeechPlan(
+        segments.length ? segments : [{ text: unit.speechText, lang: 'zh' }],
+        true,
+      ).find((chunk) => chunk.engine === 'ai')
+      if (first) chunks.push(first, ...first.nextChunks)
+    }
     const needChinese =
       !this.aiSpeech.initialized &&
-      !mostlyEnglish &&
-      this.aiStatus.phase === 'ready'
+      this.aiStatus.phase === 'ready' &&
+      (!this.chapterMostlyEnglish() || chunks.some((chunk) => chunk.lang === 'zh'))
     const needEnglish =
-      this.settings.englishAi &&
+      settings.englishAi &&
       !this.aiSpeech.englishInitialized &&
       this.englishPackReady() &&
-      this.chapterHasEnglish()
+      (this.chapterHasEnglish() || chunks.some((chunk) => chunk.lang === 'en'))
 
-    if (!needChinese && !needEnglish) return
+    if (!needChinese && !needEnglish && chunks.length === 0) return
     const generation = this.playbackGeneration
+    const runtimeGeneration = this.aiRuntimeGeneration
+    const englishGeneration = this.englishAiGeneration
+    const current = () =>
+      !this.destroyed && !this.isPlaying &&
+      generation === this.playbackGeneration && settings === this.settings &&
+      runtimeGeneration === this.aiRuntimeGeneration &&
+      englishGeneration === this.englishAiGeneration
 
     try {
-      await this.bookLexicon.waitForOverlay(8000)
-      if (
-        this.destroyed ||
-        this.isPlaying ||
-        generation !== this.playbackGeneration
-      ) {
-        return
-      }
+      if (voice?.modelType === 'matcha') await this.bookLexicon.waitForOverlay(8000)
+      if (!current()) return
       if (needChinese) await this.ensureAiReady()
-      if (
-        this.destroyed ||
-        this.isPlaying ||
-        generation !== this.playbackGeneration
-      ) {
-        return
-      }
+      if (!current()) return
       if (needEnglish) await this.ensureEnglishAiReady()
-      if (this.destroyed) this.releaseAiRuntime()
+      if (!current()) return
+      if (chunks.length) this.aiSpeech.preload(chunks.map((chunk) => this.aiRequest(chunk)))
     } catch {
       // Prewarming is best effort; a later play() retries with real feedback.
     }
@@ -1605,6 +1663,10 @@ export class ReaderController {
       throw new Error('当前浏览器不支持离线 AI 音色。')
     }
     const targetVoice = this.settings.aiVoiceId
+    const generation = this.aiRuntimeGeneration
+    const current = () =>
+      !this.destroyed && generation === this.aiRuntimeGeneration &&
+      targetVoice === this.settings.aiVoiceId
     if (this.aiSpeech.initialized && this.aiLoadedVoiceId === targetVoice) return
 
     if (this.aiInitPromise) {
@@ -1613,19 +1675,18 @@ export class ReaderController {
       } catch {
         // Retry below with the currently selected voice.
       }
-      if (this.aiSpeech.initialized && this.aiLoadedVoiceId === targetVoice) {
-        return
-      }
+      if (!current()) return
+      if (this.aiSpeech.initialized && this.aiLoadedVoiceId === targetVoice) return
     }
 
     const task = (async () => {
-      const overlay = this.settings.autoBookPolyphones
+      const overlay = this.settings.autoBookPolyphones &&
+        this.ai.getVoice(targetVoice)?.modelType === 'matcha'
         ? await this.bookLexicon.waitForOverlay(5000)
         : ''
-      const pack = await this.ai.loadPack(
-        this.settings.aiVoiceId,
-        overlay || undefined,
-      )
+      if (!current()) return
+      const pack = await this.ai.loadPack(targetVoice, overlay || undefined)
+      if (!current()) return
       if (this.settings.labNoiseScale !== null) {
         pack.model = {
           ...pack.model,
@@ -1637,6 +1698,7 @@ export class ReaderController {
       }
       this.aiSpeech.unlock()
       await this.aiSpeech.init(pack)
+      if (!current()) return
       this.aiLoadedPackId = pack.packId
       this.aiLoadedVoiceId = pack.voiceId
       this.aiLoadedOverlay = overlay
@@ -1660,29 +1722,31 @@ export class ReaderController {
     if (!voice) {
       throw new Error('尚未下载英文离线音色包。')
     }
+    const generation = this.englishAiGeneration
+    const current = () =>
+      !this.destroyed && generation === this.englishAiGeneration &&
+      voice.id === this.ai.getEnglishVoice()?.id
     if (
       this.aiSpeech.englishInitialized &&
-      this.aiLoadedEnglishPackId === voice.packId
-    ) {
-      return
-    }
+      this.aiLoadedEnglishVoiceId === voice.id
+    ) return
 
     if (this.englishAiInitPromise) {
       try {
         await this.englishAiInitPromise
       } catch {
-        // Retry below with the currently selected pack.
+        // Retry below with the currently selected voice.
       }
+      if (!current()) return
       if (
         this.aiSpeech.englishInitialized &&
-        this.aiLoadedEnglishPackId === voice.packId
-      ) {
-        return
-      }
+        this.aiLoadedEnglishVoiceId === voice.id
+      ) return
     }
 
     const task = (async () => {
       const pack = await this.ai.loadPack(voice.id)
+      if (!current()) return
       if (this.settings.labNoiseScale !== null) {
         pack.model = {
           ...pack.model,
@@ -1694,7 +1758,9 @@ export class ReaderController {
       }
       this.aiSpeech.unlock()
       await this.aiSpeech.initEnglish(pack)
+      if (!current()) return
       this.aiLoadedEnglishPackId = pack.packId
+      this.aiLoadedEnglishVoiceId = pack.voiceId
     })()
     this.englishAiInitPromise = task
     try {
@@ -1705,7 +1771,13 @@ export class ReaderController {
   }
 
   private englishPackReady(): boolean {
-    const pack = this.aiStatus.englishPack
+    const voice = this.ai.getEnglishVoice()
+    if (!voice) return false
+    const pack =
+      this.aiStatus.packs.find((item) => item.id === voice.packId) ??
+      (this.aiStatus.englishPack?.id === voice.packId
+        ? this.aiStatus.englishPack
+        : null)
     return Boolean(pack && pack.phase === 'ready' && pack.voices.length > 0)
   }
 
@@ -1741,28 +1813,30 @@ export class ReaderController {
     return this.countChapterLetters().latin >= 200
   }
 
-  private warmEnglishIfNeeded(plan: SpeechChunk[], text: string): void {
-    if (!this.isPlaying || this.destroyed) return
-    if (!this.settings.englishAi || !this.englishPackReady()) return
-    if (this.aiSpeech.englishInitialized || this.englishAiFallback) return
-    if (!plan.some((chunk) => chunk.lang === 'en')) return
-    if (countMatches(text, LATIN_LETTER) < 30) return
-    void this.ensureEnglishAiReady().catch(() => undefined)
-  }
-
   /**
    * The first overlay run can outlast the wait in ensureAiReady. Rather than
    * reload the engine mid-sentence, pick the overlay up on the next play:
    * releasing here is silent because play() has not started audio yet.
    */
   private refreshAiOverlayIfNeeded(): void {
+    if (this.ai.getVoice(this.settings.aiVoiceId)?.modelType !== 'matcha') return
     if (!this.aiSpeech.initialized) return
     const overlay = this.bookLexicon.getOverlay()
     if (!overlay || overlay === this.aiLoadedOverlay) return
     this.releaseAiRuntime()
   }
 
+  private releaseEnglishAi(): void {
+    this.englishAiGeneration += 1
+    this.englishAiInitPromise = null
+    this.aiSpeech.releaseEnglish()
+    this.aiLoadedEnglishPackId = null
+    this.aiLoadedEnglishVoiceId = null
+  }
+
   private releaseAiRuntime(): void {
+    this.aiRuntimeGeneration += 1
+    this.englishAiGeneration += 1
     this.aiInitPromise = null
     this.englishAiInitPromise = null
     this.aiSpeech.release()
@@ -1770,6 +1844,7 @@ export class ReaderController {
     this.aiLoadedVoiceId = null
     this.aiLoadedOverlay = ''
     this.aiLoadedEnglishPackId = null
+    this.aiLoadedEnglishVoiceId = null
     this.englishAiFallback = false
   }
 

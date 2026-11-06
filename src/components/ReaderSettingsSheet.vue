@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { AiModelStatus, AiPackStatus } from '@/core/tts/AiModel'
+import type {
+  AiModelStatus,
+  AiPackStatus,
+  AiVariantPreference,
+} from '@/core/tts/AiModel'
 import type { BookLexiconStatus } from '@/core/tts/BookLexiconService'
 import { isIOSDevice } from '@/core/tts/systemVoice'
 import type { ReaderDiagnostics } from '@/core/player/ReaderController'
@@ -114,26 +118,58 @@ const aiReady = computed(() => selectedPack.value?.phase === 'ready')
 const englishPack = computed<AiPackStatus | null>(
   () => props.ai?.englishPack ?? null,
 )
-const englishPackReady = computed(() => englishPack.value?.phase === 'ready')
+const englishVoicePack = computed<AiPackStatus | null>(() => {
+  const voice = props.ai?.englishVoice
+  if (!voice) return englishPack.value
+  return (
+    props.ai?.packs.find((pack) => pack.id === voice.packId) ??
+    (englishPack.value?.id === voice.packId ? englishPack.value : null)
+  )
+})
+const englishPackReady = computed(
+  () => englishVoicePack.value?.phase === 'ready',
+)
 const aiDownloading = computed(
   () =>
-    selectedPack.value?.phase === 'downloading' ||
-    englishPack.value?.phase === 'downloading',
+    Boolean(
+      props.ai?.packs.some((pack) => pack.phase === 'downloading') ||
+        englishPack.value?.phase === 'downloading',
+    ),
 )
 const aiVoiceLabel = computed(() => props.ai?.selectedVoice?.label || '山岚')
 const englishVoiceLabel = computed(
-  () => englishPack.value?.voices[0]?.label ?? '英文音色',
+  () =>
+    props.ai?.englishVoice?.label ??
+    englishPack.value?.voices[0]?.label ??
+    '英文音色',
 )
 // 山岚 stays above the English settings so the two favourite voices sit together.
 const primaryPacks = computed<AiPackStatus[]>(() =>
-  props.ai?.supported ? props.ai.packs.slice(0, 1) : [],
+  props.ai?.supported
+    ? props.ai.packs.filter((pack) => pack.lang !== 'bi').slice(0, 1)
+    : [],
+)
+const bilingualPacks = computed<AiPackStatus[]>(() =>
+  props.ai?.supported
+    ? props.ai.packs.filter((pack) => pack.lang === 'bi')
+    : [],
 )
 const morePacks = computed<AiPackStatus[]>(() =>
-  props.ai?.supported ? props.ai.packs.slice(1) : [],
+  props.ai?.supported
+    ? props.ai.packs.filter((pack) => pack.lang !== 'bi').slice(1)
+    : [],
 )
 const selectedVoiceId = computed(() => props.ai?.selectedVoiceId ?? null)
 const englishAiActive = computed(
   () => props.settings.englishAi && englishPackReady.value,
+)
+const sherpaEnglishSelected = computed(
+  () =>
+    englishAiActive.value &&
+    Boolean(
+      englishPack.value &&
+        props.ai?.englishVoice?.packId === englishPack.value.id,
+    ),
 )
 const aiUsable = computed(() => aiReady.value || englishPackReady.value)
 const packBusy = computed(
@@ -447,6 +483,34 @@ function selectVoice(voiceId: string, pack: AiPackStatus): void {
   if (props.settings.engine !== 'sherpa') emit('patch', { engine: 'sherpa' })
 }
 
+function englishSelectionFor(pack: AiPackStatus): string {
+  const active = props.ai?.englishVoice
+  if (active?.packId === pack.id) return active.id
+  const stored = pack.voices.find(
+    (voice) =>
+      voice.id === props.settings.aiEnglishVoiceId && voice.lang === 'en',
+  )
+  return stored?.id ?? pack.voices.find((voice) => voice.lang === 'en')?.id ?? ''
+}
+
+function selectAiEnglishVoice(pack: AiPackStatus, voiceId: string): void {
+  if (!voiceId) return
+  const active = props.ai?.englishVoice
+  if (active?.packId === pack.id && active.id === voiceId) return
+  if (props.settings.aiEnglishVoiceId !== voiceId) {
+    emit('patch', { aiEnglishVoiceId: voiceId })
+  }
+}
+
+function changeAiVariant(value: AiVariantPreference): void {
+  if (value === props.settings.aiVariant) return
+  if (props.isPlaying) {
+    emit('notice', '请先暂停朗读，再切换模型规格。')
+    return
+  }
+  emit('patch', { aiVariant: value })
+}
+
 function requestDownload(packId: string, voiceId?: string): void {
   if (props.isPlaying) {
     emit('notice', '请先暂停朗读再下载音色包。')
@@ -596,6 +660,27 @@ function removeEnglishPack(): void {
           @cancel-remove="confirmRemoveId = null"
           @cancel-pending="pendingVoice = null"
         />
+
+        <VoicePackCard
+          v-for="pack in bilingualPacks"
+          :key="pack.id"
+          :pack="pack"
+          :selected="isPackSelected(pack)"
+          :selected-voice-id="selectedVoiceId"
+          :selected-english-voice-id="englishSelectionFor(pack)"
+          :variant-preference="settings.aiVariant"
+          :pending-voice-id="pendingVoiceId(pack)"
+          :pending-voice-label="pendingLabel(pack)"
+          :busy="packBusy"
+          :confirm-remove="confirmRemoveId === pack.id"
+          @select="(voiceId) => selectVoice(voiceId, pack)"
+          @select-english="(voiceId) => selectAiEnglishVoice(pack, voiceId)"
+          @variant="changeAiVariant"
+          @download="(voiceId) => requestDownload(pack.id, voiceId)"
+          @remove="requestRemove(pack.id)"
+          @cancel-remove="confirmRemoveId = null"
+          @cancel-pending="pendingVoice = null"
+        />
       </template>
     </section>
 
@@ -620,7 +705,7 @@ function removeEnglishPack(): void {
         v-if="englishPack"
         variant="en"
         :pack="englishPack"
-        :selected="englishAiActive"
+        :selected="sherpaEnglishSelected"
         :busy="packBusy"
         :confirm-remove="englishPack ? confirmRemoveId === englishPack.id : false"
         removable-when-selected
@@ -629,7 +714,17 @@ function removeEnglishPack(): void {
         @cancel-remove="confirmRemoveId = null"
       />
 
-      <div v-if="englishPack && ai?.supported" class="switch-row english-ai-row">
+      <p
+        v-if="englishPack && selectedPack?.lang === 'bi'"
+        class="setting__note"
+      >
+        当前中文音色自带英文声线；Kristin 可在切回山岚等中文音色时使用。
+      </p>
+
+      <div
+        v-if="englishVoicePack && ai?.supported"
+        class="switch-row english-ai-row"
+      >
         <div class="switch-copy">
           <h3 class="setting__title">英文使用离线音色</h3>
           <p>

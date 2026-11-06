@@ -1,16 +1,19 @@
-import type { AiPackLang, AiRuntimeConfig } from './AiModel'
+import type { AiEngine, AiPackLang, AiRuntimeConfig } from './AiModel'
 import {
   MediaAudioSink,
   type MediaSinkDiagnostics,
 } from './MediaAudioSink'
 
-export interface SherpaSpeakOptions {
+export interface SherpaSynthesisOptions {
   text: string
   rate: number
   lang?: AiPackLang
   volume?: number
   silenceScale?: number
-  nextTexts?: (string | null)[] | null
+}
+
+export interface SherpaSpeakOptions extends SherpaSynthesisOptions {
+  nextChunks?: SherpaSynthesisOptions[]
 }
 
 export interface SherpaSpeakHandlers {
@@ -46,6 +49,7 @@ export interface SherpaStats extends SherpaReadyInfo {
 interface WorkerReadyMessage extends SherpaReadyInfo {
   type: 'ready'
   lang?: AiPackLang
+  initId?: number
   speakerId: number
 }
 
@@ -62,6 +66,7 @@ interface WorkerResultMessage {
 interface WorkerErrorMessage {
   type: 'error'
   lang?: AiPackLang
+  initId?: number
   epoch?: number
   jobId?: string
   code: string
@@ -74,20 +79,47 @@ interface WorkerDisposedMessage {
   lang?: AiPackLang
 }
 
+interface WorkerProgressMessage {
+  type: 'progress'
+  jobId: string
+  count: number
+}
+
 type WorkerMessage =
   | WorkerReadyMessage
   | WorkerResultMessage
   | WorkerErrorMessage
   | WorkerDisposedMessage
+  | WorkerProgressMessage
 
 interface PendingSynth {
   key: string
   lang: AiPackLang
   chars: number
   rate: number
+  promise: Promise<AudioBuffer>
   resolve: (buffer: AudioBuffer) => void
   reject: (error: Error) => void
   timer: number
+  idle: boolean
+}
+
+interface SynthesisRequest {
+  key: string
+  text: string
+  lang: AiPackLang
+  engine: AiEngine
+  speed: number
+  speakerId: number
+  silenceScale: number
+  volume: number
+}
+
+interface PrefetchPlan {
+  generation: number
+  chunks: SherpaSynthesisOptions[]
+  watched: Set<string>
+  idle?: boolean
 }
 
 interface SynthStats {
@@ -103,8 +135,10 @@ interface SynthStats {
 }
 
 interface RuntimeSlot {
+  engine: AiEngine | null
   readyInfo: SherpaReadyInfo | null
   initPromise: Promise<SherpaReadyInfo> | null
+  initId: number | null
   initReject: ((error: Error) => void) | null
   initFinish: ((info: SherpaReadyInfo) => void) | null
   signature: string
@@ -117,7 +151,9 @@ interface RuntimeSlot {
 const CACHE_LIMIT = 8
 const MAX_PENDING = 3
 const INIT_TIMEOUT_MS = 120_000
+const HOJO_INIT_TIMEOUT_MS = 180_000
 const SYNTH_TIMEOUT_MS = 25_000
+const HOJO_SYNTH_TIMEOUT_MS = 120_000
 const LANGS: readonly AiPackLang[] = ['zh', 'en']
 
 function emptyStats(): SynthStats {
@@ -136,8 +172,10 @@ function emptyStats(): SynthStats {
 
 function createSlot(): RuntimeSlot {
   return {
+    engine: null,
     readyInfo: null,
     initPromise: null,
+    initId: null,
     initReject: null,
     initFinish: null,
     signature: '',
@@ -153,6 +191,7 @@ function normalizeLang(lang: AiPackLang | undefined): AiPackLang {
 }
 
 function synthesisKey(
+  engine: AiEngine,
   lang: AiPackLang,
   text: string,
   rate: number,
@@ -160,9 +199,14 @@ function synthesisKey(
   silenceScale: number,
   volume: number,
 ): string {
-  return `${lang}|${speakerId}|${rate.toFixed(2)}|${silenceScale.toFixed(
+  return `${engine}|${lang}|${speakerId}|${rate.toFixed(2)}|${silenceScale.toFixed(
     2,
   )}|${volume.toFixed(2)}|${text}`
+}
+
+/** Hojo generates at 1×; the media element applies the reading rate. */
+function synthesisRate(engine: AiEngine, rate: number): number {
+  return engine === 'hojo' ? 1 : rate
 }
 
 function countSpeakableChars(text: string): number {
@@ -174,17 +218,24 @@ function noiseScaleOf(pack: AiRuntimeConfig): number | null {
   return typeof value === 'number' ? value : null
 }
 
-function workerUrl(): string {
+function workerUrl(engine: AiEngine): string {
   const base = new URL(import.meta.env.BASE_URL, document.baseURI)
-  return new URL('workers/sherpa-tts.worker.js', base).href
+  return new URL(
+    engine === 'hojo' ? 'workers/hojo-tts.worker.js' : 'workers/sherpa-tts.worker.js',
+    base,
+  ).href
 }
 
 export class SherpaDriver {
   private worker: Worker | null = null
+  private workerKind: AiEngine | null = null
   private context: AudioContext | null = null
   private master: GainNode | null = null
   private source: AudioBufferSourceNode | null = null
   private generation = 0
+  private activeLang: AiPackLang | null = null
+  private prefetchPlan: PrefetchPlan | null = null
+  private initSequence = 0
   private jobSequence = 0
   private readonly pending = new Map<string, PendingSynth>()
   private readonly sink = new MediaAudioSink()
@@ -257,6 +308,14 @@ export class SherpaDriver {
     this.runSpeak(options, handlers)
   }
 
+  preload(chunks: SherpaSynthesisOptions[]): void {
+    const plan: PrefetchPlan = {
+      generation: this.generation, chunks, watched: new Set(), idle: true,
+    }
+    this.prefetchPlan = plan
+    this.prefetchAll(plan)
+  }
+
   /** Holds the background audio session while the next chapter renders. */
   keepAlive(): void {
     this.sink.startKeepAlive()
@@ -270,24 +329,36 @@ export class SherpaDriver {
     return this.sink.playGap(ms, onEnd)
   }
 
-  cancel(): void {
+  /** Stop old playback before awaiting a voice, without losing useful prefetch. */
+  prepareSpeech(): void {
     this.generation += 1
+    this.activeLang = null
+    this.prefetchPlan = null
     this.stopSource()
+    this.sink.prepareSpeech()
+  }
+
+  cancel(): void {
+    this.prepareSpeech()
     this.sink.stop()
     this.cancelPending()
   }
 
   releaseEnglish(): void {
     const slot = this.slots.en
-    if (!this.worker && !slot.readyInfo) return
+    if (this.activeLang === 'en') this.prepareSpeech()
     this.rejectPendingLang('en', new Error('英文音色已释放。'))
     this.postMessage({ type: 'dispose-lang', lang: 'en' })
-    slot.initReject?.(new Error('英文音色已释放。'))
+    const fail = slot.initReject
+    slot.initId = null
+    slot.initPromise = null
     slot.initReject = null
     slot.initFinish = null
+    fail?.(new Error('英文音色已释放。'))
     slot.readyInfo = null
     slot.signature = ''
     slot.noiseScale = null
+    slot.engine = null
     slot.cache.clear()
     slot.stats = emptyStats()
   }
@@ -334,41 +405,43 @@ export class SherpaDriver {
     pack: AiRuntimeConfig,
   ): Promise<SherpaReadyInfo> {
     const slot = this.slots[lang]
-    const signature = `${lang}|${pack.packId}|${pack.voiceId}|${
-      noiseScaleOf(pack) ?? ''
-    }`
+    const engine = pack.engine
+    const signature = `${engine}|${lang}|${pack.packId}|${pack.variantId}|${
+      pack.packVersion
+    }|${pack.voiceId}|${noiseScaleOf(pack) ?? ''}`
 
-    if (slot.readyInfo && this.worker) {
-      if (slot.signature === signature) {
-        slot.speakerId = pack.speakerId
-        return slot.readyInfo
-      }
-      // A loaded Chinese voice still owns the single pre-2.0 style reset; an
-      // English voice can be freed in place, leaving Chinese untouched.
-      if (lang === 'zh') this.resetRuntime()
-      else this.releaseEnglish()
+    if (this.worker && slot.signature === signature) {
+      slot.speakerId = pack.speakerId
+      if (slot.readyInfo) return slot.readyInfo
+      if (slot.initPromise) return slot.initPromise
     }
 
-    if (slot.initPromise) {
-      try {
-        await slot.initPromise
-      } catch {
-        // The original caller receives the failure; try the new pack anyway.
+    if (slot.readyInfo || slot.initPromise) {
+      // Supersede, rather than await, an obsolete voice selection. The legacy
+      // worker has no init identity, so an in-flight replacement needs a worker.
+      if (
+        lang === 'zh' || slot.engine !== engine ||
+        (slot.initPromise && engine !== 'hojo')
+      ) {
+        this.resetRuntime()
+      } else {
+        this.releaseEnglish()
       }
-      if (this.worker && slot.readyInfo && slot.signature === signature) {
-        slot.speakerId = pack.speakerId
-        return slot.readyInfo
-      }
-      if (lang === 'zh') this.resetRuntime()
-      else this.releaseEnglish()
     }
 
-    if (!this.worker) this.createWorker()
+    if (this.worker && this.workerKind !== engine) this.resetRuntime()
+    if (!this.worker) this.createWorker(engine)
+    slot.engine = engine
+    // The worker runs one job at a time; idle lookahead must not delay the
+    // initialization that playback is about to wait on.
+    this.cancelIdlePending()
 
     slot.speakerId = pack.speakerId
     slot.signature = signature
     slot.noiseScale = noiseScaleOf(pack)
-    slot.initPromise = new Promise<SherpaReadyInfo>((resolve, reject) => {
+    const initId = ++this.initSequence
+    slot.initId = initId
+    const initPromise = new Promise<SherpaReadyInfo>((resolve, reject) => {
       let settled = false
       let timer = 0
 
@@ -376,22 +449,26 @@ export class SherpaDriver {
         if (settled) return
         settled = true
         window.clearTimeout(timer)
-        if (slot.initReject === fail) {
+        if (slot.initId === initId && slot.initReject === fail) {
+          slot.initId = null
           slot.initReject = null
           slot.initFinish = null
+          slot.readyInfo = null
+          slot.signature = ''
         }
-        slot.readyInfo = null
-        slot.signature = ''
         reject(error)
       }
       slot.initReject = fail
 
-      timer = window.setTimeout(() => {
-        fail(new Error('离线音色初始化超时，请重试。'))
-      }, INIT_TIMEOUT_MS)
+      timer = window.setTimeout(
+        () => {
+          fail(new Error('离线音色初始化超时，请重试。'))
+        },
+        engine === 'hojo' ? HOJO_INIT_TIMEOUT_MS : INIT_TIMEOUT_MS,
+      )
 
       const finishOk = (info: SherpaReadyInfo) => {
-        if (settled) return
+        if (settled || slot.initId !== initId) return
         settled = true
         window.clearTimeout(timer)
         slot.readyInfo = info
@@ -401,20 +478,33 @@ export class SherpaDriver {
       }
       slot.initFinish = finishOk
 
+      const message: Record<string, unknown> = {
+        type: 'init',
+        initId,
+        engine,
+        lang,
+        cacheName: pack.modelCacheName,
+        model: pack.model,
+        speakerId: pack.speakerId,
+        sampleRate: pack.sampleRate,
+        lexiconOverlay: pack.lexiconOverlay,
+        files: pack.files,
+        packId: pack.packId,
+        packVersion: pack.packVersion,
+        variantId: pack.variantId,
+        runtimeBaseUrl: pack.runtimeBaseUrl,
+        runtimeVersion: pack.runtimeVersion,
+      }
+      if (engine === 'hojo') {
+        message.runtimeFiles = pack.runtimeFiles
+      } else {
+        message.glueUrl = pack.glueUrl
+        message.apiUrl = pack.apiUrl
+        message.wasmUrl = pack.wasmUrl
+      }
+
       try {
-        this.worker!.postMessage({
-          type: 'init',
-          lang,
-          glueUrl: pack.glueUrl,
-          apiUrl: pack.apiUrl,
-          wasmUrl: pack.wasmUrl,
-          cacheName: pack.modelCacheName,
-          model: pack.model,
-          speakerId: pack.speakerId,
-          sampleRate: pack.sampleRate,
-          lexiconOverlay: pack.lexiconOverlay,
-          files: pack.files,
-        })
+        this.worker!.postMessage(message)
       } catch (error) {
         fail(
           error instanceof Error && error.message
@@ -423,27 +513,31 @@ export class SherpaDriver {
         )
       }
     }).finally(() => {
-      slot.initPromise = null
+      if (slot.initPromise === initPromise) slot.initPromise = null
     })
+    slot.initPromise = initPromise
 
-    return slot.initPromise
+    return initPromise
   }
 
-  private createWorker(): Worker {
-    const worker = new Worker(workerUrl())
+  private createWorker(engine: AiEngine): Worker {
+    const worker = new Worker(workerUrl(engine))
     this.worker = worker
+    this.workerKind = engine
 
     worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
-      this.handleMessage(event.data)
+      if (this.worker === worker) this.handleMessage(event.data)
     }
 
     worker.onerror = (event) => {
       event.preventDefault?.()
-      this.failWorker(event.message || '离线音色运行时加载失败。')
+      if (this.worker === worker) {
+        this.failWorker(event.message || '离线音色运行时加载失败。')
+      }
     }
 
     worker.onmessageerror = () => {
-      this.failWorker('离线音色返回了无法解析的数据。')
+      if (this.worker === worker) this.failWorker('离线音色返回了无法解析的数据。')
     }
 
     return worker
@@ -453,14 +547,18 @@ export class SherpaDriver {
     const error = new Error(message)
     const worker = this.worker
     this.worker = null
+    this.workerKind = null
     for (const lang of LANGS) {
       const slot = this.slots[lang]
       const fail = slot.initReject
+      slot.initId = null
+      slot.initPromise = null
       slot.initReject = null
       slot.initFinish = null
       slot.readyInfo = null
       slot.signature = ''
-      slot.initPromise = null
+      slot.engine = null
+      slot.cache.clear()
       if (fail) fail(error)
     }
     this.rejectPending(error)
@@ -477,14 +575,18 @@ export class SherpaDriver {
     this.cancel()
     const worker = this.worker
     this.worker = null
+    this.workerKind = null
     for (const lang of LANGS) {
       const slot = this.slots[lang]
       const fail = slot.initReject
+      slot.initId = null
+      slot.initPromise = null
       slot.initReject = null
       slot.initFinish = null
       slot.readyInfo = null
       slot.signature = ''
       slot.noiseScale = null
+      slot.engine = null
       slot.cache.clear()
       slot.stats = emptyStats()
       if (fail) fail(new Error(reason))
@@ -505,30 +607,31 @@ export class SherpaDriver {
     options: SherpaSpeakOptions,
     handlers: SherpaSpeakHandlers,
   ): void {
-    const generation = ++this.generation
-    this.stopSource()
-    this.sink.prepareSpeech()
-
-    const lang = normalizeLang(options.lang)
+    this.prepareSpeech()
+    const generation = this.generation
+    const request = this.synthesisRequest(options)
+    const { lang, engine, key } = request
     const slot = this.slots[lang]
-    const volume = lang === 'en' ? (options.volume ?? 1) : 1
-    const silenceScale = options.silenceScale ?? 1
-    const nextTexts = (options.nextTexts ?? []).filter(
-      (text): text is string => Boolean(text),
+    const plan: PrefetchPlan = {
+      generation,
+      chunks: (options.nextChunks ?? []).filter((chunk) => Boolean(chunk.text)),
+      watched: new Set(),
+    }
+    const cached = slot.cache.get(key)
+    const orderedKeys = new Set([
+      key,
+      ...plan.chunks.map((chunk) => this.synthesisRequest(chunk).key),
+    ])
+    // Preserve relevant work in either language, reserving a queue position
+    // for a new current request before adding any more lookahead.
+    const capacity = MAX_PENDING - (!cached && !this.hasPendingKey(key) ? 1 : 0)
+    this.prunePending(
+      new Set(
+        [...orderedKeys].filter((item) => this.hasPendingKey(item)).slice(0, capacity),
+      ),
     )
-    const keyOf = (text: string) =>
-      synthesisKey(
-        lang,
-        text,
-        options.rate,
-        slot.speakerId,
-        silenceScale,
-        volume,
-      )
-    const keepKeys = new Set([options.text, ...nextTexts].map(keyOf))
-    // Seeks and voice changes leave prefetches for text that will never be
-    // spoken. Dropping them frees the single worker for the current sentence.
-    this.prunePending(keepKeys)
+    // Retained preloads are now part of live playback, not disposable idle work.
+    for (const pending of this.pending.values()) pending.idle = false
 
     if (!slot.readyInfo || !this.worker) {
       handlers.onError?.(
@@ -537,53 +640,40 @@ export class SherpaDriver {
       return
     }
 
-    const key = keyOf(options.text)
-    const cached = slot.cache.get(key)
+    this.activeLang = lang
+    this.prefetchPlan = plan
     if (cached) {
       slot.stats.cacheHits += 1
-      // Still inside the previous clip's ended handler: playing from the
-      // cache here keeps the iOS media chain uninterrupted.
-      this.playBuffer(cached, generation, handlers)
-      this.prefetchAll(nextTexts, options.rate, silenceScale, lang, volume)
+      // Stay synchronous inside the previous clip's ended handler on iOS.
+      this.playBuffer(cached, generation, handlers, options.rate, engine)
+      this.prefetchAll(plan)
       return
     }
 
-    void this.synthesizeAndPlay(
-      options,
-      lang,
-      volume,
-      silenceScale,
-      nextTexts,
-      handlers,
-      generation,
-    )
+    void this.synthesizeAndPlay(request, options.rate, plan, handlers)
   }
 
   private async synthesizeAndPlay(
-    options: SherpaSpeakOptions,
-    lang: AiPackLang,
-    volume: number,
-    silenceScale: number,
-    nextTexts: string[],
+    request: SynthesisRequest,
+    rate: number,
+    plan: PrefetchPlan,
     handlers: SherpaSpeakHandlers,
-    generation: number,
   ): Promise<void> {
+    const { generation } = plan
     this.sink.startKeepAlive()
     try {
       if (this.context?.state === 'suspended') {
         void this.context.resume().catch(() => undefined)
       }
-      const buffer = await this.requestBuffer(
-        options.text,
-        options.rate,
-        silenceScale,
-        lang,
-        volume,
-      )
+      // Enqueue the current sentence first, then fill spare worker positions
+      // while it synthesizes (rather than waiting for playback to begin).
+      const pending = this.requestBuffer(request)
+      this.prefetchAll(plan)
+      const buffer = await pending
       if (generation !== this.generation) return
 
-      this.playBuffer(buffer, generation, handlers)
-      this.prefetchAll(nextTexts, options.rate, silenceScale, lang, volume)
+      this.playBuffer(buffer, generation, handlers, rate, request.engine)
+      this.prefetchAll(plan)
     } catch (error) {
       if (generation !== this.generation) return
       this.sink.stop()
@@ -599,28 +689,38 @@ export class SherpaDriver {
     buffer: AudioBuffer,
     generation: number,
     handlers: SherpaSpeakHandlers,
+    rate: number,
+    engine: AiEngine,
   ): void {
-    const started = this.sink.playBuffer(buffer, {
-      onStart: () => {
-        if (generation !== this.generation) return
-        handlers.onStart?.()
+    const playbackRate = engine === 'hojo' ? rate : 1
+    const started = this.sink.playBuffer(
+      buffer,
+      {
+        onStart: () => {
+          if (generation !== this.generation) return
+          handlers.onStart?.()
+        },
+        onEnd: () => {
+          if (generation !== this.generation) return
+          handlers.onEnd?.()
+        },
+        onError: () => {
+          if (generation !== this.generation) return
+          this.playViaWebAudio(buffer, generation, handlers, playbackRate)
+        },
       },
-      onEnd: () => {
-        if (generation !== this.generation) return
-        handlers.onEnd?.()
-      },
-      onError: () => {
-        if (generation !== this.generation) return
-        this.playViaWebAudio(buffer, generation, handlers)
-      },
-    })
-    if (!started) this.playViaWebAudio(buffer, generation, handlers)
+      { rate: playbackRate },
+    )
+    if (!started) {
+      this.playViaWebAudio(buffer, generation, handlers, playbackRate)
+    }
   }
 
   private playViaWebAudio(
     buffer: AudioBuffer,
     generation: number,
     handlers: SherpaSpeakHandlers,
+    rate: number,
   ): void {
     const context = this.context
     if (!context) {
@@ -632,6 +732,13 @@ export class SherpaDriver {
       if (generation !== this.generation) return
       const source = context.createBufferSource()
       source.buffer = buffer
+      source.playbackRate.value = rate
+      const pitched = source as AudioBufferSourceNode & {
+        preservesPitch?: boolean
+        webkitPreservesPitch?: boolean
+      }
+      if ('preservesPitch' in pitched) pitched.preservesPitch = true
+      pitched.webkitPreservesPitch = true
       if (this.master) source.connect(this.master)
       else source.connect(context.destination)
 
@@ -655,15 +762,23 @@ export class SherpaDriver {
     start()
   }
 
-  private prefetchAll(
-    texts: string[],
-    rate: number,
-    silenceScale: number,
-    lang: AiPackLang,
-    volume: number,
-  ): void {
-    for (const text of texts) {
-      this.prefetch(text, rate, silenceScale, lang, volume)
+  private prefetchAll(plan: PrefetchPlan): void {
+    if (plan.generation !== this.generation || plan !== this.prefetchPlan) return
+    for (const chunk of plan.chunks) {
+      const request = this.synthesisRequest(chunk)
+      const slot = this.slots[request.lang]
+      if (!slot.readyInfo || !this.worker) continue
+      if (slot.cache.has(request.key) || plan.watched.has(request.key)) continue
+      const existing = this.findPendingByKey(request.key)
+      if (!existing && this.pending.size >= MAX_PENDING) continue
+      plan.watched.add(request.key)
+      const pending = existing ?? this.requestBuffer(request, plan.idle)
+      // One watcher per key and plan: reused requests resolve once, and old
+      // playback generations cannot refill the queue after a seek/voice change.
+      void pending.then(
+        () => this.prefetchAll(plan),
+        () => this.prefetchAll(plan),
+      )
     }
   }
 
@@ -680,28 +795,31 @@ export class SherpaDriver {
     source.disconnect()
   }
 
-  private prefetch(
-    text: string,
-    rate: number,
-    silenceScale: number,
-    lang: AiPackLang,
-    volume: number,
-  ): void {
-    if (!text) return
+  private synthesisRequest(options: SherpaSynthesisOptions): SynthesisRequest {
+    const lang = normalizeLang(options.lang)
     const slot = this.slots[lang]
-    const key = synthesisKey(
+    const engine = slot.engine ?? 'sherpa'
+    const speed = synthesisRate(engine, options.rate)
+    const silenceScale = options.silenceScale ?? 1
+    const volume = options.volume ?? 1
+    return {
+      key: synthesisKey(
+        engine,
+        lang,
+        options.text,
+        speed,
+        slot.speakerId,
+        silenceScale,
+        volume,
+      ),
+      text: options.text,
       lang,
-      text,
-      rate,
-      slot.speakerId,
+      engine,
+      speed,
+      speakerId: slot.speakerId,
       silenceScale,
       volume,
-    )
-    if (slot.cache.has(key) || this.hasPendingKey(key)) return
-    if (this.pending.size >= MAX_PENDING) return
-    void this.requestBuffer(text, rate, silenceScale, lang, volume).catch(
-      () => undefined,
-    )
+    }
   }
 
   private hasPendingKey(key: string): boolean {
@@ -711,22 +829,20 @@ export class SherpaDriver {
     return false
   }
 
-  private requestBuffer(
-    text: string,
-    rate: number,
-    silenceScale: number,
-    lang: AiPackLang,
-    volume: number,
-  ): Promise<AudioBuffer> {
+  private cancelIdlePending(): void {
+    if (this.prefetchPlan?.idle) this.prefetchPlan = null
+    for (const [jobId, pending] of this.pending) {
+      if (!pending.idle) continue
+      this.pending.delete(jobId)
+      window.clearTimeout(pending.timer)
+      pending.reject(new Error('语音合成任务已取消。'))
+      this.postCancelJob(jobId)
+    }
+  }
+
+  private requestBuffer(request: SynthesisRequest, idle = false): Promise<AudioBuffer> {
+    const { key, text, lang, engine, speed, speakerId, silenceScale, volume } = request
     const slot = this.slots[lang]
-    const key = synthesisKey(
-      lang,
-      text,
-      rate,
-      slot.speakerId,
-      silenceScale,
-      volume,
-    )
     const cached = slot.cache.get(key)
     if (cached) {
       slot.stats.cacheHits += 1
@@ -739,65 +855,60 @@ export class SherpaDriver {
       return existing
     }
 
-    if (!this.worker) return Promise.reject(new Error('离线音色尚未初始化。'))
+    if (!this.worker || !slot.readyInfo) {
+      return Promise.reject(new Error('离线音色尚未初始化。'))
+    }
     slot.stats.cacheMisses += 1
 
-    return new Promise<AudioBuffer>((resolve, reject) => {
-      const jobId = `job-${++this.jobSequence}`
-      const timer = window.setTimeout(() => {
-        const pending = this.pending.get(jobId)
-        if (!pending) return
-        this.pending.delete(jobId)
-        pending.reject(new Error('语音合成超时，请重试。'))
-      }, SYNTH_TIMEOUT_MS)
-      this.pending.set(jobId, {
-        key,
-        lang,
-        chars: countSpeakableChars(text),
-        rate,
-        resolve,
-        reject,
-        timer,
-      })
-      try {
-        this.worker!.postMessage({
-          type: 'synth',
-          lang,
-          epoch: this.generation,
-          jobId,
-          text,
-          speed: rate,
-          speakerId: slot.speakerId,
-          silenceScale,
-          volume,
-        })
-      } catch (error) {
-        const pending = this.pending.get(jobId)
-        if (pending) {
-          window.clearTimeout(pending.timer)
-          this.pending.delete(jobId)
-        }
-        reject(error instanceof Error ? error : new Error('语音合成请求失败。'))
-      }
+    let resolve!: (buffer: AudioBuffer) => void
+    let reject!: (error: Error) => void
+    const promise = new Promise<AudioBuffer>((res, rej) => {
+      resolve = res
+      reject = rej
     })
+    const jobId = `job-${++this.jobSequence}`
+    const timer = window.setTimeout(
+      () => {
+        const pending = this.takePending(jobId)
+        if (!pending) return
+        this.postCancelJob(jobId)
+        pending.reject(new Error('语音合成超时，请重试。'))
+      },
+      engine === 'hojo' ? HOJO_SYNTH_TIMEOUT_MS : SYNTH_TIMEOUT_MS,
+    )
+    this.pending.set(jobId, {
+      key,
+      lang,
+      chars: countSpeakableChars(text),
+      rate: speed,
+      promise,
+      resolve,
+      reject,
+      timer,
+      idle,
+    })
+    try {
+      this.worker.postMessage({
+        type: 'synth',
+        lang,
+        epoch: this.generation,
+        jobId,
+        text,
+        speed,
+        speakerId,
+        silenceScale,
+        volume,
+      })
+    } catch (error) {
+      this.takePending(jobId)
+      reject(error instanceof Error ? error : new Error('语音合成请求失败。'))
+    }
+    return promise
   }
 
   private findPendingByKey(key: string): Promise<AudioBuffer> | null {
     for (const item of this.pending.values()) {
-      if (item.key === key) {
-        return new Promise<AudioBuffer>((resolve, reject) => {
-          const original = item.resolve
-          item.resolve = (buffer) => {
-            original(buffer)
-            resolve(buffer)
-          }
-          const originalReject = item.reject
-          item.reject = (error) => {
-            originalReject(error)
-            reject(error)
-          }
-        })
-      }
+      if (item.key === key) return item.promise
     }
     return null
   }
@@ -806,28 +917,21 @@ export class SherpaDriver {
     if (message.type === 'ready') {
       const lang = normalizeLang(message.lang)
       const slot = this.slots[lang]
+      if (slot.engine === 'hojo' && message.initId !== slot.initId) return
       const finish = slot.initFinish
-      if (finish) {
-        finish({
-          sampleRate: message.sampleRate,
-          numSpeakers: message.numSpeakers,
-          initMs: message.initMs,
-          warmupMs: message.warmupMs,
-          heapBytes: message.heapBytes,
-        })
-        return
-      }
-      slot.readyInfo = {
+      if (!finish) return
+      finish({
         sampleRate: message.sampleRate,
         numSpeakers: message.numSpeakers,
         initMs: message.initMs,
         warmupMs: message.warmupMs,
         heapBytes: message.heapBytes,
-      }
+      })
+      if (this.prefetchPlan) this.prefetchAll(this.prefetchPlan)
       return
     }
 
-    if (message.type === 'disposed') {
+    if (message.type === 'disposed' || message.type === 'progress') {
       return
     }
 
@@ -836,14 +940,18 @@ export class SherpaDriver {
       const slot = this.slots[lang]
       const error = new Error(message.message || '语音合成失败。')
       if (message.jobId) {
-        const pending = this.takePending(message.jobId)
-        if (pending) {
-          pending.reject(error)
-          return
-        }
+        // A cancelled/timed-out job may fail after another voice starts loading.
+        // It must never be interpreted as that voice's initialization failure.
+        this.takePending(message.jobId)?.reject(error)
+        return
+      }
+      if (message.code === 'init-failed' || message.initId !== undefined) {
+        if (slot.engine === 'hojo' && message.initId !== slot.initId) return
+        slot.initReject?.(error)
+        return
       }
       if (slot.initReject) {
-        slot.initReject(error)
+        if (slot.engine !== 'hojo') slot.initReject(error)
         return
       }
       slot.readyInfo = null

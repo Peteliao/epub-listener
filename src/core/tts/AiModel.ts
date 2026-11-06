@@ -11,7 +11,9 @@ export type AiPhase =
 
 export type AiPackPhase = 'missing' | 'downloading' | 'ready' | 'error'
 
-export type AiModelType = 'vits' | 'matcha' | 'kokoro'
+export type AiModelType = 'vits' | 'matcha' | 'kokoro' | 'hojo'
+
+export type AiEngine = 'sherpa' | 'hojo'
 
 export interface AiPackLicense {
   label: string
@@ -22,6 +24,9 @@ export interface AiPackLicense {
 
 export type AiPackLang = 'zh' | 'en'
 
+/** A bilingual pack exposes both Chinese and English voices. */
+export type AiPackKind = AiPackLang | 'bi'
+
 export interface AiVoiceStatus {
   id: string
   label: string
@@ -31,14 +36,24 @@ export interface AiVoiceStatus {
   packId: string
   packName: string
   lang: AiPackLang
+  engine: AiEngine
   modelType: AiModelType
   commercialUse: boolean
   licenseLabel: string
 }
 
+export interface AiPackVariantStatus {
+  id: string
+  label: string
+  description: string
+  totalBytes: number
+  selected: boolean
+}
+
 export interface AiPackStatus {
   id: string
-  lang: AiPackLang
+  lang: AiPackKind
+  engine: AiEngine
   name: string
   version: string
   description: string
@@ -51,17 +66,22 @@ export interface AiPackStatus {
   persisted: boolean
   message: string | null
   error: string | null
+  variantId: string
+  variantLabel: string
+  variants: AiPackVariantStatus[]
   voices: AiVoiceStatus[]
 }
 
 export interface AiModelStatus {
   supported: boolean
   phase: AiPhase
-  /** Chinese narration packs only; the English pack is exposed separately. */
+  /** Chinese and bilingual packs; the English pack is exposed separately. */
   packs: AiPackStatus[]
   englishPack: AiPackStatus | null
   selectedVoiceId: string
   selectedVoice: AiVoiceStatus | null
+  englishVoice: AiVoiceStatus | null
+  variantPreference: AiVariantPreference
   runtimeBytes: number
   persisted: boolean
   modelBytes: number
@@ -83,20 +103,33 @@ export interface AiModelDefinition {
   warmupText?: string
 }
 
-export interface AiRuntimeFile {
+export interface AiRuntimeFilePart {
   name: string
   url: string
   bytes: number
   sha256: string
 }
 
+export interface AiRuntimeFile {
+  name: string
+  url: string
+  bytes: number
+  sha256: string
+  parts?: AiRuntimeFilePart[]
+}
+
 export interface AiRuntimeConfig {
+  engine: AiEngine
   runtimeBaseUrl: string
-  glueUrl: string
-  apiUrl: string
-  wasmUrl: string
+  glueUrl?: string
+  apiUrl?: string
+  wasmUrl?: string
+  runtimeFiles?: AiRuntimeFile[]
+  runtimeVersion: string
   modelCacheName: string
   packId: string
+  packVersion: string
+  variantId: string
   lang: AiPackLang
   voiceId: string
   speakerId: number
@@ -116,11 +149,19 @@ export interface AiLexiconAssets {
   packVersion: string
 }
 
+interface ManifestFilePart {
+  name: string
+  url: string
+  bytes: number
+  sha256: string
+}
+
 interface ManifestFile {
   name: string
   url: string
   bytes: number
   sha256: string
+  parts?: ManifestFilePart[]
 }
 
 interface ManifestLicense {
@@ -143,40 +184,60 @@ interface ManifestVoice {
   sampleRate: number
   label: string
   description?: string
+  lang?: AiPackLang
+}
+
+interface ManifestVariant {
+  id: string
+  label: string
+  description?: string
+  totalBytes: number
+  files: ManifestFile[]
 }
 
 interface ManifestPack {
   id: string
-  lang?: AiPackLang
+  engine?: AiEngine
+  lang?: AiPackKind
   name: string
   version: string
   description: string
   license: ManifestLicense
   baseUrl: string
-  model: ManifestModel
+  model?: ManifestModel
   voices: ManifestVoice[]
   totalBytes: number
-  files: ManifestFile[]
+  files?: ManifestFile[]
+  variants?: ManifestVariant[]
+}
+
+interface ManifestRuntimeFile {
+  name: string
+  url: string
+  bytes: number
+  sha256: string
 }
 
 interface ManifestRuntime {
   version: string
   baseUrl: string
-  glue: string
-  api: string
-  wasm: string
   bytes: number
-  glueBytes: number
-  apiBytes: number
-  wasmBytes: number
-  glueSha256: string
-  wasmSha256: string
-  apiSha256: string
+  glue?: string
+  api?: string
+  wasm?: string
+  glueBytes?: number
+  apiBytes?: number
+  wasmBytes?: number
+  glueSha256?: string
+  wasmSha256?: string
+  apiSha256?: string
+  files?: ManifestRuntimeFile[]
 }
 
 interface AiManifest {
   schemaVersion: number
   runtime: ManifestRuntime
+  hojoRuntime?: ManifestRuntime
   packs: ManifestPack[]
 }
 
@@ -193,12 +254,17 @@ interface CacheInspection {
   downloadedBytes: number
 }
 
-const MANIFEST_STORAGE_KEY = 'shusheng.ai.manifest.v3'
-const LEGACY_MANIFEST_STORAGE_KEYS = ['shusheng.ai.manifest.v2']
+export type AiVariantPreference = 'auto' | 'full' | 'int8'
+
+const MANIFEST_STORAGE_KEY = 'shusheng.ai.manifest.v4'
+const LEGACY_MANIFEST_STORAGE_KEYS = [
+  'shusheng.ai.manifest.v3',
+  'shusheng.ai.manifest.v2',
+]
 const CACHE_PREFIX = 'shusheng-tts-'
 const MODEL_CACHE_PREFIX = `${CACHE_PREFIX}model-`
 const RUNTIME_CACHE_PREFIX = `${CACHE_PREFIX}runtime-`
-const MODEL_TYPES: readonly AiModelType[] = ['vits', 'matcha', 'kokoro']
+const MODEL_TYPES: readonly AiModelType[] = ['vits', 'matcha', 'kokoro', 'hojo']
 
 function resolveUrl(path: string): string {
   const base = new URL(import.meta.env.BASE_URL, document.baseURI)
@@ -209,7 +275,7 @@ function resolveUrl(path: string): string {
 // a usable MIME type, so preserve one when re-wrapping downloaded bytes.
 function contentTypeFor(url: string): string {
   const path = url.split('?')[0] ?? url
-  if (path.endsWith('.js')) return 'text/javascript; charset=utf-8'
+  if (path.endsWith('.js') || path.endsWith('.mjs')) return 'text/javascript; charset=utf-8'
   if (path.endsWith('.wasm')) return 'application/wasm'
   if (path.endsWith('.json')) return 'application/json; charset=utf-8'
   if (path.endsWith('.txt')) return 'text/plain; charset=utf-8'
@@ -267,17 +333,41 @@ function isManifestModel(value: unknown): value is ManifestModel {
   )
 }
 
+function isManifestFilePart(value: unknown): value is ManifestFilePart {
+  if (!value || typeof value !== 'object') return false
+  const part = value as Partial<ManifestFilePart>
+  return (
+    typeof part.name === 'string' &&
+    part.name.length > 0 &&
+    typeof part.url === 'string' &&
+    part.url.length > 0 &&
+    typeof part.bytes === 'number' &&
+    part.bytes > 0 &&
+    isHexHash(part.sha256)
+  )
+}
+
 function isManifestFile(value: unknown): value is ManifestFile {
   if (!value || typeof value !== 'object') return false
   const file = value as Partial<ManifestFile>
+  if (
+    typeof file.name !== 'string' ||
+    file.name.length === 0 ||
+    typeof file.url !== 'string' ||
+    file.url.length === 0 ||
+    typeof file.bytes !== 'number' ||
+    file.bytes <= 0 ||
+    !isHexHash(file.sha256)
+  ) {
+    return false
+  }
+  if (file.parts === undefined) return true
   return (
-    typeof file.name === 'string' &&
-    file.name.length > 0 &&
-    typeof file.url === 'string' &&
-    file.url.length > 0 &&
-    typeof file.bytes === 'number' &&
-    file.bytes > 0 &&
-    isHexHash(file.sha256)
+    Array.isArray(file.parts) &&
+    file.parts.length > 1 &&
+    file.parts.every(isManifestFilePart) &&
+    new Set(file.parts.map((part) => part.name)).size === file.parts.length &&
+    file.parts.reduce((total, part) => total + part.bytes, 0) === file.bytes
   )
 }
 
@@ -307,7 +397,29 @@ function isManifestVoice(value: unknown): value is ManifestVoice {
     voice.sampleRate > 0 &&
     typeof voice.label === 'string' &&
     voice.label.length > 0 &&
-    (voice.description === undefined || typeof voice.description === 'string')
+    (voice.description === undefined || typeof voice.description === 'string') &&
+    (voice.lang === undefined || voice.lang === 'zh' || voice.lang === 'en')
+  )
+}
+
+function isManifestVariant(value: unknown): value is ManifestVariant {
+  if (!value || typeof value !== 'object') return false
+  const variant = value as Partial<ManifestVariant>
+  const files = variant.files
+  return (
+    typeof variant.id === 'string' &&
+    variant.id.length > 0 &&
+    typeof variant.label === 'string' &&
+    variant.label.length > 0 &&
+    (variant.description === undefined ||
+      typeof variant.description === 'string') &&
+    typeof variant.totalBytes === 'number' &&
+    variant.totalBytes > 0 &&
+    Array.isArray(files) &&
+    files.length > 0 &&
+    files.every(isManifestFile) &&
+    new Set(files.map((file) => file.name)).size === files.length &&
+    files.reduce((total, file) => total + file.bytes, 0) === variant.totalBytes
   )
 }
 
@@ -316,6 +428,8 @@ function isManifestPack(value: unknown): value is ManifestPack {
   const pack = value as Partial<ManifestPack>
   const files = pack.files
   const voices = pack.voices
+  const variants = pack.variants
+  const engine = pack.engine ?? 'sherpa'
   if (
     typeof pack.id !== 'string' ||
     pack.id.length === 0 ||
@@ -324,17 +438,17 @@ function isManifestPack(value: unknown): value is ManifestPack {
     typeof pack.version !== 'string' ||
     pack.version.length === 0 ||
     typeof pack.description !== 'string' ||
-    (pack.lang !== undefined && pack.lang !== 'zh' && pack.lang !== 'en') ||
+    (engine !== 'sherpa' && engine !== 'hojo') ||
+    (pack.lang !== undefined &&
+      pack.lang !== 'zh' &&
+      pack.lang !== 'en' &&
+      pack.lang !== 'bi') ||
     typeof pack.baseUrl !== 'string' ||
     pack.baseUrl.length === 0 ||
     !isManifestLicense(pack.license) ||
     !isManifestModel(pack.model) ||
     typeof pack.totalBytes !== 'number' ||
     pack.totalBytes <= 0 ||
-    !Array.isArray(files) ||
-    files.length === 0 ||
-    !files.every(isManifestFile) ||
-    new Set(files.map((file) => file.name)).size !== files.length ||
     !Array.isArray(voices) ||
     voices.length === 0 ||
     !voices.every(isManifestVoice) ||
@@ -342,22 +456,73 @@ function isManifestPack(value: unknown): value is ManifestPack {
   ) {
     return false
   }
-  const fileBytes = files.reduce((total, file) => total + file.bytes, 0)
-  return fileBytes === pack.totalBytes
+  if (engine === 'sherpa') {
+    if (pack.lang === 'bi') return false
+    if (
+      !Array.isArray(files) ||
+      files.length === 0 ||
+      !files.every(isManifestFile) ||
+      new Set(files.map((file) => file.name)).size !== files.length
+    ) {
+      return false
+    }
+    const fileBytes = files.reduce((total, file) => total + file.bytes, 0)
+    return fileBytes === pack.totalBytes
+  }
+  if (pack.model.type !== 'hojo' || pack.lang !== 'bi') return false
+  if (files !== undefined && (!Array.isArray(files) || files.length > 0)) {
+    return false
+  }
+  if (
+    !Array.isArray(variants) ||
+    variants.length === 0 ||
+    !variants.every(isManifestVariant) ||
+    new Set(variants.map((variant) => variant.id)).size !== variants.length
+  ) {
+    return false
+  }
+  if (!voices.every((voice) => voice.lang === 'zh' || voice.lang === 'en')) {
+    return false
+  }
+  return (
+    pack.totalBytes === Math.max(...variants.map((variant) => variant.totalBytes))
+  )
 }
 
 function isManifestRuntime(value: unknown): value is ManifestRuntime {
   if (!value || typeof value !== 'object') return false
   const runtime = value as Partial<ManifestRuntime>
+  if (
+    typeof runtime.version !== 'string' ||
+    runtime.version.length === 0 ||
+    typeof runtime.baseUrl !== 'string' ||
+    typeof runtime.bytes !== 'number' ||
+    runtime.bytes <= 0
+  ) {
+    return false
+  }
+  if (runtime.files !== undefined) {
+    const files = runtime.files
+    return (
+      Array.isArray(files) &&
+      files.length > 0 &&
+      files.every(
+        (file) =>
+          file &&
+          typeof file.name === 'string' &&
+          typeof file.url === 'string' &&
+          typeof file.bytes === 'number' &&
+          file.bytes > 0 &&
+          isHexHash(file.sha256),
+      ) &&
+      new Set(files.map((file) => file.name)).size === files.length &&
+      files.reduce((total, file) => total + file.bytes, 0) === runtime.bytes
+    )
+  }
   return (
-    typeof runtime.version === 'string' &&
-    runtime.version.length > 0 &&
-    typeof runtime.baseUrl === 'string' &&
     typeof runtime.glue === 'string' &&
     typeof runtime.api === 'string' &&
     typeof runtime.wasm === 'string' &&
-    typeof runtime.bytes === 'number' &&
-    runtime.bytes > 0 &&
     typeof runtime.glueBytes === 'number' &&
     runtime.glueBytes > 0 &&
     typeof runtime.apiBytes === 'number' &&
@@ -375,13 +540,18 @@ function isManifest(value: unknown): value is AiManifest {
   const manifest = value as Partial<AiManifest>
   const packs = manifest.packs
   if (
-    manifest.schemaVersion !== 3 ||
+    manifest.schemaVersion !== 4 ||
     !isManifestRuntime(manifest.runtime) ||
     !Array.isArray(packs) ||
     packs.length === 0 ||
     !packs.every(isManifestPack)
   ) {
     return false
+  }
+  const hasHojo = packs.some((pack) => (pack.engine ?? 'sherpa') === 'hojo')
+  if (hasHojo) {
+    if (!isManifestRuntime(manifest.hojoRuntime)) return false
+    if (!manifest.hojoRuntime.files?.length) return false
   }
   const packIds = new Set(packs.map((pack) => pack.id))
   if (packIds.size !== packs.length) return false
@@ -408,6 +578,61 @@ function supportsAi(): boolean {
   )
 }
 
+function packEngine(pack: ManifestPack): AiEngine {
+  return pack.engine ?? 'sherpa'
+}
+
+function packLangOf(pack: ManifestPack): AiPackKind {
+  return pack.lang ?? 'zh'
+}
+
+function voiceLangOf(pack: ManifestPack, voice: ManifestVoice): AiPackLang {
+  return voice.lang ?? (pack.lang === 'en' ? 'en' : 'zh')
+}
+
+function packVariants(pack: ManifestPack): ManifestVariant[] {
+  if (pack.variants?.length) return pack.variants
+  if (!pack.files?.length) return []
+  return [
+    {
+      id: 'default',
+      label: '默认',
+      totalBytes: pack.totalBytes,
+      files: pack.files,
+    },
+  ]
+}
+
+function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return true
+  if ((navigator.maxTouchPoints ?? 0) > 1) {
+    try {
+      return window.matchMedia?.('(pointer: coarse)').matches ?? false
+    } catch {
+      return false
+    }
+  }
+  return false
+}
+
+function runtimeFor(
+  manifest: AiManifest,
+  engine: AiEngine,
+): ManifestRuntime | null {
+  return engine === 'hojo' ? (manifest.hojoRuntime ?? null) : manifest.runtime
+}
+
+function runtimeFiles(runtime: ManifestRuntime): ManifestRuntimeFile[] {
+  if (runtime.files?.length) return runtime.files
+  return [
+    { name: 'glue', url: `${runtime.baseUrl}${runtime.glue}`, bytes: runtime.glueBytes!, sha256: runtime.glueSha256! },
+    { name: 'api', url: `${runtime.baseUrl}${runtime.api}`, bytes: runtime.apiBytes!, sha256: runtime.apiSha256! },
+    { name: 'wasm', url: `${runtime.baseUrl}${runtime.wasm}`, bytes: runtime.wasmBytes!, sha256: runtime.wasmSha256! },
+  ]
+}
+
 function emptyPackState(): PackRuntimeState {
   return {
     phase: 'missing',
@@ -426,6 +651,8 @@ export class AiModelManager {
     englishPack: null,
     selectedVoiceId: '',
     selectedVoice: null,
+    englishVoice: null,
+    variantPreference: 'auto',
     runtimeBytes: 0,
     persisted: false,
     modelBytes: 0,
@@ -442,14 +669,17 @@ export class AiModelManager {
 
   private manifest: AiManifest | null = null
   private selectedVoiceId: string
+  private selectedEnglishVoiceId: string
+  private variantPreference: AiVariantPreference = 'auto'
   private readonly packStates = new Map<string, PackRuntimeState>()
   private readonly listeners = new Set<(status: AiModelStatus) => void>()
   private downloadTask: Promise<void> | null = null
   private persisted = false
   private lastProgressAt = 0
 
-  constructor(selectedVoiceId = 'shanlan') {
+  constructor(selectedVoiceId = 'shanlan', selectedEnglishVoiceId = 'kristin') {
     this.selectedVoiceId = selectedVoiceId
+    this.selectedEnglishVoiceId = selectedEnglishVoiceId
     this.status.supported = supportsAi()
     if (!this.status.supported) {
       this.status.phase = 'unsupported'
@@ -473,7 +703,12 @@ export class AiModelManager {
   }
 
   getEnglishVoice(): AiVoiceStatus | null {
-    return this.status.englishPack?.voices[0] ?? null
+    if (!this.manifest) return null
+    const selected = this.voiceStatus(this.selectedEnglishVoiceId)
+    if (selected && selected.lang === 'en' && this.englishVoiceAllowed(selected)) {
+      return selected
+    }
+    return this.defaultEnglishVoice()
   }
 
   subscribe(listener: (status: AiModelStatus) => void): () => void {
@@ -484,12 +719,37 @@ export class AiModelManager {
 
   selectVoice(voiceId: string): boolean {
     const voice = this.voiceStatus(voiceId)
-    if (!voice || voice.lang === 'en') return false
+    if (!voice || voice.lang !== 'zh') return false
     if (this.selectedVoiceId !== voiceId) {
       this.selectedVoiceId = voiceId
+      this.ensureSelectedEnglishVoice()
       this.rebuildStatus()
     }
     return true
+  }
+
+  selectEnglishVoice(voiceId: string): boolean {
+    const voice = this.voiceStatus(voiceId)
+    if (!voice || voice.lang !== 'en' || !this.englishVoiceAllowed(voice)) {
+      return false
+    }
+    if (this.selectedEnglishVoiceId !== voiceId) {
+      this.selectedEnglishVoiceId = voiceId
+      this.rebuildStatus()
+    }
+    return true
+  }
+
+  /** `auto` picks the full pack on desktop and int8 on touch devices. */
+  async setVariantPreference(
+    preference: AiVariantPreference,
+  ): Promise<AiModelStatus> {
+    this.variantPreference = preference
+    if (this.manifest && !this.downloadTask) {
+      await this.refreshPackStates(this.manifest)
+      this.rebuildStatus()
+    }
+    return this.getStatus()
   }
 
   async refresh(): Promise<AiModelStatus> {
@@ -501,24 +761,10 @@ export class AiModelManager {
       this.manifest = manifest
       this.ensurePackStates(manifest)
       this.ensureSelectedVoice(manifest)
+      this.ensureSelectedEnglishVoice()
 
-      const runtime = await this.inspectRuntime(manifest)
-      const persisted = await this.isPersisted()
-      this.persisted = persisted
-
-      for (const pack of manifest.packs) {
-        const model = await this.inspectPack(pack)
-        const previous = this.packStates.get(pack.id) ?? emptyPackState()
-        this.packStates.set(pack.id, {
-          phase: model.present && runtime.present ? 'ready' : 'missing',
-          downloadedBytes:
-            model.downloadedBytes + (runtime.present ? manifest.runtime.bytes : 0),
-          persisted,
-          message: previous.phase === 'error' ? previous.message : null,
-          error: previous.phase === 'error' ? previous.error : null,
-        })
-      }
-
+      this.persisted = await this.isPersisted()
+      await this.refreshPackStates(manifest)
       this.rebuildStatus()
     } catch (error) {
       this.fatalError(
@@ -529,6 +775,29 @@ export class AiModelManager {
     }
 
     return this.getStatus()
+  }
+
+  private async refreshPackStates(manifest: AiManifest): Promise<void> {
+    const runtimes = new Map<AiEngine, CacheInspection>()
+    for (const pack of manifest.packs) {
+      const engine = packEngine(pack)
+      let runtime = runtimes.get(engine)
+      if (!runtime) {
+        runtime = await this.inspectRuntime(manifest, engine)
+        runtimes.set(engine, runtime)
+      }
+      const model = await this.inspectPack(pack)
+      const previous = this.packStates.get(pack.id) ?? emptyPackState()
+      const runtimeBytes = runtimeFor(manifest, engine)?.bytes ?? 0
+      this.packStates.set(pack.id, {
+        phase: model.present && runtime.present ? 'ready' : 'missing',
+        downloadedBytes:
+          model.downloadedBytes + (runtime.present ? runtimeBytes : 0),
+        persisted: this.persisted,
+        message: previous.phase === 'error' ? previous.message : null,
+        error: previous.phase === 'error' ? previous.error : null,
+      })
+    }
   }
 
   async download(packId: string): Promise<void> {
@@ -559,12 +828,14 @@ export class AiModelManager {
       persisted: this.persisted,
     })
 
-    const remaining = await caches.keys()
-    const hasOtherPack = remaining.some(
-      (name) => name.startsWith(MODEL_CACHE_PREFIX) && name !== this.modelCacheName(pack),
-    )
-    if (!hasOtherPack && this.manifest) {
-      await caches.delete(this.runtimeCacheName(this.manifest))
+    if (this.manifest) {
+      const engine = packEngine(pack)
+      const hasSameEngine = this.manifest.packs.some(
+        (item) => item.id !== pack.id && packEngine(item) === engine,
+      )
+      if (!hasSameEngine) {
+        await caches.delete(this.runtimeCacheName(this.manifest, engine))
+      }
     }
 
     this.rebuildStatus()
@@ -575,13 +846,20 @@ export class AiModelManager {
       this.manifest = await this.loadManifest()
       this.ensurePackStates(this.manifest)
       this.ensureSelectedVoice(this.manifest)
+      this.ensureSelectedEnglishVoice()
     }
     const manifest = this.manifest
     const voice = this.voiceStatus(voiceId)
     const pack = voice ? this.packDefinition(voice.packId) : null
-    if (!voice || !pack) {
+    if (!voice || !pack || !pack.model) {
       throw new Error('所选离线音色不存在，请重新选择。')
     }
+    const engine = packEngine(pack)
+    const runtime = runtimeFor(manifest, engine)
+    if (!runtime) {
+      throw new Error('离线语音运行时清单缺失，请刷新页面后重试。')
+    }
+    const variant = this.variantFor(pack)
 
     const modelCacheName = this.modelCacheName(pack)
     const model = await this.inspectPack(pack)
@@ -590,25 +868,25 @@ export class AiModelManager {
       throw new Error('离线音色包不完整，请重新下载。')
     }
 
-    const runtime = await this.inspectRuntime(manifest)
-    if (!runtime.present) {
+    const runtimeState = await this.inspectRuntime(manifest, engine)
+    if (!runtimeState.present) {
       this.markPackMissing(
         pack,
-        model.downloadedBytes + runtime.downloadedBytes,
+        model.downloadedBytes + runtimeState.downloadedBytes,
       )
       throw new Error('离线语音运行时缺失，请重新下载音色包。')
     }
 
     this.packStates.set(pack.id, {
       phase: 'ready',
-      downloadedBytes: model.downloadedBytes + runtime.downloadedBytes,
+      downloadedBytes: model.downloadedBytes + runtimeState.downloadedBytes,
       persisted: this.persisted,
       message: null,
       error: null,
     })
     this.rebuildStatus()
 
-    const runtimeRoot = new URL(manifest.runtime.baseUrl, resolveUrl(''))
+    const runtimeRoot = new URL(runtime.baseUrl, resolveUrl(''))
 
     const lexiconOverlay =
       pack.model.type === 'matcha' &&
@@ -618,16 +896,28 @@ export class AiModelManager {
           )
         : undefined
 
-    // The worker hashes each file while streaming it into MEMFS, so the main
-    // thread never has to hold the whole (100 MB+) voice pack at once.
-    return {
+    const files = this.packFiles(pack).map((file) => ({
+      ...file,
+      url: resolveUrl(file.url),
+      ...(file.parts
+        ? {
+            parts: file.parts.map((part) => ({
+              ...part,
+              url: resolveUrl(part.url),
+            })),
+          }
+        : {}),
+    }))
+
+    const common = {
+      engine,
       runtimeBaseUrl: runtimeRoot.href,
-      glueUrl: new URL(manifest.runtime.glue, runtimeRoot).href,
-      apiUrl: new URL(manifest.runtime.api, runtimeRoot).href,
-      wasmUrl: new URL(manifest.runtime.wasm, runtimeRoot).href,
+      runtimeVersion: runtime.version,
       modelCacheName,
       packId: pack.id,
-      lang: pack.lang === 'en' ? 'en' : 'zh',
+      packVersion: pack.version,
+      variantId: variant?.id ?? '',
+      lang: voice.lang,
       voiceId: voice.id,
       speakerId: voice.speakerId,
       sampleRate: voice.sampleRate,
@@ -639,10 +929,32 @@ export class AiModelManager {
         ...(pack.model.warmupText ? { warmupText: pack.model.warmupText } : {}),
       },
       ...(lexiconOverlay ? { lexiconOverlay } : {}),
-      files: pack.files.map((file) => ({
-        ...file,
-        url: resolveUrl(file.url),
-      })),
+      files,
+    }
+
+    if (engine === 'hojo') {
+      return {
+        ...common,
+        runtimeFiles: runtimeFiles(runtime).map((file) => ({
+          ...file,
+          url: resolveUrl(file.url),
+        })),
+      }
+    }
+
+    if (
+      typeof runtime.glue !== 'string' ||
+      typeof runtime.api !== 'string' ||
+      typeof runtime.wasm !== 'string'
+    ) {
+      throw new Error('离线语音运行时清单不完整。')
+    }
+
+    return {
+      ...common,
+      glueUrl: new URL(runtime.glue, runtimeRoot).href,
+      apiUrl: new URL(runtime.api, runtimeRoot).href,
+      wasmUrl: new URL(runtime.wasm, runtimeRoot).href,
     }
   }
 
@@ -651,14 +963,16 @@ export class AiModelManager {
       this.manifest = await this.loadManifest()
       this.ensurePackStates(this.manifest)
       this.ensureSelectedVoice(this.manifest)
+      this.ensureSelectedEnglishVoice()
     }
     const voice = this.voiceStatus(voiceId)
     const pack = voice ? this.packDefinition(voice.packId) : null
-    if (!voice || !pack || pack.model.type !== 'matcha') return null
+    if (!voice || !pack || !pack.model || pack.model.type !== 'matcha') return null
     const lexiconName = pack.model.config.lexicon
     if (typeof lexiconName !== 'string') return null
-    const lexiconFile = pack.files.find((file) => file.name === lexiconName)
-    const tokensFile = pack.files.find((file) => file.name === 'tokens.txt')
+    const files = this.packFiles(pack)
+    const lexiconFile = files.find((file) => file.name === lexiconName)
+    const tokensFile = files.find((file) => file.name === 'tokens.txt')
     if (!lexiconFile || !tokensFile) return null
     return {
       cacheName: this.modelCacheName(pack),
@@ -682,9 +996,19 @@ export class AiModelManager {
     this.manifest = manifest
     this.ensurePackStates(manifest)
     this.ensureSelectedVoice(manifest)
+    this.ensureSelectedEnglishVoice()
     const pack = manifest.packs.find((item) => item.id === packId)
     if (!pack) {
       throw new Error('音色清单中找不到这个音色包，请刷新页面后重试。')
+    }
+    const variant = this.variantFor(pack)
+    if (!variant) {
+      throw new Error('音色包清单不完整，请刷新页面后重试。')
+    }
+    const engine = packEngine(pack)
+    const runtime = runtimeFor(manifest, engine)
+    if (!runtime) {
+      throw new Error('离线语音运行时清单缺失，请刷新页面后重试。')
     }
     this.packStates.set(pack.id, {
       ...(this.packStates.get(pack.id) ?? emptyPackState()),
@@ -696,8 +1020,8 @@ export class AiModelManager {
     this.rebuildStatus()
 
     const modelCacheName = this.modelCacheName(pack)
-    const runtimeCacheName = this.runtimeCacheName(manifest)
-    const total = pack.totalBytes + manifest.runtime.bytes
+    const runtimeCacheName = this.runtimeCacheName(manifest, engine)
+    const total = variant.totalBytes + runtime.bytes
     let downloaded = 0
 
     try {
@@ -707,55 +1031,69 @@ export class AiModelManager {
         message: '正在准备模型文件…',
       })
 
-      for (const file of pack.files) {
-        const url = resolveUrl(file.url)
-        const cached = await this.readVerified(modelCache, url, file.bytes, file.sha256)
-        if (cached) {
-          downloaded += file.bytes
-          this.reportProgress(pack.id, downloaded, `正在检查 ${file.name}…`)
-          continue
-        }
+      for (const file of variant.files) {
+        const entries = file.parts?.length ? file.parts : [file]
+        for (const entry of entries) {
+          const url = resolveUrl(entry.url)
+          const cached = await this.readVerified(
+            modelCache,
+            url,
+            entry.bytes,
+            entry.sha256,
+          )
+          if (cached) {
+            downloaded += entry.bytes
+            this.reportProgress(pack.id, downloaded, `正在检查 ${file.name}…`)
+            continue
+          }
 
-        const buffer = await this.fetchFile(
-          url,
-          file.bytes,
-          downloaded,
-          `正在下载 ${file.name}`,
-          pack.id,
-        )
-        this.patchPackState(pack.id, { message: `正在校验 ${file.name}…` })
-        const digest = await hashToHex(buffer)
-        if (digest !== file.sha256.toLowerCase()) {
-          throw new Error(`${file.name} 校验失败，请重试。`)
+          const buffer = await this.fetchFile(
+            url,
+            entry.bytes,
+            downloaded,
+            `正在下载 ${file.name}`,
+            pack.id,
+          )
+          this.patchPackState(pack.id, { message: `正在校验 ${file.name}…` })
+          const digest = await hashToHex(buffer)
+          if (digest !== entry.sha256.toLowerCase()) {
+            throw new Error(`${file.name} 校验失败，请重试。`)
+          }
+          await modelCache.put(
+            url,
+            new Response(buffer, {
+              headers: { 'Content-Type': contentTypeFor(url) },
+            }),
+          )
+          downloaded += entry.bytes
+          this.reportProgress(pack.id, downloaded, `已缓存 ${file.name}`)
         }
-        await modelCache.put(
-          url,
-          new Response(buffer, { headers: { 'Content-Type': contentTypeFor(url) } }),
-        )
-        downloaded += file.bytes
-        this.reportProgress(pack.id, downloaded, `已缓存 ${file.name}`)
       }
 
-      for (const [name, url, bytes] of this.runtimeEntries(manifest)) {
-        const absolute = resolveUrl(url)
-        const expected = this.runtimeHash(manifest, name)
-        const cached = await this.readVerified(runtimeCache, absolute, bytes, expected)
+      for (const entry of runtimeFiles(runtime)) {
+        const absolute = resolveUrl(entry.url)
+        const cached = await this.readVerified(
+          runtimeCache,
+          absolute,
+          entry.bytes,
+          entry.sha256,
+        )
         if (cached) {
-          downloaded += bytes
+          downloaded += entry.bytes
           this.reportProgress(pack.id, downloaded, '正在检查离线运行时…')
           continue
         }
 
         const buffer = await this.fetchFile(
           absolute,
-          bytes,
+          entry.bytes,
           downloaded,
           '正在下载离线运行时',
           pack.id,
         )
         this.patchPackState(pack.id, { message: '正在校验离线运行时…' })
         const digest = await hashToHex(buffer)
-        if (digest !== expected.toLowerCase()) {
+        if (digest !== entry.sha256.toLowerCase()) {
           throw new Error('离线运行时校验失败，请重试。')
         }
         await runtimeCache.put(
@@ -764,7 +1102,7 @@ export class AiModelManager {
             headers: { 'Content-Type': contentTypeFor(absolute) },
           }),
         )
-        downloaded += bytes
+        downloaded += entry.bytes
         this.reportProgress(pack.id, downloaded, '已缓存离线运行时')
       }
 
@@ -914,18 +1252,30 @@ export class AiModelManager {
   }
 
   private async inspectPack(pack: ManifestPack): Promise<CacheInspection> {
+    const variant = this.variantFor(pack)
+    if (!variant) return { present: false, downloadedBytes: 0 }
     return this.inspectCache(
       this.modelCacheName(pack),
-      pack.files.map((file) => ({ url: resolveUrl(file.url), bytes: file.bytes })),
+      variant.files.flatMap((file) =>
+        (file.parts?.length ? file.parts : [file]).map((entry) => ({
+          url: resolveUrl(entry.url),
+          bytes: entry.bytes,
+        })),
+      ),
     )
   }
 
-  private async inspectRuntime(manifest: AiManifest): Promise<CacheInspection> {
+  private async inspectRuntime(
+    manifest: AiManifest,
+    engine: AiEngine,
+  ): Promise<CacheInspection> {
+    const runtime = runtimeFor(manifest, engine)
+    if (!runtime) return { present: false, downloadedBytes: 0 }
     return this.inspectCache(
-      this.runtimeCacheName(manifest),
-      this.runtimeEntries(manifest).map(([, url, bytes]) => ({
-        url: resolveUrl(url),
-        bytes,
+      this.runtimeCacheName(manifest, engine),
+      runtimeFiles(runtime).map((file) => ({
+        url: resolveUrl(file.url),
+        bytes: file.bytes,
       })),
     )
   }
@@ -948,40 +1298,31 @@ export class AiModelManager {
     return { present, downloadedBytes }
   }
 
-  private runtimeEntries(
-    manifest: AiManifest,
-  ): Array<[string, string, number]> {
-    return [
-      [
-        'glue',
-        `${manifest.runtime.baseUrl}${manifest.runtime.glue}`,
-        manifest.runtime.glueBytes,
-      ],
-      [
-        'api',
-        `${manifest.runtime.baseUrl}${manifest.runtime.api}`,
-        manifest.runtime.apiBytes,
-      ],
-      [
-        'wasm',
-        `${manifest.runtime.baseUrl}${manifest.runtime.wasm}`,
-        manifest.runtime.wasmBytes,
-      ],
-    ]
-  }
-
-  private runtimeHash(manifest: AiManifest, name: string): string {
-    if (name === 'glue') return manifest.runtime.glueSha256
-    if (name === 'api') return manifest.runtime.apiSha256
-    return manifest.runtime.wasmSha256
-  }
-
   private modelCacheName(pack: ManifestPack): string {
     return `${MODEL_CACHE_PREFIX}${pack.id}-${pack.version}`
   }
 
-  private runtimeCacheName(manifest: AiManifest): string {
-    return `${RUNTIME_CACHE_PREFIX}${manifest.runtime.version}`
+  private runtimeCacheName(manifest: AiManifest, engine: AiEngine): string {
+    const runtime = runtimeFor(manifest, engine)
+    return `${RUNTIME_CACHE_PREFIX}${runtime?.version ?? 'unknown'}`
+  }
+
+  /** `full` and `int8` are Hojo variants; sherpa packs have one default. */
+  private variantFor(pack: ManifestPack): ManifestVariant | null {
+    const variants = packVariants(pack)
+    if (!variants.length) return null
+    if (packEngine(pack) !== 'hojo') return variants[0]
+    const wanted =
+      this.variantPreference === 'auto'
+        ? isMobileDevice()
+          ? 'int8'
+          : 'full'
+        : this.variantPreference
+    return variants.find((variant) => variant.id === wanted) ?? variants[0]
+  }
+
+  private packFiles(pack: ManifestPack): ManifestFile[] {
+    return this.variantFor(pack)?.files ?? []
   }
 
   private packDefinition(packId: string): ManifestPack | null {
@@ -1002,8 +1343,9 @@ export class AiModelManager {
           sampleRate: voice.sampleRate,
           packId: pack.id,
           packName: pack.name,
-          lang: pack.lang === 'en' ? 'en' : 'zh',
-          modelType: pack.model.type,
+          lang: voiceLangOf(pack, voice),
+          engine: packEngine(pack),
+          modelType: pack.model!.type,
           commercialUse: pack.license.commercialUse,
           licenseLabel: pack.license.label,
         }
@@ -1022,11 +1364,62 @@ export class AiModelManager {
 
   private ensureSelectedVoice(manifest: AiManifest): void {
     for (const pack of manifest.packs) {
-      if (pack.lang === 'en') continue
-      if (pack.voices.some((voice) => voice.id === this.selectedVoiceId)) return
+      if (packLangOf(pack) === 'en') continue
+      if (
+        pack.voices.some(
+          (voice) =>
+            voice.id === this.selectedVoiceId &&
+            voiceLangOf(pack, voice) === 'zh',
+        )
+      ) {
+        return
+      }
     }
-    const fallback = manifest.packs.find((pack) => pack.lang !== 'en')?.voices[0]?.id
-    if (fallback) this.selectedVoiceId = fallback
+    for (const pack of manifest.packs) {
+      if (packLangOf(pack) === 'en') continue
+      const fallback = pack.voices.find(
+        (voice) => voiceLangOf(pack, voice) === 'zh',
+      )
+      if (fallback) {
+        this.selectedVoiceId = fallback.id
+        return
+      }
+    }
+  }
+
+  /** English voices must use the same engine as the Chinese voice. */
+  private englishVoiceAllowed(voice: AiVoiceStatus): boolean {
+    if (voice.lang !== 'en') return false
+    const current = this.voiceStatus(this.selectedVoiceId)
+    return !current || voice.engine === current.engine
+  }
+
+  private defaultEnglishVoice(): AiVoiceStatus | null {
+    const manifest = this.manifest
+    if (!manifest) return null
+    const current = this.voiceStatus(this.selectedVoiceId)
+    const currentPack = current ? this.packDefinition(current.packId) : null
+    if (currentPack) {
+      const paired = currentPack.voices.find(
+        (voice) => voiceLangOf(currentPack, voice) === 'en',
+      )
+      if (paired) return this.voiceStatus(paired.id)
+    }
+    for (const pack of manifest.packs) {
+      if (packLangOf(pack) !== 'en') continue
+      if (current && packEngine(pack) !== current.engine) continue
+      const voice = pack.voices.find(
+        (item) => voiceLangOf(pack, item) === 'en',
+      )
+      if (voice) return this.voiceStatus(voice.id)
+    }
+    return null
+  }
+
+  private ensureSelectedEnglishVoice(): void {
+    const selected = this.voiceStatus(this.selectedEnglishVoiceId)
+    if (selected && this.englishVoiceAllowed(selected)) return
+    this.selectedEnglishVoiceId = this.defaultEnglishVoice()?.id ?? ''
   }
 
   private markPackMissing(pack: ManifestPack, downloadedBytes: number): void {
@@ -1058,10 +1451,15 @@ export class AiModelManager {
   }
 
   private async removeOldCaches(manifest: AiManifest): Promise<void> {
-    const active = new Set<string>([
-      this.runtimeCacheName(manifest),
-      ...manifest.packs.map((pack) => this.modelCacheName(pack)),
-    ])
+    const active = new Set<string>(
+      manifest.packs.map((pack) => this.modelCacheName(pack)),
+    )
+    for (const pack of manifest.packs) {
+      const engine = packEngine(pack)
+      if (runtimeFor(manifest, engine)) {
+        active.add(this.runtimeCacheName(manifest, engine))
+      }
+    }
     const names = await caches.keys()
     await Promise.all(
       names
@@ -1078,6 +1476,7 @@ export class AiModelManager {
         packs: [],
         englishPack: null,
         selectedVoice: null,
+        englishVoice: null,
         message: null,
         error: message,
       }
@@ -1116,12 +1515,19 @@ export class AiModelManager {
     }
 
     this.ensureSelectedVoice(manifest)
-    const runtimeBytes = manifest.runtime.bytes
+    this.ensureSelectedEnglishVoice()
     const allPacks: AiPackStatus[] = manifest.packs.map((pack) => {
       const state = this.packStates.get(pack.id) ?? emptyPackState()
+      const engine = packEngine(pack)
+      const runtime = runtimeFor(manifest, engine)
+      const runtimeBytes = runtime?.bytes ?? 0
+      const variant = this.variantFor(pack)
+      const variants = packVariants(pack)
+      const modelBytes = variant?.totalBytes ?? pack.totalBytes
       return {
         id: pack.id,
-        lang: pack.lang === 'en' ? 'en' : 'zh',
+        lang: packLangOf(pack),
+        engine,
         name: pack.name,
         version: pack.version,
         description: pack.description,
@@ -1132,13 +1538,22 @@ export class AiModelManager {
           url: pack.license.url ?? null,
         },
         phase: state.phase,
-        modelBytes: pack.totalBytes,
+        modelBytes,
         runtimeBytes,
-        totalBytes: pack.totalBytes + runtimeBytes,
+        totalBytes: modelBytes + runtimeBytes,
         downloadedBytes: state.downloadedBytes,
         persisted: this.persisted,
         message: state.message,
         error: state.error,
+        variantId: variant?.id ?? '',
+        variantLabel: variant?.label ?? '',
+        variants: variants.map((item) => ({
+          id: item.id,
+          label: item.label,
+          description: item.description ?? '',
+          totalBytes: item.totalBytes,
+          selected: item.id === variant?.id,
+        })),
         voices: pack.voices.map((voice) => ({
           id: voice.id,
           label: voice.label,
@@ -1147,8 +1562,9 @@ export class AiModelManager {
           sampleRate: voice.sampleRate,
           packId: pack.id,
           packName: pack.name,
-          lang: pack.lang === 'en' ? 'en' : 'zh',
-          modelType: pack.model.type,
+          lang: voiceLangOf(pack, voice),
+          engine,
+          modelType: pack.model!.type,
           commercialUse: pack.license.commercialUse,
           licenseLabel: pack.license.label,
         })),
@@ -1157,6 +1573,7 @@ export class AiModelManager {
 
     const packs = allPacks.filter((pack) => pack.lang !== 'en')
     const englishPack = allPacks.find((pack) => pack.lang === 'en') ?? null
+    const englishVoice = this.getEnglishVoice()
 
     const selectedVoice =
       packs
@@ -1173,7 +1590,9 @@ export class AiModelManager {
       englishPack,
       selectedVoiceId: selectedVoice?.id ?? this.selectedVoiceId,
       selectedVoice,
-      runtimeBytes,
+      englishVoice,
+      variantPreference: this.variantPreference,
+      runtimeBytes: selectedPack?.runtimeBytes ?? 0,
       persisted: this.persisted,
       modelBytes: selectedPack?.modelBytes ?? 0,
       totalBytes: selectedPack?.totalBytes ?? 0,

@@ -116,6 +116,20 @@ describe('MediaAudioSink', () => {
     expect(sink.diagnostics.state).toBe('idle')
   })
 
+  it('applies a playback rate to speech and resets it for silence', () => {
+    const sink = new MediaAudioSink()
+    sink.unlock()
+
+    expect(sink.playBuffer(fakeBuffer(), {}, { rate: 1.2 })).toBe(true)
+    const audio = element()
+    expect(audio.defaultPlaybackRate).toBe(1.2)
+    expect(audio.playbackRate).toBe(1.2)
+
+    sink.playGap(120, () => {})
+    expect(audio.defaultPlaybackRate).toBe(1)
+    expect(audio.playbackRate).toBe(1)
+  })
+
   it('plays an exact-length silence between sentences', () => {
     const sink = new MediaAudioSink()
     sink.unlock()

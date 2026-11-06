@@ -45,6 +45,10 @@ export interface ReaderSettings {
   autoScroll: boolean
   engine: TtsEngine
   aiVoiceId: string
+  /** English voice used by offline synthesis; paired with the Chinese voice. */
+  aiEnglishVoiceId: string
+  /** Hojo model size: auto picks full on desktop and int8 on touch devices. */
+  aiVariant: 'auto' | 'full' | 'int8'
   /** Use the offline English voice for English runs instead of system TTS. */
   englishAi: boolean
   autoBookPolyphones: boolean
@@ -121,6 +125,8 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   autoScroll: true,
   engine: 'system',
   aiVoiceId: 'shanlan',
+  aiEnglishVoiceId: 'kristin',
+  aiVariant: 'auto',
   englishAi: true,
   autoBookPolyphones: true,
   groupSentences: true,

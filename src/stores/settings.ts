@@ -65,6 +65,18 @@ function sanitize(raw: unknown): ReaderSettings {
       ? source.aiVoiceId
       : DEFAULT_SETTINGS.aiVoiceId
 
+  const aiEnglishVoiceId =
+    typeof source.aiEnglishVoiceId === 'string' && source.aiEnglishVoiceId
+      ? source.aiEnglishVoiceId
+      : DEFAULT_SETTINGS.aiEnglishVoiceId
+
+  const aiVariant =
+    source.aiVariant === 'full' || source.aiVariant === 'int8'
+      ? source.aiVariant
+      : source.aiVariant === 'auto'
+        ? 'auto'
+        : DEFAULT_SETTINGS.aiVariant
+
   const englishAi =
     typeof source.englishAi === 'boolean'
       ? source.englishAi
@@ -111,6 +123,8 @@ function sanitize(raw: unknown): ReaderSettings {
     autoScroll,
     engine,
     aiVoiceId,
+    aiEnglishVoiceId,
+    aiVariant,
     englishAi,
     autoBookPolyphones,
     groupSentences,

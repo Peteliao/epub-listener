@@ -183,7 +183,10 @@ const aiVoiceLabel = computed(
   () => aiStatus.value?.selectedVoice?.label || '山岚',
 )
 const englishVoiceLabel = computed(
-  () => aiStatus.value?.englishPack?.voices[0]?.label || '英文音色',
+  () =>
+    aiStatus.value?.englishVoice?.label ||
+    aiStatus.value?.englishPack?.voices[0]?.label ||
+    '英文音色',
 )
 
 const playBusy = computed(() => state.value.isPlaying && state.value.isLoading)
@@ -594,7 +597,9 @@ async function downloadAiModel(
     }
     const pack = nextStatus.packs.find((item) => item.id === packId)
     const voice =
-      pack?.voices.find((item) => item.id === voiceId) ?? pack?.voices[0]
+      pack?.voices.find((item) => item.id === voiceId) ??
+      pack?.voices.find((item) => item.lang === 'zh') ??
+      pack?.voices[0]
     if (pack?.phase === 'ready' && voice) {
       current.prepareAiEngine()
       settingsStore.patch({ aiVoiceId: voice.id, engine: 'sherpa' })
