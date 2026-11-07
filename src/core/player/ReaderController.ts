@@ -724,6 +724,10 @@ export class ReaderController {
       this.aiFallback = false
     }
 
+    if (this.iosDevice && (!wantsAi || this.aiFallback)) {
+      this.notifyIosSilentSwitch()
+    }
+
     if (this.chapterLoading) {
       this.isPlaying = true
       this.isLoading = true
@@ -746,6 +750,20 @@ export class ReaderController {
     this.enableWakeLock()
     this.emitState()
     this.speakCurrent()
+  }
+
+  // iOS 的静音拨片会静音 speechSynthesis（AI 音色的媒体播放不受影响），网页
+  // 读不到拨片状态，只能在首次用系统语音时提醒一次。
+  private notifyIosSilentSwitch(): void {
+    try {
+      if (localStorage.getItem('shusheng:ios-silent-hint')) return
+      localStorage.setItem('shusheng:ios-silent-hint', '1')
+    } catch {
+      // 存储不可用时退化为每次会话提示。
+    }
+    this.options.onToast(
+      '系统语音会被静音键挡住：若没有声音，请关闭 iPhone 左侧静音开关（露出橙色为静音）。',
+    )
   }
 
   pause(): void {

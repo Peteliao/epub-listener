@@ -1023,6 +1023,9 @@ function removeEnglishPack(): void {
           点按「试听」调用系统朗读；音色列表来自 iOS 已安装的中文语音。
         </p>
         <p class="setting__note ios-voice-hint">
+          没有声音？先看 iPhone 左侧的静音开关：露出橙色表示已静音，系统语音会被挡住。拨回响铃（不露橙色）即可恢复；离线 AI 音色不受此开关影响。
+        </p>
+        <p class="setting__note ios-voice-hint">
           安装更多音色：设置 → 辅助功能 → 朗读内容 → 声音 → 中文。下载「增强」音色后回到这里点「重新检测」。Siri 音色通常不向网页开放。
         </p>
         <p class="setting__note ios-voice-hint">

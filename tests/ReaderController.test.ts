@@ -264,3 +264,26 @@ describe('ReaderController bilingual playback', () => {
     })
   })
 })
+
+describe('ReaderController iOS silent-switch hint', () => {
+  const HINT_KEY = 'shusheng:ios-silent-hint'
+
+  afterEach(() => { localStorage.removeItem(HINT_KEY) })
+
+  it('warns about the silent switch only once and remembers the dismissal', () => {
+    localStorage.removeItem(HINT_KEY)
+    const reader = fixture()
+    reader.notifyIosSilentSwitch()
+    reader.notifyIosSilentSwitch()
+    expect(reader.options.onToast).toHaveBeenCalledTimes(1)
+    expect(reader.options.onToast.mock.calls[0][0]).toContain('静音')
+    expect(localStorage.getItem(HINT_KEY)).toBe('1')
+  })
+
+  it('stays silent when the hint was already dismissed in a previous session', () => {
+    localStorage.setItem(HINT_KEY, '1')
+    const reader = fixture()
+    reader.notifyIosSilentSwitch()
+    expect(reader.options.onToast).not.toHaveBeenCalled()
+  })
+})
