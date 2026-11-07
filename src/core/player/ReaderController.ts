@@ -697,9 +697,10 @@ export class ReaderController {
     const wantsAi =
       this.settings.engine === 'sherpa' || !this.speech.supported
     if (wantsAi) this.refreshAiOverlayIfNeeded()
-    // iOS only trusts speech synthesis started from this gesture; AI mode
-    // speaks English through the system voice long after the tap.
-    if (wantsAi) this.speech.unlock()
+    // iOS only trusts speech synthesis started from this gesture. The first
+    // system utterance — pure system mode or an English chunk in AI mode — is
+    // spoken after an async delay, so unlock inside the tap regardless of engine.
+    this.speech.unlock()
     if (wantsAi) {
       if (!this.aiStatus.supported) {
         if (!this.speech.supported) {
