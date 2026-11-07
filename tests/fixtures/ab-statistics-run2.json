@@ -1,0 +1,151 @@
+{
+  "seed": 1872219488,
+  "order": {
+    "noise": [
+      0.8,
+      0.667,
+      0.5
+    ],
+    "silence": [
+      1.2,
+      1,
+      0.8
+    ],
+    "group": [
+      120,
+      90,
+      60
+    ]
+  },
+  "analyses": [
+    {
+      "metric": "noiseScale → RTF",
+      "direction": "lower",
+      "summary": [
+        {
+          "label": "0.5",
+          "n": 12,
+          "mean": 0.324333,
+          "std": 0.015511,
+          "ci95": [
+            0.315557,
+            0.33311
+          ]
+        },
+        {
+          "label": "0.667",
+          "n": 12,
+          "mean": 0.3045,
+          "std": 0.004034,
+          "ci95": [
+            0.302218,
+            0.306782
+          ]
+        },
+        {
+          "label": "0.8",
+          "n": 12,
+          "mean": 0.317417,
+          "std": 0.00363,
+          "ci95": [
+            0.315363,
+            0.31947
+          ]
+        }
+      ],
+      "F": 13.5094,
+      "etaSquared": 0.4502,
+      "permutationP": 0.0001,
+      "permutations": 10000,
+      "significant": true,
+      "best": "0.667",
+      "conclusion": "组间差异显著（p=0.00010），最低均值：0.667"
+    },
+    {
+      "metric": "silenceScale → silenceRatio",
+      "direction": "none",
+      "summary": [
+        {
+          "label": "0.8",
+          "n": 6,
+          "mean": 0.17845,
+          "std": 0.001334,
+          "ci95": [
+            0.177383,
+            0.179517
+          ]
+        },
+        {
+          "label": "1",
+          "n": 6,
+          "mean": 0.187483,
+          "std": 0.002221,
+          "ci95": [
+            0.185706,
+            0.189261
+          ]
+        },
+        {
+          "label": "1.2",
+          "n": 6,
+          "mean": 0.2181,
+          "std": 0.001556,
+          "ci95": [
+            0.216855,
+            0.219345
+          ]
+        }
+      ],
+      "F": 851.1546,
+      "etaSquared": 0.9913,
+      "permutationP": 0.0001,
+      "permutations": 10000,
+      "significant": true,
+      "best": null,
+      "conclusion": "组间差异显著（p=0.00010），需按听感选择取值"
+    },
+    {
+      "metric": "groupChars → synthMs",
+      "direction": "lower",
+      "summary": [
+        {
+          "label": "60",
+          "n": 3,
+          "mean": 2365.333333,
+          "std": 133.717364,
+          "ci95": [
+            2214.017892,
+            2516.648775
+          ]
+        },
+        {
+          "label": "90",
+          "n": 3,
+          "mean": 5645,
+          "std": 184.772834,
+          "ci95": [
+            5435.909855,
+            5854.090145
+          ]
+        },
+        {
+          "label": "120",
+          "n": 3,
+          "mean": 6900.666667,
+          "std": 218.500191,
+          "ci95": [
+            6653.410425,
+            7147.922909
+          ]
+        }
+      ],
+      "F": 494.7016,
+      "etaSquared": 0.994,
+      "permutationP": 0.0027,
+      "permutations": 10000,
+      "significant": true,
+      "best": "60",
+      "conclusion": "组间差异显著（p=0.00270），最低均值：60"
+    }
+  ]
+}

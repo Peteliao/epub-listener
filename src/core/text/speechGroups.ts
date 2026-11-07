@@ -22,13 +22,34 @@ export interface SpeechGroupOptions {
   maxChars?: number
 }
 
+// A/B measured on the real WASM runtime (tests/fixtures/ab-baseline.json):
+// a 105-char group took 6.8s to synthesize vs 5.1s at 83 chars, with the same
+// RTF and slightly higher peaks. 90 keeps 2–3 sentences of shared prosody
+// while cutting the worst first-audio wait by about a quarter on desktop (and
+// proportionally more on slower phones).
 const DEFAULTS = {
   maxSentences: 3,
-  maxChars: 120,
+  maxChars: 90,
 }
 
 function countChars(text: string): number {
   return text.replace(/\s+/g, '').length
+}
+
+/**
+ * Adapts the group size to the measured real-time factor of the previous
+ * chapter. Desktop sits near 0.31; once synthesis approaches playback speed a
+ * shorter group keeps the first-audio wait and underrun risk bounded. The cap
+ * never grows past the measured 90-character default (120 was measurably
+ * slower and closer to the limiter).
+ *
+ * A/B evidence: tests/fixtures/ab-statistics.json (groupChars, p=0.0044).
+ */
+export function groupCharsForRtf(rtf: number | null | undefined): number {
+  if (typeof rtf === 'number' && Number.isFinite(rtf) && rtf >= 0.9) {
+    return 60
+  }
+  return DEFAULTS.maxChars
 }
 
 const ASCII_END = /[A-Za-z0-9]$/

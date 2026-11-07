@@ -54,4 +54,22 @@ describe('splitLanguageSegments', () => {
     expect(splitLanguageSegments('……')).toEqual([])
     expect(splitLanguageSegments('')).toEqual([])
   })
+
+  it('keeps a digit run with the English term that follows it', () => {
+    expect(splitLanguageSegments('用了5G就开始卡。')).toEqual([
+      { text: '用了', lang: 'zh' },
+      { text: '5G', lang: 'en' },
+      { text: '就开始卡。', lang: 'zh' },
+    ])
+  })
+
+  it('never drops speakable text that has no Han or ASCII Latin letters', () => {
+    expect(splitLanguageSegments('Ａｐｐ')).toEqual([
+      { text: 'Ａｐｐ', lang: 'en' },
+    ])
+    expect(splitLanguageSegments('2026')).toEqual([
+      { text: '2026', lang: 'zh' },
+    ])
+    expect(splitLanguageSegments('Ⅳ')).toEqual([{ text: 'Ⅳ', lang: 'zh' }])
+  })
 })

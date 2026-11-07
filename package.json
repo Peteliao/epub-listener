@@ -10,6 +10,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "audit:polyphones": "node scripts/audit-polyphones.mjs",
+    "audit:golden": "node scripts/audit-golden.mjs --all",
+    "regression:build": "node scripts/build-pronunciation-regression.mjs",
+    "audit:coverage": "node scripts/audit-coverage.mjs",
+    "lab:ab": "node tests/browser/run-ab.mjs",
+    "lab:smoke": "node tests/browser/run-ab.mjs --smoke",
+    "lab:stats": "node scripts/ab-stats.mjs",
     "reports:overlay": "node scripts/reports-to-overlay.mjs"
   },
   "dependencies": {

@@ -426,7 +426,7 @@
 皱着眉 zhou4 zhe mei2
 红着脸 hong2 zhe lian3
 板着脸 ban3 zhe lian3
-打量着 da3 liang4 zhe
+打量着 da3 liang zhe
 盼着 pan4 zhe
 念着 nian4 zhe
 提着 ti2 zhe
@@ -640,3 +640,71 @@
 地址 di4 zhi3
 一溜烟 yi2 liu4 yan1
 玄奘 xuan2 zang4
+# 2026-11-07 轻声补齐：词库把这些词的末字标成全调，口语标准读音是轻声。
+# 所用轻声音素都已在词库其它条目出现（如 便宜 pian2 yi、踏实 ta1 shi），不是新音素。
+答应 da1 ying
+结实 jie1 shi
+作坊 zuo1 fang
+提防 di1 fang
+累赘 lei2 zhui
+扫帚 sao4 zhou
+头发 tou2 fa
+称呼 cheng1 hu
+恶心 e3 xin
+吓唬 xia4 hu
+应酬 ying4 chou
+折腾 zhe1 teng
+薄荷 bo4 he
+伺候 ci4 hou
+咳嗽 ke2 sou
+衣服 yi1 fu
+哑巴 ya3 ba
+拾掇 shi2 duo
+约摸 yue1 mo
+模糊 mo2 hu
+浆糊 jiang4 hu
+脊梁 ji3 liang
+打量 da3 liang
+要是 yao4 shi
+# 词库缺条：单字兜底会把“朝鲜”读成 chao2 xian1、“吹倒”读成 dao4。
+朝鲜 chao2 xian3
+吹倒 chui1 dao3
+撞倒 zhuang4 dao3
+# 2026-11-07 样书语料审计：词库把“通红”标成 tong4、“散发”标成头发义的 fa4。
+通红 tong1 hong2
+散发 san4 fa1
+# 2026-11-07 高频口语轻声：词库缺条或标成全调，单字兜底会读得生硬。
+# 这些词在样书与常见小说里出现频率很高，优先补齐。
+爸爸 ba4 ba
+妈妈 ma1 ma
+哥哥 ge1 ge
+姐姐 jie3 jie
+弟弟 di4 di
+妹妹 mei4 mei
+爷爷 ye2 ye
+奶奶 nai3 nai
+谢谢 xie4 xie
+星星 xing1 xing
+时候 shi2 hou
+喜欢 xi3 huan
+眼睛 yan3 jing
+月亮 yue4 liang
+朋友 peng2 you
+师傅 shi1 fu
+东西 dong1 xi
+告诉 gao4 su
+明白 ming2 bai
+味道 wei4 dao
+力气 li4 qi
+聪明 cong1 ming
+耳朵 er3 duo
+喇叭 la3 ba
+庄稼 zhuang1 jia
+婆家 po2 jia
+样子 yang4 zi
+舒服 shu1 fu
+认识 ren4 shi
+漂亮 piao4 liang
+地方 di4 fang
+知道 zhi1 dao
+多少 duo1 shao

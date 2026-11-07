@@ -7,7 +7,13 @@ export interface LanguageSegment {
 
 const HAN = /\p{Script=Han}/u
 const LATIN = /\p{Script=Latin}/u
-const NUMBER = /\p{Nd}/u
+// Full-width Latin letters are English too. Without this they fell through as
+// unclassified characters and a sentence made only of them produced no
+// segment at all (silent playback).
+const FULLWIDTH_LATIN = /[\uff21-\uff3a\uff41-\uff5a]/u
+const NUMBER = /[\p{Nd}\p{Nl}]/u
+// Roman numerals share the Latin script but are numbers, not letters.
+const ROMAN_NUMERAL = /[\u2160-\u217f]/u
 const SPEAKABLE = /[\p{L}\p{N}]/u
 
 // CJK punctuation is placed in the Chinese bucket so a full-width comma
@@ -19,7 +25,8 @@ const CJK_PUNCTUATION =
 function classify(char: string): SegmentLang | null {
   if (CJK_PUNCTUATION.test(char)) return 'zh'
   if (HAN.test(char)) return 'zh'
-  if (LATIN.test(char)) return 'en'
+  if (ROMAN_NUMERAL.test(char)) return null
+  if (LATIN.test(char) || FULLWIDTH_LATIN.test(char)) return 'en'
   // Digits, spaces and ASCII punctuation join the surrounding run; leading
   // neutral characters join whichever language starts next.
   if (NUMBER.test(char) || /[\s!-/:-@[-`{-~]/.test(char)) return null
@@ -43,19 +50,39 @@ function pushSegment(list: LanguageSegment[], lang: SegmentLang, text: string): 
 
 /**
  * Splits text into runs of Chinese and non-Chinese characters so each run can
- * be sent to an engine that actually supports it. Whitespace and digits stay
- * with the neighbouring run; punctuation-only runs are absorbed by the run
- * before them.
+ * be sent to an engine that actually supports it.
+ *
+ * A digit run followed by Latin text belongs to that English run ("用了5G" →
+ * "用了" + "5G"), while digits surrounded by Chinese stay in the Chinese run.
+ * Unclassified-but-speakable text is never dropped: a sentence of only
+ * full-width letters or numerals still produces a segment.
  */
 export function splitLanguageSegments(input: string): LanguageSegment[] {
   const segments: LanguageSegment[] = []
+  const chars = Array.from(input)
+  // Precompute the next classified language to the right in one backwards
+  // pass, so deciding where a digit run belongs stays O(n).
+  const nextLang: Array<SegmentLang | null> = new Array(chars.length + 1).fill(null)
+  let next: SegmentLang | null = null
+  for (let i = chars.length - 1; i >= 0; i -= 1) {
+    const lang = classify(chars[i]!)
+    if (lang) next = lang
+    nextLang[i] = next
+  }
+
   let current: LanguageSegment | null = null
   let pending = ''
+  let heldForRight = ''
 
-  for (const char of input) {
+  for (let i = 0; i < chars.length; i += 1) {
+    const char = chars[i]!
     const lang = classify(char)
     if (lang === null) {
-      pending += char
+      if (current?.lang === 'zh' && nextLang[i + 1] === 'en') {
+        heldForRight += char
+      } else {
+        pending += char
+      }
       continue
     }
 
@@ -64,16 +91,20 @@ export function splitLanguageSegments(input: string): LanguageSegment[] {
     } else if (current) {
       current.text += pending
       pushSegment(segments, current.lang, current.text)
-      current = { lang, text: char }
+      current = { lang, text: heldForRight + char }
     } else {
-      current = { lang, text: pending + char }
+      current = { lang, text: pending + heldForRight + char }
     }
     pending = ''
+    heldForRight = ''
   }
 
   if (current) {
-    current.text += pending
+    current.text += pending + heldForRight
     pushSegment(segments, current.lang, current.text)
+  } else if (SPEAKABLE.test(pending + heldForRight)) {
+    // Never return an empty list for text that has something to pronounce.
+    pushSegment(segments, 'zh', pending + heldForRight)
   }
 
   return segments

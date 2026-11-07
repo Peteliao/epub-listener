@@ -464,4 +464,33 @@ describe('SherpaDriver', () => {
     expect(driver.initialized).toBe(true)
     expect(driver.englishInitialized).toBe(false)
   })
+
+  it('touches the synthesis cache on a hit so hot sentences survive LRU', async () => {
+    const internal = driver as unknown as {
+      slots: {
+        zh: { cache: Map<string, AudioBuffer>; stats: { cacheHits: number } }
+      }
+      requestBuffer: (request: Record<string, unknown>) => Promise<AudioBuffer>
+    }
+    const hot = { length: 1 } as unknown as AudioBuffer
+    const cold = { length: 1 } as unknown as AudioBuffer
+    const cache = internal.slots.zh.cache
+    cache.set('hot', hot)
+    cache.set('cold', cold)
+
+    const request = {
+      key: 'hot',
+      text: '热句',
+      lang: 'zh',
+      engine: 'sherpa',
+      speed: 1,
+      speakerId: 0,
+      silenceScale: 1,
+      volume: 1,
+      chars: 2,
+    }
+    expect(await internal.requestBuffer(request)).toBe(hot)
+    expect([...cache.keys()]).toEqual(['cold', 'hot'])
+    expect(internal.slots.zh.stats.cacheHits).toBeGreaterThan(0)
+  })
 })

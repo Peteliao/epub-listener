@@ -20,11 +20,16 @@ export interface MediaSinkDiagnostics {
   lastError: string | null
   clips: number
   recoveries: number
+  /** Sample rate used for generated silence clips. */
+  silenceRate: number
 }
 
 type PlaybackKind = 'speech' | 'gap' | 'keepalive'
 
-const SILENCE_RATE = 8000
+// Silent clips used to use a fixed 8kHz rate while speech is 22.05/24kHz,
+// forcing a decoder reconfiguration on every sentence boundary. Keep the
+// silence on the same sample rate as the last speech clip.
+const DEFAULT_SILENCE_RATE = 22050
 const LOOP_SILENCE_MS = 1000
 const CLIP_URL_LIMIT = 8
 const GAP_URL_LIMIT = 24
@@ -44,7 +49,10 @@ export class MediaAudioSink {
   private token = 0
   private handlers: MediaSinkHandlers | null = null
   private loopUrl: string | null = null
-  private readonly gapUrls = new Map<number, string>()
+  private loopRate = 0
+  private silenceRate = DEFAULT_SILENCE_RATE
+  private readonly staleLoopUrls: string[] = []
+  private readonly gapUrls = new Map<string, string>()
   private readonly clipUrls = new Map<AudioBuffer, string>()
   private lastError: string | null = null
   private startWatchdog: number | null = null
@@ -57,6 +65,7 @@ export class MediaAudioSink {
       lastError: this.lastError,
       clips: this.clipUrls.size,
       recoveries: this.recoveries,
+      silenceRate: this.silenceRate,
     }
   }
 
@@ -101,6 +110,7 @@ export class MediaAudioSink {
 
     try {
       const url = this.clipUrl(buffer)
+      this.silenceRate = buffer.sampleRate || this.silenceRate
       element.loop = false
       this.applyRate(element, options?.rate)
       element.src = url
@@ -168,7 +178,11 @@ export class MediaAudioSink {
     this.state = 'keepalive'
 
     try {
-      this.loopUrl ??= this.silenceUrl(LOOP_SILENCE_MS)
+      if (!this.loopUrl || this.loopRate !== this.silenceRate) {
+        if (this.loopUrl) this.staleLoopUrls.push(this.loopUrl)
+        this.loopUrl = this.silenceUrl(LOOP_SILENCE_MS)
+        this.loopRate = this.silenceRate
+      }
       element.loop = true
       this.applyRate(element, 1)
       if (element.src !== this.loopUrl) element.src = this.loopUrl
@@ -234,6 +248,10 @@ export class MediaAudioSink {
       URL.revokeObjectURL(this.loopUrl)
       this.loopUrl = null
     }
+    for (const url of this.staleLoopUrls) URL.revokeObjectURL(url)
+    this.staleLoopUrls.length = 0
+    this.loopRate = 0
+    this.silenceRate = DEFAULT_SILENCE_RATE
   }
 
   private ensureElement(): HTMLAudioElement | null {
@@ -406,7 +424,10 @@ export class MediaAudioSink {
   }
 
   private gapUrl(ms: number): string {
-    const key = Math.max(1, Math.round(ms / 10) * 10)
+    const duration = Math.max(1, Math.round(ms / 10) * 10)
+    // The cache key must include the sample rate: the same 210ms gap encoded
+    // at 22.05kHz and 24kHz is a different WAV.
+    const key = `${this.silenceRate}:${duration}`
     const existing = this.gapUrls.get(key)
     if (existing) {
       this.gapUrls.delete(key)
@@ -414,7 +435,7 @@ export class MediaAudioSink {
       return existing
     }
 
-    const url = this.silenceUrl(key)
+    const url = this.silenceUrl(duration)
     this.gapUrls.set(key, url)
     while (this.gapUrls.size > GAP_URL_LIMIT) {
       const oldest = this.gapUrls.keys().next().value
@@ -427,9 +448,10 @@ export class MediaAudioSink {
   }
 
   private silenceUrl(ms: number): string {
-    const sampleCount = Math.max(1, Math.round((SILENCE_RATE * ms) / 1000))
+    const rate = this.silenceRate
+    const sampleCount = Math.max(1, Math.round((rate * ms) / 1000))
     return URL.createObjectURL(
-      encodeWavBlob(new Float32Array(sampleCount), SILENCE_RATE),
+      encodeWavBlob(new Float32Array(sampleCount), rate),
     )
   }
 }

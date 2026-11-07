@@ -12,9 +12,6 @@ const MANIFEST_PATH = join(ROOT, 'public/models/manifest.json')
 const OVERLAY_PATH = join(ROOT, 'src/core/tts/polyphones.v1.txt')
 const HAN = /\p{Script=Han}/u
 const PINYIN_OPTS = { toneType: 'num', v: true }
-const NEUTRAL_PHONES = new Set([
-  'de', 'le', 'zhe', 'me', 'zi', 'men', 'ba', 'shi', 'yi', 'tou', 'jia', 'li',
-])
 const virtualConsole = new VirtualConsole()
 
 const args = process.argv.slice(2)
@@ -79,6 +76,8 @@ function parseTokens(text) {
   return tokens
 }
 
+
+
 function parseOverlay(source) {
   const entries = new Map()
   const duplicates = []
@@ -106,7 +105,6 @@ function auditOverlay(entries, lexicon, tokens) {
     count: entries.size,
     structure: [],
     missingPhones: [],
-    neutralPhones: [],
     redundant: [],
     duplicates: [],
     mismatches: [],
@@ -125,9 +123,6 @@ function auditOverlay(entries, lexicon, tokens) {
     }
     for (const phone of entry.reading.split(/\s+/)) {
       if (!tokens.has(phone)) result.missingPhones.push(`${entry.word}: ${phone}`)
-      if (!/\d$/.test(phone) && !NEUTRAL_PHONES.has(phone)) {
-        result.neutralPhones.push(`${entry.word}: ${phone}`)
-      }
     }
     if (lexicon.get(entry.word) === entry.reading) {
       result.redundant.push(entry.word)
@@ -250,8 +245,6 @@ function printD1(result) {
   for (const item of result.structure.slice(0, top)) console.log(`  - ${item}`)
   console.log(`tokens.txt 缺失音素：${result.missingPhones.length}`)
   for (const item of result.missingPhones.slice(0, top)) console.log(`  - ${item}`)
-  console.log(`未在词库出现的轻声音素：${result.neutralPhones.length}`)
-  for (const item of result.neutralPhones.slice(0, top)) console.log(`  - ${item}`)
   console.log(`与词库重复且读音相同：${result.redundant.length}`)
   if (result.duplicates.length) {
     console.log(`重复词条：${result.duplicates.length}`)

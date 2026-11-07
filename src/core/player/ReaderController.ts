@@ -20,6 +20,7 @@ import { SherpaDriver, type SherpaStats, type SherpaSynthesisOptions } from '@/c
 import type { MediaSinkDiagnostics } from '@/core/tts/MediaAudioSink'
 import {
   buildSpeechUnits,
+  groupCharsForRtf,
   type SpeechUnit,
 } from '@/core/text/speechGroups'
 import { MediaSessionController } from '@/core/system/MediaSession'
@@ -186,7 +187,9 @@ export class ReaderController {
   private activeEngine: TtsEngine | null = null
   private activeLang: 'zh' | 'en' | null = null
   private measuredZhMsPerChar: number | null = null
+  private measuredEnMsPerChar: number | null = null
   private lastSampledAudioMs: number | null = null
+  private lastSampledEnAudioMs: number | null = null
   private prewarmTimer: number | null = null
   private prewarmStarted = false
   private slowRtfStreak = 0
@@ -1087,6 +1090,9 @@ export class ReaderController {
   private rebuildUnits(): void {
     this.units = buildSpeechUnits(this.highlighter?.sentences ?? [], {
       enabled: this.settings.groupSentences,
+      // A slower device gets shorter utterances on the next chapter, using the
+      // RTF measured during this one. No listener-visible change on desktop.
+      maxChars: groupCharsForRtf(this.aiSpeech.stats?.lastRtf),
     })
     if (this.units.length === 0) {
       this.sentenceIndex = 0
@@ -2120,17 +2126,34 @@ export class ReaderController {
   }
 
   private sampleSpeechRate(): void {
-    const stats = this.aiSpeech.stats
-    if (!stats?.lastAudioMs || stats.lastAudioMs === this.lastSampledAudioMs) {
-      return
-    }
-    this.lastSampledAudioMs = stats.lastAudioMs
+    this.sampleSpeechRateSlot(this.aiSpeech.stats, 'zh')
+    this.sampleSpeechRateSlot(this.aiSpeech.englishStats, 'en')
+  }
+
+  private sampleSpeechRateSlot(
+    stats: SherpaStats | null,
+    lang: 'zh' | 'en',
+  ): void {
+    if (!stats?.lastAudioMs) return
+    const last =
+      lang === 'zh' ? this.lastSampledAudioMs : this.lastSampledEnAudioMs
+    if (stats.lastAudioMs === last) return
+    if (lang === 'zh') this.lastSampledAudioMs = stats.lastAudioMs
+    else this.lastSampledEnAudioMs = stats.lastAudioMs
+
     const sample = stats.lastAudioMsPerChar
     if (!sample || !Number.isFinite(sample)) return
-    this.measuredZhMsPerChar =
-      this.measuredZhMsPerChar === null
-        ? sample
-        : this.measuredZhMsPerChar * 0.7 + sample * 0.3
+    if (lang === 'zh') {
+      this.measuredZhMsPerChar =
+        this.measuredZhMsPerChar === null
+          ? sample
+          : this.measuredZhMsPerChar * 0.7 + sample * 0.3
+    } else {
+      this.measuredEnMsPerChar =
+        this.measuredEnMsPerChar === null
+          ? sample
+          : this.measuredEnMsPerChar * 0.7 + sample * 0.3
+    }
   }
 
   private estimateRemaining(): number | null {
@@ -2141,6 +2164,7 @@ export class ReaderController {
       rate: this.settings.rate,
       englishRate: this.settings.englishRate,
       zhMsPerChar: this.measuredZhMsPerChar,
+      enMsPerChar: this.measuredEnMsPerChar,
       grouped: this.settings.groupSentences,
       pauseScale: PAUSE_PRESET_SCALES[this.settings.pausePreset],
     })

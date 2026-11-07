@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildSpeechUnits,
+  groupCharsForRtf,
   joinSentenceText,
 } from '../src/core/text/speechGroups'
 
@@ -20,7 +21,35 @@ describe('joinSentenceText', () => {
   })
 })
 
+describe('groupCharsForRtf', () => {
+  it('keeps the measured default on desktop and before the first sample', () => {
+    expect(groupCharsForRtf(null)).toBe(90)
+    expect(groupCharsForRtf(undefined)).toBe(90)
+    expect(groupCharsForRtf(0.31)).toBe(90)
+    expect(groupCharsForRtf(Number.NaN)).toBe(90)
+  })
+
+  it('shortens groups once synthesis approaches playback speed', () => {
+    expect(groupCharsForRtf(0.9)).toBe(60)
+    expect(groupCharsForRtf(1.4)).toBe(60)
+  })
+})
+
 describe('buildSpeechUnits', () => {
+  it('caps the default group at 90 characters per the A/B baseline', () => {
+    const chunk = '山'.repeat(40) + '。'
+    const units = buildSpeechUnits([
+      sentence(chunk),
+      sentence(chunk),
+      sentence(chunk),
+    ])
+    // 40 + 40 <= 90, but a third sentence would reach 120.
+    expect(units.map((unit) => [unit.start, unit.end])).toEqual([
+      [0, 1],
+      [2, 2],
+    ])
+  })
+
   it('groups two or three neighbouring sentences from one paragraph', () => {
     const units = buildSpeechUnits(
       [

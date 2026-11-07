@@ -17,6 +17,10 @@ const MODEL_CONFIG_KEYS = {
 
 const RUNTIME_ROOT = '/models'
 const LANGS = ['zh', 'en']
+// Releasing the MEMFS copies keeps only the ORT sessions resident, which is
+// where the model weights actually live after init. Flip this off if a runtime
+// turns out to read model files lazily.
+const RELEASE_MODEL_FILES = true
 
 let runtime = null
 let runtimePromise = null
@@ -36,6 +40,7 @@ function createSlot(lang) {
     initializing: false,
     modelType: '',
     files: [],
+    releasedModelBytes: 0,
     oovWords: null,
   }
 }
@@ -163,6 +168,22 @@ self.onmessage = (event) => {
         if (oldest !== undefined) cancelledJobs.delete(oldest)
       }
     }
+  } else if (data.type === 'probe') {
+    // Diagnostics-only: lets a lab harness confirm that the ONNX copies were
+    // released from MEMFS while synthesis still works.
+    const lang = normalizeLang(data.lang)
+    const slot = slots[lang]
+    const fs = runtime?.FS
+    post({
+      type: 'probe-result',
+      lang,
+      files: slot.files.map((name) => ({
+        name,
+        exists: Boolean(fs?.analyzePath(`${slot.dir}/${name}`)?.exists),
+      })),
+      releasedModelBytes: slot.releasedModelBytes,
+      heapBytes: runtime?.HEAPF32 ? runtime.HEAPF32.byteLength : 0,
+    })
   } else if (data.type === 'dispose-lang') {
     const lang = normalizeLang(data.lang)
     disposeSlot(slots[lang])
@@ -240,6 +261,7 @@ async function init(data) {
     if (lang === 'en') slot.oovWords = buildOovWords(fs, data, slot.dir)
 
     const warmupStart = performance.now()
+    let warmedUp = false
     try {
       instance.generate({
         text:
@@ -249,9 +271,21 @@ async function init(data) {
         sid: slot.speakerId,
         speed: 1,
       })
+      warmedUp = true
     } catch {
       // A failed warmup is reported when the first real sentence is requested.
     }
+    // createOfflineTts() loads both ONNX sessions into memory, and the warmup
+    // exercises the vocoder once. Dropping the MEMFS copies afterwards frees
+    // about 129MB for 山岚; the small lexicon/FST files stay as a safety margin
+    // and are rewritten from Cache on a later re-init anyway.
+    if (warmedUp && RELEASE_MODEL_FILES) releaseModelFiles(fs, slot)
+    slot.releasedModelBytes = (Array.isArray(data.files) ? data.files : [])
+      .filter(
+        (file) =>
+          warmedUp && RELEASE_MODEL_FILES && /\.onnx$/i.test(file?.name ?? ''),
+      )
+      .reduce((sum, file) => sum + (Number(file.bytes) || 0), 0)
 
     slot.ready = true
     slot.initializing = false
@@ -263,6 +297,7 @@ async function init(data) {
       initMs: Math.round(warmupStart - startedAt),
       warmupMs: Math.round(performance.now() - warmupStart),
       heapBytes: module.HEAPF32 ? module.HEAPF32.byteLength : 0,
+      releasedModelBytes: slot.releasedModelBytes,
       speakerId: slot.speakerId,
     })
   } catch (error) {
@@ -678,7 +713,9 @@ function enhancePcm(input, rate, volume = 1) {
   const rms = active > 0 ? Math.sqrt(sumSquares / active) : 0
   const gain = rms > 1e-4 ? Math.min(MAX_GAIN, TARGET_RMS / rms) : 1
   const output = new Float32Array(trimmed.length)
-  const fade = Math.min(Math.round(rate * 0.006), Math.floor(trimmed.length / 2))
+  // 12ms is long enough to hide the clip edge on phone speakers without
+  // audibly clipping the first consonant of a short sentence.
+  const fade = Math.min(Math.round(rate * 0.012), Math.floor(trimmed.length / 2))
   const kneeRange = LIMIT_CEILING - LIMIT_KNEE
 
   for (let i = 0; i < trimmed.length; i += 1) {
@@ -709,6 +746,7 @@ function postReady(slot, initMs, warmupMs) {
     initMs,
     warmupMs,
     heapBytes: runtime?.HEAPF32 ? runtime.HEAPF32.byteLength : 0,
+    releasedModelBytes: slot.releasedModelBytes,
     speakerId: slot.speakerId,
   })
 }
@@ -725,21 +763,30 @@ function cleanupSlot(slot) {
   slot.ready = false
   slot.numSpeakers = 0
   slot.modelType = ''
+  slot.releasedModelBytes = 0
   slot.oovWords = null
+}
+
+function unlinkSlotFiles(fs, slot, keep) {
+  for (const name of slot.files) {
+    if (keep && !keep(name)) continue
+    try {
+      fs.unlink(`${slot.dir}/${name}`)
+    } catch {
+      // Already removed by a previous release or dispose.
+    }
+  }
+}
+
+/** Drops the ONNX weights once their sessions hold the data in memory. */
+function releaseModelFiles(fs, slot) {
+  unlinkSlotFiles(fs, slot, (name) => /\.onnx$/i.test(name))
 }
 
 function disposeSlot(slot) {
   const fs = runtime?.FS
   cleanupSlot(slot)
-  if (fs) {
-    for (const name of slot.files) {
-      try {
-        fs.unlink(`${slot.dir}/${name}`)
-      } catch {
-        // Already removed by a previous dispose.
-      }
-    }
-  }
+  if (fs) unlinkSlotFiles(fs, slot)
   slot.files = []
 }
 

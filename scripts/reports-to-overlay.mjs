@@ -14,26 +14,30 @@ const TONE_MARK = /[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜńňǹḿ]/u
 function parseArgs(argv) {
   const files = []
   let out = null
+  let golden = null
   for (const arg of argv) {
     if (arg.startsWith('--out=')) out = arg.slice('--out='.length)
+    else if (arg.startsWith('--golden=')) golden = arg.slice('--golden='.length)
     else if (arg === '--help' || arg === '-h') {
       printHelp()
       process.exit(0)
     } else if (!arg.startsWith('--')) files.push(arg)
   }
-  return { files, out }
+  return { files, out, golden }
 }
 
 function printHelp() {
-  console.log(`用法: node scripts/reports-to-overlay.mjs <reports.jsonl> [--out=path]
+  console.log(`用法: node scripts/reports-to-overlay.mjs <reports.jsonl> [--out=path] [--golden=path]
 
 从「读音反馈记录」导出的 JSONL 生成 polyphones.v1.txt 候选行。
 只输出 2–4 字、没有冲突、且词典里尚不存在的候选；单字语境会跳过，
 避免一条反馈覆盖该字在所有词里的读音。请人工复核后再合并。
+--golden 额外输出读音黄金集候选行，复核后追加到
+tests/fixtures/pronunciation-golden.jsonl，让这条反馈成为回归用例。
 
 示例:
   node scripts/reports-to-overlay.mjs ~/Downloads/pronunciation-reports-20261102.jsonl
-  node scripts/reports-to-overlay.mjs reports.jsonl --out=scripts/out/overlay-candidates.txt`)
+  node scripts/reports-to-overlay.mjs reports.jsonl --out=scripts/out/overlay-candidates.txt --golden=scripts/out/golden-candidates.jsonl`)
 }
 
 function normalizePhone(raw) {
@@ -195,6 +199,7 @@ function collectCandidates(reports) {
         positions: new Map(),
         reports: new Set(),
         voices: new Map(),
+        samples: [],
       }
       const position = info.positions.get(charOffset) ?? {
         char: mark.char,
@@ -208,6 +213,14 @@ function collectCandidates(reports) {
       }
       position.options.set(phone, (position.options.get(phone) ?? 0) + 1)
       info.positions.set(charOffset, position)
+      if (info.samples.length < 2) {
+        info.samples.push({
+          text: paragraph.text,
+          char: mark.char,
+          charIndex,
+          phone,
+        })
+      }
 
       if (!reportWords.has(group.word)) {
         reportWords.add(group.word)
@@ -254,6 +267,7 @@ function collectCandidates(reports) {
       phones: phones.join(' '),
       reports: info.reports,
       voices: info.voices,
+      samples: info.samples,
     })
   }
 
@@ -261,7 +275,7 @@ function collectCandidates(reports) {
 }
 
 async function main() {
-  const { files, out } = parseArgs(process.argv.slice(2))
+  const { files, out, golden } = parseArgs(process.argv.slice(2))
   if (!files.length) {
     printHelp()
     process.exitCode = 1
@@ -371,6 +385,40 @@ async function main() {
     await mkdir(dirname(target), { recursive: true })
     await writeFile(target, text, 'utf8')
     console.log(`\n候选文件已写入 ${target}（只有可合并的词行与文件头注释）`)
+  }
+
+  if (golden) {
+    // Each accepted word gets one regression case built from the reported
+    // paragraph. Review the sentence and the expected phone before appending
+    // it to tests/fixtures/pronunciation-golden.jsonl.
+    const lines = []
+    for (const entry of add) {
+      const sample = entry.samples?.[0]
+      if (!sample) continue
+      const before = Array.from(sample.text.slice(0, sample.charIndex))
+      const occurrence =
+        before.filter((char) => char === sample.char).length + 1
+      lines.push(
+        JSON.stringify({
+          id: `feedback-${entry.word}`,
+          word: entry.word,
+          text: sample.text,
+          readings: [[sample.char, occurrence, sample.phone]],
+        }),
+      )
+    }
+    if (lines.length) {
+      const target = resolve(ROOT, golden)
+      await mkdir(dirname(target), { recursive: true })
+      await writeFile(
+        target,
+        `# 由读音反馈生成，人工复核后追加到 tests/fixtures/pronunciation-golden.jsonl。\n` +
+          `# 生成时间 ${new Date().toISOString()} · ${reports.length} 条反馈\n` +
+          `${lines.join('\n')}\n`,
+        'utf8',
+      )
+      console.log(`\n黄金集候选已写入 ${target}（${lines.length} 条）`)
+    }
   }
 }
 

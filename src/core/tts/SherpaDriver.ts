@@ -846,6 +846,10 @@ export class SherpaDriver {
     const cached = slot.cache.get(key)
     if (cached) {
       slot.stats.cacheHits += 1
+      // Touch on hit: the LRU order must reflect use, not just insertion, or
+      // a repeatedly replayed sentence is evicted while cold lookahead stays.
+      slot.cache.delete(key)
+      slot.cache.set(key, cached)
       return Promise.resolve(cached)
     }
 

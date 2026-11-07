@@ -285,4 +285,38 @@ describe('MediaAudioSink', () => {
     expect(document.querySelector('audio')).toBeNull()
     expect(URL.revokeObjectURL).toHaveBeenCalled()
   })
+
+  it('generates silence at the speech sample rate', () => {
+    const sink = new MediaAudioSink()
+    expect(sink.diagnostics.silenceRate).toBe(22050)
+    sink.unlock()
+    // Keep-alive silence must not force a sample-rate switch before the first
+    // sentence either.
+    expect(sink.diagnostics.silenceRate).toBe(22050)
+
+    const buffer = fakeBuffer()
+    ;(buffer as { sampleRate: number }).sampleRate = 24000
+    sink.playBuffer(buffer, {})
+    expect(sink.diagnostics.silenceRate).toBe(24000)
+
+    sink.playGap(210, () => {})
+    expect(sink.diagnostics.silenceRate).toBe(24000)
+    sink.stop()
+  })
+
+  it('keys cached gaps by both duration and sample rate', () => {
+    const sink = new MediaAudioSink()
+    sink.unlock()
+    sink.playGap(210, () => {})
+    const first = (URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls.length
+    sink.playGap(210, () => {})
+    expect((URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls.length).toBe(first)
+
+    const buffer = fakeBuffer()
+    ;(buffer as { sampleRate: number }).sampleRate = 24000
+    sink.playBuffer(buffer, {})
+    sink.playGap(210, () => {})
+    expect((URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(first + 1)
+    sink.stop()
+  })
 })

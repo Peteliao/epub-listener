@@ -106,9 +106,21 @@ describe('generateBookLexicon', () => {
     }
   })
 
-  it('rejects readings that need a neutral phone outside the whitelist', () => {
-    const result = generate(['师傅点了点头，没有说话。'])
-    expect(result.entries.map((entry) => entry.word)).not.toContain('师傅')
+  it('accepts neutral readings the bundled lexicon already attests', () => {
+    // 狐狸 hú li: the lexicon never stores the word, but it does use neutral
+    // li elsewhere, so the automatic overlay may pin the reading.
+    const result = generate(['山里的狐狸常常夜里出来。'])
+    expect(result.entries).toEqual([
+      { word: '狐狸', reading: 'hu2 li', count: 1 },
+    ])
+  })
+
+  it('rejects readings that need a neutral phone outside the lexicon set', () => {
+    // 喜欢 is xǐ huan, but the bundled lexicon never uses a neutral huan, so
+    // the automatic overlay stays conservative and leaves it to the curated
+    // table (which a human reviews before adding the reading).
+    const result = generate(['我很喜欢这本书。'])
+    expect(result.entries.map((entry) => entry.word)).not.toContain('喜欢')
   })
 
   it('rejects OOV words that contain characters the curated overlay guards', () => {

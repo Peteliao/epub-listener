@@ -7,13 +7,26 @@ export const MAX_BOOK_OVERLAY_ENTRIES = 2000
 
 const HAN = /\p{Script=Han}/u
 const PINYIN_OPTIONS = { toneType: 'num', v: true } as const
-const MAX_WORD_LENGTH = 4
+const MAX_WORD_LENGTH = 6
 const MAX_SENTENCE_LENGTH = 400
-// Only neutral phones that the bundled lexicon/tokens actually attest.
-const NEUTRAL_PHONES = new Set([
-  'de', 'le', 'zhe', 'me', 'zi', 'men', 'ba', 'shi', 'yi', 'tou', 'jia', 'li',
-])
 const SANDHI_EXEMPT = new Set(['一', '不'])
+
+/**
+ * Neutral phones the bundled lexicon itself uses. Automatic overlay entries
+ * come from pinyin-pro, which is reliable about polyphones but occasionally
+ * over-neutralises a syllable, so the generated overlay stays inside the set
+ * the lexicon already demonstrates. The curated table (human reviewed) may go
+ * further and use any neutral present in tokens.txt.
+ */
+function attestedNeutrals(lexicon: Map<string, string>): Set<string> {
+  const set = new Set<string>()
+  for (const reading of lexicon.values()) {
+    for (const phone of reading.split(/\s+/)) {
+      if (phone && !/\d$/.test(phone)) set.add(phone)
+    }
+  }
+  return set
+}
 // Single-character stems that only occur before particle 地.
 const DE_SINGLE_CHAR_STEMS = new Set([
   '猛', '啪', '忽', '倏', '霍', '蓦', '突', '怎', '恁',
@@ -383,6 +396,7 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
   const effective = new Map(lexicon)
   for (const [word, reading] of curated) effective.set(word, reading)
   const reserved = deriveReservedChars(curated, lexicon)
+  const neutrals = attestedNeutrals(lexicon)
 
   let maxLexiconLength = 1
   for (const word of effective.keys()) {
@@ -471,7 +485,7 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
             valid = false
             break
           }
-          if (phone.tone === null && !NEUTRAL_PHONES.has(phone.base)) {
+          if (phone.tone === null && !neutrals.has(phone.base)) {
             valid = false
             break
           }
@@ -632,7 +646,7 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
             valid = false
             break
           }
-          if (phone.tone === null && !NEUTRAL_PHONES.has(phone.base)) {
+          if (phone.tone === null && !neutrals.has(phone.base)) {
             valid = false
             break
           }

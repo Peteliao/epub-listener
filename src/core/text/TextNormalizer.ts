@@ -44,6 +44,26 @@ const LIANG_MEASURES = new Set(
 const TWO_PREFIX_GUARD = /(?:第|公元|公元前|星期|礼拜|周|分之)$/
 
 const CIRCLED_NUMBERS = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'
+const ROMAN_UPPER = 'ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫ'
+const ROMAN_LOWER = 'ⅰⅱⅲⅳⅴⅵⅶⅷⅸⅹⅺⅻ'
+
+/**
+ * Every downstream number rule matches ASCII `\d`. Full-width digits and
+ * Roman numerals used to fall through silently (or reach the model as
+ * unpronounceable symbols), so fold them to Arabic numerals first.
+ */
+function normalizeNumeralChars(input: string): string {
+  return input
+    .replace(/[\uff10-\uff19]/g, (char) =>
+      String(char.charCodeAt(0) - 0xff10),
+    )
+    .replace(/[\u2160-\u216b\u2170-\u217b]/gu, (char) => {
+      const upper = ROMAN_UPPER.indexOf(char)
+      if (upper >= 0) return String(upper + 1)
+      const lower = ROMAN_LOWER.indexOf(char)
+      return lower >= 0 ? String(lower + 1) : char
+    })
+}
 
 const UNIT_WORDS: Array<[string, string]> = [
   ['㎡', '平方米'],
@@ -496,7 +516,7 @@ function normalizeNumbers(input: string): string {
 }
 
 export function normalizeSpeechText(input: string): string {
-  const cleaned = input
+  const cleaned = normalizeNumeralChars(input)
     .replace(/[\u00a0\u2007\u202f\u3000]/g, ' ')
     .replace(/[\u200b-\u200f\u202a-\u202e\u2060\ufeff]/g, '')
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
