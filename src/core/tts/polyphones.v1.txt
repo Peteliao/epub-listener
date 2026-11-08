@@ -708,3 +708,436 @@
 地方 di4 fang
 知道 zhi1 dao
 多少 duo1 shao
+# 2026-11-08 《明朝那些事儿》专项：用户点名的多音字，以及明代人名、地名、官署与科举语境。
+# 可汗、恐吓、单于、乐工词库本已正确，仍钉住防止基础词典更新后回归。
+朱重八 zhu1 chong2 ba1
+重八 chong2 ba1
+朱祐樘 zhu1 you4 cheng1
+祐樘 you4 cheng1
+可汗 ke4 han2
+恐吓 kong3 he4
+铁骑 tie3 qi2
+卒中 cu4 zhong4
+司礼监 si1 li3 jian4
+胪朐河 lu2 qu2 he2
+亳州 bo2 zhou1
+# 明代人名（含蒙古汗号与日本战国人名）。
+朱由校 zhu1 you2 jiao4
+朱载垕 zhu1 zai3 hou4
+申时行 shen1 shi2 xing2
+小西行长 xiao3 xi1 xing2 chang2
+李善长 li3 shan4 chang2
+徐文长 xu2 wen2 chang2
+黑田长政 hei1 tian2 chang2 zheng4
+陆万龄 lu4 wan4 ling2
+王艮 wang2 gen4
+缪昌期 miao4 chang1 qi1
+仇鸾 qiu2 luan2
+仇成 qiu2 cheng2
+翟銮 zhai2 luan2
+杨镐 yang2 hao4
+织田信长 zhi1 tian2 xin4 chang2
+解纶 xie4 lun2
+解家沟 xie4 jia1 gou1
+达延汗 da2 yan2 han2
+满都鲁汗 man3 du1 lu3 han2
+卓里克图汗 zhuo1 li3 ke4 tu2 han2
+单于 chan2 yu2
+乐工 yue4 gong1
+# 地名、部族与都城。中都只按明代都城短语覆盖，避免截走“书中都/朝中都是”。
+瓦剌 wa3 la4
+土木堡 tu3 mu4 bu3
+洪都 hong2 du1
+应天 ying4 tian1
+应昌 ying4 chang1
+应州 ying4 zhou1
+阿剌 a1 la4
+土剌河 tu3 la4 he2
+八剌 ba1 la4
+哈剌 ha1 la4
+处州 chu3 zhou1
+长洲 chang2 zhou1
+东都和西都 dong1 du1 he2 xi1 du1
+小西都 xiao3 xi1 du1
+为中都 wei2 zhong1 du1
+中都皇城 zhong1 du1 huang2 cheng2
+回中都 hui2 zhong1 du1
+所谓中都 suo3 wei4 zhong1 du1
+一个中都 yi2 ge4 zhong1 du1
+遍游塞上 bian4 you2 sai4 shang4
+广渠门 guang3 qu2 men2
+# 明代官署与勋官。
+给事中 ji3 shi4 zhong1
+都给事中 du1 ji3 shi4 zhong1
+都御史 du1 yu4 shi3
+都指挥使 du1 zhi3 hui1 shi3
+都指挥同知 du1 zhi3 hui1 tong2 zhi1
+都指挥佥事 du1 zhi3 hui1 qian1 shi4
+都司 du1 si1
+御马监 yu4 ma3 jian4
+内官监 nei4 guan1 jian4
+尚膳监 shang4 shan4 jian4
+直殿监 zhi2 dian4 jian4
+都知监 du1 zhi1 jian4
+少监 shao4 jian4
+监丞 jian4 cheng2
+矿监税使 kuang4 jian4 shui4 shi3
+少保 shao4 bao3
+少师 shao4 shi1
+少傅 shao4 fu4
+少卿 shao4 qing1
+太仆寺 tai4 pu2 si4
+# 科举与史书语境：中、载、靖难。
+考中 kao3 zhong4
+高考中 gao1 kao3 zhong1
+中举人 zhong4 ju3 ren2
+乡试中举 xiang1 shi4 zhong4 ju3
+同时中举 tong2 shi2 zhong4 ju3
+岁中举 sui4 zhong4 ju3
+中举对他 zhong4 ju3 dui4 ta1
+中进士 zhong4 jin4 shi4
+高中进士 gao1 zhong4 jin4 shi4
+高中解元 gao1 zhong4 jie4 yuan2
+考题高中 kao3 ti2 gao1 zhong4
+中状元 zhong4 zhuang4 yuan2
+中榜 zhong4 bang3
+中埋伏 zhong4 mai2 fu2
+中箭 zhong4 jian4
+一举中第 yi4 ju3 zhong4 di4
+中第的最佳 zhong4 di4 de zui4 jia1
+让他中第 rang4 ta1 zhong4 di4
+能够中第 neng2 gou4 zhong4 di4
+科举中第 ke1 ju3 zhong4 di4
+张嗣修中第 zhang1 si4 xiu1 zhong4 di4
+载入历史 zai3 ru4 li4 shi3
+载入史书 zai3 ru4 shi3 shu1
+载入军事史册 zai3 ru4 jun1 shi4 shi3 ce4
+靖难 jing4 nan4
+靖难之役 jing4 nan4 zhi1 yi4
+# 结构助词与跨词误切：的、了、地、着。
+打的 da3 de
+打的去 da3 di1 qu4
+打的到 da3 di1 dao4
+打的回 da3 di1 hui2
+打的走 da3 di1 zou3
+打的上班 da3 di1 shang4 ban1
+打的回家 da3 di1 hui2 jia1
+打的费 da3 di1 fei4
+打的吧 da3 di1 ba
+了当 le dang1
+的当 de dang1
+的哥哥 de ge1 ge
+的当天 de dang4 tian1
+的当晚 de dang4 wan3
+的当铺 de dang4 pu4
+他的当 ta1 de dang4
+哥哥的当 ge1 ge de dang4
+方孝孺的当 fang1 xiao4 ru2 de dang4
+海瑞的当 hai3 rui4 de dang4
+沉着地 chen2 zhuo2 de
+着地质 zhe di4 zhi4
+着地上 zhe di4 shang4
+# “还、行、没、朝、为”等高频搭配。
+还给自己 hai2 gei3 zi4 ji3
+还给了自己 hai2 gei3 le zi4 ji3
+还给当时 hai2 gei3 dang1 shi2
+还给解缙派 hai2 gei3 xie4 jin4 pai4
+还给他的子孙 hai2 gei3 ta1 de zi3 sun1
+还给对方留 hai2 gei3 dui4 fang1 liu2
+还给马文升派 hai2 gei2 ma3 wen2 sheng1 pai4
+还给了他几个随从 hai2 gei3 le ta1 ji3 ge4 sui2 cong2
+还给了他一个前所未有 hai2 gei3 le ta1 yi2 ge4 qian2 suo3 wei4 you3
+还给他追加 hai2 gei3 ta1 zhui1 jia1
+还给他修了坛 hai2 gei3 ta1 xiu1 le tan2
+还给朱元璋生 hai2 gei3 zhu1 yuan2 zhang1 sheng1
+还给他们分 hai2 gei3 ta1 men fen1
+还给纸币 hai2 gei2 zhi3 bi4
+还给张居正送 hai2 gei3 zhang1 ju1 zheng4 song4
+还给郭松龄跪 hai2 gei3 guo1 song1 ling2 gui4
+还给皇帝讲 hai2 gei3 huang2 di4 jiang3
+还给过我 hai2 gei3 guo4 wo3
+还给李成梁打 hai2 gei2 li3 cheng2 liang2 da3
+还给首辅大人下 hai2 gei2 shou2 fu3 da4 ren2 xia4
+还给皇上奉送 hai2 gei3 huang2 shang4 feng4 song4
+在行军 zai4 xing2 jun1
+在行骗 zai4 xing2 pian4
+在行人 zai4 xing2 ren2
+在行进 zai4 xing2 jin4
+在行刑 zai4 xing2 xing2
+在行动 zai4 xing2 dong4
+没过 mei2 guo4
+没过膝盖 mo4 guo4 xi1 gai4
+没过脚踝 mo4 guo4 jiao3 huai2
+没过小腿 mo4 guo4 xiao2 tui3
+没过腰 mo4 guo4 yao1
+没过顶 mo4 guo4 ding3
+没过脖子 mo4 guo4 bo2 zi
+大王 da4 wang2
+朝会 chao2 hui4
+质的 zhi4 de
+# 词库整词读音错误或未收录（按字族补齐）。
+作乐 zuo4 le4
+不得了 bu4 de2 liao3
+赶得上 gan3 de shang4
+乡长 xiang1 zhang3
+私了 si1 liao3
+最为 zui4 wei2
+为例 wei2 li4
+化为 hua4 wei2
+中肯 zhong4 ken3
+重整 chong2 zheng3
+着实 zhuo2 shi2
+查查 cha2 cha2
+正着 zheng4 zhao2
+三行 san1 hang2
+第二行 di4 er4 hang2
+第三行 di4 san1 hang2
+二三行 er4 san1 hang2
+流放重犯 liu2 fang4 zhong4 fan4
+东林重犯 dong1 lin2 zhong4 fan4
+必是重犯 bi4 shi4 zhong4 fan4
+内传抄 nei4 chuan2 chao1
+内传来 nei4 chuan2 lai2
+成行动 cheng2 xing2 dong4
+力见长 li4 jian4 chang2
+见长安 jian4 chang2 an1
+小角色 xiao3 jue2 se4
+一角色 yi4 jue2 se4
+送还 song4 huan2
+送还管 song4 hai2 guan3
+兴冲冲 xing4 chong1 chong1
+号哭 hao2 ku1
+晕过去 yun1 guo4 qu4
+处处 chu4 chu4
+马尾 ma2 wei3
+九重 jiu3 chong2
+胶着 jiao1 zhuo2
+简朴 jian2 pu3
+质朴 zhi4 pu3
+见世面 jian4 shi4 mian4
+故伎重演 gu4 ji4 chong2 yan3
+反省 fan2 xing3
+薄礼 bo2 li3
+混蛋 hun2 dan4
+缘分 yuan2 fen4
+血缘分配 xue4 yuan2 fen1 pei4
+压根 ya4 gen1
+处变不惊 chu3 bian4 bu4 jing1
+悄无声息 qiao3 wu2 sheng1 xi1
+直奔 zhi2 ben4
+点中的考生 dian3 zhong4 de kao3 sheng1
+点中几个 dian3 zhong4 ji3 ge4
+点中了 dian3 zhong4 le
+点中严嵩 dian3 zhong4 yan2 song1
+满头大汗 man3 tou2 da4 han4
+满身大汗 man3 shen1 da4 han4
+一身大汗 yi4 shen1 da4 han4
+大汗淋漓 da4 han4 lin2 li2
+出大汗 chu1 da4 han4
+冒大汗 mao4 da4 han4
+大汗直冒 da4 han4 zhi2 mao4
+汗位 han2 wei4
+为汗 wei2 han2
+# 容量单位“石”“斗”与更次。
+石米 dan4 mi3
+一石米 yi2 dan4 mi3
+贩卖一石 fan4 mai4 yi2 dan4
+一石就 yi2 dan4 jiu4
+米一石 mi3 yi2 dan4
+石粮 dan4 liang2
+万石 wan4 dan4
+千石 qian1 dan4
+十石 shi2 dan4
+七石 qi1 dan4
+三石 san1 dan4
+两石 liang3 dan4
+八斗 ba1 dou3
+几斗 ji2 dou3
+庶几 shu4 ji1
+升斗 sheng1 dou3
+一更 yi4 geng1
+二更 er4 geng1
+四更 si4 geng1
+初更 chu1 geng1
+# 不得了 family stolen by base 可不/哭笑不得/顾不得/动不得/了不得
+可不得了 ke3 bu4 de2 liao3
+哭笑不得了 ku1 xiao4 bu4 de2 liao3
+顾不得了 gu4 bu4 de2 liao3
+动不得了 dong4 bu4 de2 liao3
+了不得了 liao3 bu4 de2 liao3
+# 十万 steals 十 so the stone measure needs the full phrase
+十万石 shi2 wan4 dan4
+# 减少 is absent from base, so 少保/少监 stole it
+减少 jian2 shao3
+# 助词“了”被词库多字词吞掉：默认按助词读，真正读 liǎo 的短语单独保护
+了无 le wu2
+了无牵挂 liao3 wu2 qian1 gua4
+了无音信 liao3 wu2 yin1 xin4
+了局 le ju2
+了了 le liao3
+了账 le zhang4
+一了 yi1 le
+了事情 le shi4 qing2
+了事物 le shi4 wu4
+了事态 le shi4 tai4
+了事实 le shi4 shi2
+了事件 le shi4 jian4
+出了事 chu1 le shi4
+闹了事 nao4 le shi4
+犯了事 fan4 le shi4
+错了事 cuo4 le shi4
+了结论 le jie2 lun4
+了结局 le jie2 ju2
+了结果 le jie2 guo3
+输了却 shu1 le que4
+# 词库缺少这些动词，导致“X明了”被切成“X + 明了(liǎo)”
+证明 zheng4 ming2
+表明 biao3 ming2
+摆明 bai3 ming2
+列明 lie4 ming2
+辨明 bian4 ming2
+探明 tan4 ming2
+# 残余的“X明+了”与“照说”跨词吞并
+朱厚照 zhu1 hou4 zhao4
+精明 jing1 ming2
+光明 guang1 ming2
+文明 wen2 ming2
+柳暗花明 liu3 an4 hua1 ming2
+却说明 que4 shuo1 ming2
+了结盟 le jie2 meng2
+# 2026-11-08 整书扫描：跨词边界与词库错读
+徐时行 xu2 shi2 xing2
+时行 shi2 xing2
+朱见深 zhu1 jian4 shen1
+和面前 he2 mian4 qian2
+和药材 he2 yao4 cai2
+和乐工 he2 yue4 gong1
+和了解 he2 liao2 jie3
+和了一把 huo4 le yi4 ba3
+地和稀泥 de huo4 xi1 ni2
+中长大 zhong1 zhang3 da4
+大便宜 da4 pian2 yi
+寻找着 xun2 zhao3 zhe
+分行李 fen1 xing2 li
+过重重 guo4 chong2 chong2
+还手握 hai2 shou3 wo4
+必得 bi4 de2
+何曾 he2 ceng2
+藏人 cang2 ren2
+从重围 cong2 chong2 wei2
+大都会动用 da4 dou1 hui4 dong4 yong4
+过长子 guo4 zhang2 zi3
+算了了 suan4 le liao3
+和面试 he2 mian4 shi4
+和药理 he2 yao4 li3
+# 2026-11-08 音调候选复核
+还要 hai2 yao4
+要好 yao4 hao3
+忍无可忍 ren3 wu2 ke2 ren3
+知识分子 zhi1 shi fen4 zi3
+你来我往 ni3 lai2 wo2 wang3
+何处 he2 chu4
+无处 wu2 chu4
+分散 fen1 san4
+更深 geng4 shen1
+一发生 yi4 fa1 sheng1
+一发子弹 yi4 fa1 zi3 dan4
+一发火炮 yi4 fa1 huo3 pao4
+一发火 yi4 fa1 huo3
+一发不可收拾 yi4 fa1 bu4 ke3 shou1 shi
+# 2026-11-08 词库音调复核
+只见 zhi3 jian4
+只当不知道 zhi3 dang4 bu4 zhi1 dao4
+只当是 zhi3 dang4 shi4
+一帆风顺 yi4 fan1 feng1 shun4
+一哄而散 yi2 hong4 er2 san4
+一肚子 yi2 du4 zi
+肚子 du4 zi
+大肚子 da4 du4 zi
+拉肚子 la1 du4 zi
+伸手不见五指 shen1 shou3 bu2 jian4 wu2 zhi3
+开花结果 kai1 hua1 jie1 guo3
+软骨头 ruan2 gu3 tou
+老骨头 lao2 gu3 tou
+不切实际 bu2 qie4 shi2 ji4
+不遂人愿 bu2 sui4 ren2 yuan4
+读书种子 du2 shu1 zhong3 zi
+碰钉子 peng4 ding1 zi
+土生土长 tu3 sheng1 tu2 zhang3
+有鼻子有眼 you3 bi2 zi you2 yan3
+更名改姓 geng1 ming2 gai3 xing4
+可怜相 ke3 lian2 xiang4
+空当 kong4 dang4
+空位 kong4 wei4
+累加 lei3 jia1
+闷雷 men4 lei2
+闹哄哄 nao4 hong1 hong1
+是非曲直 shi4 fei1 qu1 zhi2
+温差 wen1 cha1
+用处 yong4 chu4
+万户侯 wan4 hu4 hou2
+大吃大喝 da4 chi1 da4 he1
+吐口水 tu2 kou2 shui3
+受累 shou4 lei4
+难处 nan2 chu4
+塞门 sai1 men2
+被难倒 bei4 nan2 dao3
+从难民 cong2 nan4 min2
+解解元 xie4 jie4 yuan2
+亮晃晃 liang4 huang2 huang3
+士大夫 shi4 da4 fu1
+御史大夫 yu4 shi3 da4 fu1
+卿大夫 qing1 da4 fu1
+资善大夫 zi1 shan4 da4 fu1
+光禄大夫 guang1 lu4 da4 fu1
+# 2026-11-08 一/不 变调（词库按本调收录的高频词）
+一切 yi2 qie4
+一句话 yi2 ju4 hua4
+一片 yi2 pian4
+一份 yi2 fen4
+一副 yi2 fu4
+一会 yi2 hui4
+一会儿 yi2 hui4 er
+一共 yi2 gong4
+一大堆 yi2 da4 dui1
+一系列 yi2 xi4 lie4
+一大批 yi2 da4 pi1
+一触即溃 yi2 chu4 ji2 kui4
+一动不动 yi2 dong4 bu2 dong4
+一视同仁 yi2 shi4 tong2 ren2
+一大把 yi2 da4 ba3
+一并 yi2 bing4
+一败涂地 yi2 bai4 tu2 di4
+一见如故 yi2 jian4 ru2 gu4
+一觉 yi2 jiao4
+一大半 yi2 da4 ban4
+一病不起 yi2 bing4 bu4 qi3
+一卷 yi2 juan4
+一去不复返 yi2 qu4 bu2 fu4 fan3
+一大早 yi2 da4 zao3
+一字一句 yi2 zi4 yi2 ju4
+一棍子打死 yi2 gun4 zi da2 si3
+一落千丈 yi2 luo4 qian1 zhang4
+一路顺风 yi2 lu4 shun4 feng1
+一意孤行 yi2 yi4 gu1 xing2
+一脉相承 yi2 mai4 xiang1 cheng2
+一见钟情 yi2 jian4 zhong1 qing2
+一代不如一代 yi2 dai4 bu4 ru2 yi2 dai4
+一块石头落了地 yi2 kuai4 shi2 tou luo4 le di4
+一念之差 yi2 nian4 zhi1 cha1
+一掷百万 yi2 zhi4 bai3 wan4
+一服药 yi2 fu4 yao4
+一步一个脚印 yi2 bu4 yi2 ge4 jiao3 yin4
+一窍不通 yi2 qiao4 bu4 tong1
+一笑了之 yi2 xiao4 liao3 zhi1
+一地鸡毛 yi2 di4 ji1 mao2
+一亩三分地 yi4 mu3 san1 fen1 di4
+一模一样 yi4 mu2 yi2 yang4
+有朝一日 you3 zhao1 yi2 ri4
+不一而足 bu4 yi1 er2 zu2
+大喝 da4 he4
+一声 yi4 sheng1
+# 2026-11-08 补充复核
+垛子 duo4 zi
+入土为安 ru4 tu3 wei2 an1
+与偶像同行 yu2 ou3 xiang4 tong2 xing2
