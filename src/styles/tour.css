@@ -1,0 +1,128 @@
+/* driver.js popover reskinned to the app's paper-and-ink palette. */
+
+/* The shelf scrolls inside its own container; freeze it so the spotlight
+   stays aligned, while scrollIntoView can still jump between steps. */
+body.driver-active .library {
+  overflow: hidden;
+}
+
+.ss-tour.driver-popover {
+  font-family: var(--font-ui);
+  min-width: min(272px, calc(100vw - 28px));
+  max-width: min(320px, calc(100vw - 28px));
+  padding: 18px 18px 14px;
+  border: 1px solid var(--app-line);
+  border-radius: 18px;
+  background: var(--app-ui);
+  color: var(--app-fg);
+  box-shadow: 0 20px 55px rgba(22, 15, 8, 0.34);
+}
+
+.ss-tour .driver-popover-title {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.45;
+}
+
+.ss-tour .driver-popover-description {
+  margin-top: 7px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: color-mix(in srgb, var(--app-fg) 80%, var(--app-bg));
+}
+
+.ss-tour .driver-popover-footer {
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.ss-tour .driver-popover-progress-text {
+  flex: none;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--app-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ss-tour .driver-popover-navigation-btns {
+  gap: 6px;
+}
+
+.ss-tour .driver-popover-navigation-btns button + button {
+  margin-left: 0;
+}
+
+.ss-tour .driver-popover-footer-btn {
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.ss-tour .driver-popover-prev-btn {
+  border: 1px solid var(--app-line);
+  background: transparent;
+  color: var(--app-fg);
+}
+
+.ss-tour .driver-popover-next-btn {
+  border: 1px solid transparent;
+  background: var(--app-accent);
+  color: var(--app-bg);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--app-accent) 28%, transparent);
+}
+
+.ss-tour .driver-popover-footer-btn:active:not(.driver-popover-btn-disabled) {
+  transform: scale(0.96);
+}
+
+.ss-tour .driver-popover-close-btn {
+  position: static;
+  order: -1;
+  flex: none;
+  width: auto;
+  height: auto;
+  padding: 6px 4px;
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--app-muted);
+}
+
+.ss-tour .driver-popover-close-btn:hover,
+.ss-tour .driver-popover-close-btn:focus-visible {
+  color: var(--app-fg);
+}
+
+.ss-tour .driver-popover-arrow {
+  border-color: var(--app-ui);
+}
+
+.ss-tour .driver-popover-arrow-side-left {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-right-color: transparent;
+}
+
+.ss-tour .driver-popover-arrow-side-right {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+}
+
+.ss-tour .driver-popover-arrow-side-top {
+  border-bottom-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
+.ss-tour .driver-popover-arrow-side-bottom {
+  border-top-color: transparent;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}

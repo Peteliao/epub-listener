@@ -49,6 +49,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { appBuildId } from '@/ui/pwa'
 import { showToast } from '@/ui/toast'
 import { navigateToLibrary } from '@/ui/nav'
+import { READER_TOUR_KEY, startReaderTour, stopTour, tourSeen } from '@/ui/tour'
 import {
   formatClock,
   formatRemaining,
@@ -120,6 +121,7 @@ const {
 let booting = false
 let unmounted = false
 let diagnosticsTimer: number | null = null
+let tourTimer: number | null = null
 
 const rateLabel = computed(() => `${settingsStore.settings.rate.toFixed(1)}×`)
 
@@ -163,6 +165,55 @@ function stopDiagnostics(): void {
   if (diagnosticsTimer === null) return
   window.clearInterval(diagnosticsTimer)
   diagnosticsTimer = null
+}
+
+function clearTourTimer(): void {
+  if (tourTimer !== null) {
+    window.clearTimeout(tourTimer)
+    tourTimer = null
+  }
+}
+
+function launchReaderTour(): void {
+  clearTourTimer()
+  startReaderTour({
+    isPlaying: () => state.value.isPlaying,
+    onFinish: () => {
+      if (!state.value.isPlaying && state.value.canSpeak) controller.value?.toggle()
+    },
+  })
+}
+
+function anySheetOpen(): boolean {
+  return (
+    tocOpen.value ||
+    settingsOpen.value ||
+    statsOpen.value ||
+    feedbackOpen.value ||
+    reportsOpen.value ||
+    tuneOpen.value ||
+    sleepOpen.value
+  )
+}
+
+function scheduleReaderTour(): void {
+  if (tourSeen(READER_TOUR_KEY)) return
+  clearTourTimer()
+  tourTimer = window.setTimeout(() => {
+    tourTimer = null
+    if (unmounted || !ready.value || pocketActive.value || anySheetOpen()) return
+    if (tourSeen(READER_TOUR_KEY)) return
+    launchReaderTour()
+  }, 800)
+}
+
+function reopenTour(): void {
+  closeSettings()
+  clearTourTimer()
+  tourTimer = window.setTimeout(() => {
+    tourTimer = null
+    if (!unmounted && ready.value) launchReaderTour()
+  }, 240)
 }
 
 function startDiagnostics(): void {
@@ -223,6 +274,7 @@ const showUnsupported = computed(() => ready.value && !state.value.canSpeak)
 async function boot(): Promise<void> {
   if (booting) return
   booting = true
+  clearTourTimer()
   loading.value = true
   loadError.value = ''
   ready.value = false
@@ -332,6 +384,7 @@ async function boot(): Promise<void> {
     aiStatus.value = nextController.getAiStatus()
     bookLexiconStatus.value = nextController.getBookLexiconStatus()
     ready.value = true
+    scheduleReaderTour()
   } catch (error) {
     if (unmounted) return
     controller.value?.destroy()
@@ -673,6 +726,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  clearTourTimer()
+  stopTour()
   stopListeningTracking()
   stopDiagnostics()
   controller.value?.destroy()
@@ -706,6 +761,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="icon-btn icon-btn--small sleep-tool"
+          data-tour="sleep"
           :class="{ 'is-active': sleepActive }"
           :aria-label="sleepAriaLabel"
           :disabled="!ready"
@@ -717,6 +773,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="icon-btn icon-btn--small"
+          data-tour="toc"
           aria-label="目录"
           :disabled="!ready"
           @click="openToc"
@@ -726,6 +783,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="icon-btn icon-btn--small"
+          data-tour="settings"
           aria-label="阅读设置"
           :disabled="!ready"
           @click="openSettings()"
@@ -739,7 +797,7 @@ onBeforeUnmount(() => {
       <i :style="{ width: `${bookPercent}%` }"></i>
     </div>
 
-    <main class="reader__stage" aria-label="正文">
+    <main class="reader__stage" data-tour="stage" aria-label="正文">
       <div ref="epubHost" class="epub-host"></div>
 
       <div v-if="loading" class="reader__state">
@@ -808,7 +866,7 @@ onBeforeUnmount(() => {
         </span>
       </div>
       <div class="player__controls">
-        <div class="player__tune" role="group" aria-label="阅读外观">
+        <div class="player__tune" data-tour="appearance" role="group" aria-label="阅读外观">
           <button
             type="button"
             class="tune-btn"
@@ -841,6 +899,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="play-btn"
+            data-tour="play"
             :disabled="!ready || !state.canSpeak"
             :aria-label="state.isPlaying ? '暂停朗读' : '开始朗读'"
             @click="togglePlayback"
@@ -858,7 +917,7 @@ onBeforeUnmount(() => {
             <AppIcon name="skip-forward" :size="21" />
           </button>
         </div>
-        <div class="player__tune" role="group" aria-label="朗读速度与口袋模式">
+        <div class="player__tune" data-tour="pace" role="group" aria-label="朗读速度与口袋模式">
           <button
             type="button"
             class="tune-btn tune-btn--rate"
@@ -912,6 +971,7 @@ onBeforeUnmount(() => {
       @open-stats="openStats"
       @open-feedback="openFeedback"
       @open-reports="openReports"
+      @open-tour="reopenTour"
     />
 
     <ReadingStatsSheet

@@ -19,6 +19,7 @@
     "reports:overlay": "node scripts/reports-to-overlay.mjs"
   },
   "dependencies": {
+    "driver.js": "^1.10.2",
     "epubjs": "^0.3.93",
     "idb": "^8.0.4",
     "pinia": "^4.1.0",

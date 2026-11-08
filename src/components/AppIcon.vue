@@ -22,6 +22,7 @@ type IconName =
   | 'theme'
   | 'share'
   | 'flag'
+  | 'help'
 
 withDefaults(defineProps<{ name: IconName; size?: number }>(), { size: 20 })
 </script>
@@ -129,6 +130,11 @@ withDefaults(defineProps<{ name: IconName; size?: number }>(), { size: 20 })
     <template v-else-if="name === 'flag'">
       <path d="M6 21V4" />
       <path d="M6 4.8h11.4l-2.3 3.8 2.3 3.8H6" />
+    </template>
+    <template v-else-if="name === 'help'">
+      <circle cx="12" cy="12" r="8.2" />
+      <path d="M9.8 9.5a2.3 2.3 0 1 1 3.2 2.1c-.6.3-1 .8-1 1.5v.2" />
+      <path d="M12 16.4h.01" stroke-width="2.4" />
     </template>
   </svg>
 </template>

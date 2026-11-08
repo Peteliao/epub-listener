@@ -47,6 +47,7 @@ const emit = defineEmits<{
   openStats: []
   openFeedback: []
   openReports: []
+  openTour: []
 }>()
 
 const isIos = isIOSDevice()
@@ -1253,6 +1254,22 @@ function removeEnglishPack(): void {
           type="button"
           class="voice-refresh"
           @click="emit('openStats')"
+        >
+          查看
+        </button>
+      </div>
+    </section>
+
+    <section class="setting">
+      <div class="voice-head">
+        <div>
+          <h3 class="setting__title">新手引导</h3>
+          <p class="voice-sub">按步骤回顾播放器与朗读的用法</p>
+        </div>
+        <button
+          type="button"
+          class="voice-refresh"
+          @click="emit('openTour')"
         >
           查看
         </button>

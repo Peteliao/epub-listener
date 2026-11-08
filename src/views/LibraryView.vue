@@ -24,6 +24,7 @@ import ReadingStatsSheet from '@/components/ReadingStatsSheet.vue'
 import { showToast } from '@/ui/toast'
 import { navigateToReader } from '@/ui/nav'
 import { appBuildId, installAvailable, isStandalone, promptInstall } from '@/ui/pwa'
+import { LIBRARY_TOUR_KEY, startLibraryTour, stopTour, tourSeen } from '@/ui/tour'
 
 const INSTALL_HINT_KEY = 'shusheng.installHintDismissed.v1'
 
@@ -39,6 +40,7 @@ const statsOpen = ref(false)
 const listeningStats = ref<ListeningSnapshot>(getListeningSnapshot())
 let backfillRunning = false
 let disposed = false
+let tourTimer: number | null = null
 
 const installHintDismissed = ref(readInstallHintDismissed())
 const isIos =
@@ -291,6 +293,38 @@ async function confirmDelete(book: BookSummary): Promise<void> {
   }
 }
 
+function clearTourTimer(): void {
+  if (tourTimer !== null) {
+    window.clearTimeout(tourTimer)
+    tourTimer = null
+  }
+}
+
+function launchLibraryTour(): void {
+  if (isBusy.value) return
+  clearTourTimer()
+  startLibraryTour({
+    hasStats: listeningStats.value.totalMs > 0,
+    hasBooks: books.value.length > 0,
+    onFinish: () => {
+      const latest = books.value[0]
+      if (latest) openBook(latest)
+      else void openSample()
+    },
+  })
+}
+
+function scheduleLibraryTour(): void {
+  if (tourSeen(LIBRARY_TOUR_KEY)) return
+  clearTourTimer()
+  tourTimer = window.setTimeout(() => {
+    tourTimer = null
+    if (disposed || statsOpen.value || isBusy.value) return
+    if (tourSeen(LIBRARY_TOUR_KEY)) return
+    launchLibraryTour()
+  }, 900)
+}
+
 onMounted(async () => {
   try {
     await refresh()
@@ -299,10 +333,13 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  scheduleLibraryTour()
 })
 
 onBeforeUnmount(() => {
   disposed = true
+  clearTourTimer()
+  stopTour()
   for (const url of Object.values(coverUrls.value)) URL.revokeObjectURL(url)
   coverUrls.value = {}
 })
@@ -339,6 +376,15 @@ onBeforeUnmount(() => {
           <small>SHUSHENG</small>
         </span>
         <span class="brand__tag">纯网页听书</span>
+        <button
+          type="button"
+          class="brand__help"
+          data-tour="help"
+          aria-label="新手引导"
+          @click="launchLibraryTour"
+        >
+          <AppIcon name="help" :size="16" />
+        </button>
       </header>
 
       <aside v-if="installHint" class="install-hint">
@@ -377,6 +423,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="btn btn--primary"
+            data-tour="import"
             :disabled="isBusy"
             @click="pickFile"
           >
@@ -387,6 +434,7 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="btn btn--ghost"
+            data-tour="sample"
             :disabled="isBusy"
             @click="openSample"
           >
@@ -405,6 +453,7 @@ onBeforeUnmount(() => {
         v-if="listeningStats.totalMs > 0"
         type="button"
         class="listen-strip"
+        data-tour="stats"
         @click="statsOpen = true"
       >
         <span class="listen-strip__icon" aria-hidden="true">
@@ -422,7 +471,7 @@ onBeforeUnmount(() => {
         </span>
       </button>
 
-      <section class="shelf" aria-labelledby="shelf-title">
+      <section class="shelf" data-tour="shelf" aria-labelledby="shelf-title">
         <header class="shelf__head">
           <h2 id="shelf-title">书架</h2>
           <span>{{ loading ? '正在整理' : `${books.length} 本` }}</span>
@@ -615,6 +664,23 @@ onBeforeUnmount(() => {
   font-size: 10px;
   letter-spacing: 0.08em;
   color: var(--app-muted);
+}
+
+.brand__help {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--app-line);
+  border-radius: 50%;
+  color: var(--app-muted);
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.brand__help:active {
+  background: color-mix(in srgb, var(--app-fg) 7%, transparent);
+  color: var(--app-fg);
 }
 
 .install-hint {
