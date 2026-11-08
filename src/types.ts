@@ -5,6 +5,9 @@ export type ReaderTheme =
   | 'mist'
   | 'celadon'
   | 'rose'
+  | 'forest'
+  | 'mint'
+  | 'bee'
   | 'night'
   | 'indigo'
   | 'oled'
@@ -137,7 +140,10 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
 }
 
 export interface ReaderPalette {
+  /** Solid base color: meta theme-color, share canvas and color-mix() need a plain color. */
   bg: string
+  /** Optional layered gradients painted over bg for non-solid themes. */
+  bgImage?: string
   fg: string
   muted: string
   highlight: string
@@ -154,6 +160,9 @@ export const READER_THEME_ORDER: ReaderTheme[] = [
   'mist',
   'celadon',
   'rose',
+  'forest',
+  'mint',
+  'bee',
   'night',
   'indigo',
   'oled',
@@ -166,6 +175,9 @@ export const READER_THEME_LABELS: Record<ReaderTheme, string> = {
   mist: '雾灰',
   celadon: '青瓷',
   rose: '绯纸',
+  forest: '森林',
+  mint: '薄荷',
+  bee: '蜜蜂',
   night: '夜读',
   indigo: '靛蓝',
   oled: '省电',
@@ -224,6 +236,39 @@ export const READER_PALETTES: Record<ReaderTheme, ReaderPalette> = {
     highlight: 'rgba(176, 106, 98, 0.3)',
     accent: '#8d4a44',
     uiBg: '#eeddd9',
+    dark: false,
+  },
+  forest: {
+    bg: '#eef5ea',
+    bgImage:
+      'radial-gradient(120% 85% at 88% -12%, rgba(150, 205, 140, 0.36) 0%, rgba(150, 205, 140, 0) 56%), radial-gradient(110% 80% at -8% 108%, rgba(97, 152, 116, 0.22) 0%, rgba(97, 152, 116, 0) 58%), linear-gradient(168deg, #f5faf1 0%, #eef5e9 46%, #e6f0e0 100%)',
+    fg: '#2a3526',
+    muted: '#5d7055',
+    highlight: 'rgba(92, 152, 86, 0.3)',
+    accent: '#37743d',
+    uiBg: '#e6f0df',
+    dark: false,
+  },
+  mint: {
+    bg: '#eaf6f2',
+    bgImage:
+      'radial-gradient(115% 85% at 100% -10%, rgba(126, 219, 195, 0.38) 0%, rgba(126, 219, 195, 0) 55%), radial-gradient(100% 75% at -6% 106%, rgba(112, 198, 220, 0.24) 0%, rgba(112, 198, 220, 0) 58%), linear-gradient(165deg, #f3fbf8 0%, #eaf6f1 48%, #e1f1ec 100%)',
+    fg: '#1f3833',
+    muted: '#52716a',
+    highlight: 'rgba(46, 162, 130, 0.26)',
+    accent: '#187a60',
+    uiBg: '#dfefe8',
+    dark: false,
+  },
+  bee: {
+    bg: '#fbf6e7',
+    bgImage:
+      'radial-gradient(115% 85% at 90% -10%, rgba(252, 208, 100, 0.4) 0%, rgba(252, 208, 100, 0) 55%), radial-gradient(100% 75% at -6% 108%, rgba(238, 178, 82, 0.22) 0%, rgba(238, 178, 82, 0) 58%), linear-gradient(166deg, #fdfbf1 0%, #fbf6e6 48%, #f7efd7 100%)',
+    fg: '#3d321e',
+    muted: '#7d6b44',
+    highlight: 'rgba(226, 170, 60, 0.32)',
+    accent: '#946412',
+    uiBg: '#f4edd7',
     dark: false,
   },
   night: {

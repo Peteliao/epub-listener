@@ -982,7 +982,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--app-bg);
+  background-color: var(--app-bg);
+  background-image: var(--app-bg-image);
+  background-attachment: fixed;
   color: var(--app-fg);
 }
 
@@ -998,7 +1000,6 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   padding: calc(env(safe-area-inset-top, 0px) + 7px) 10px 7px;
-  background: var(--app-bg);
   z-index: 3;
 }
 

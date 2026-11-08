@@ -6,6 +6,7 @@
     'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', 'SimSun', Georgia,
     serif;
   --app-bg: #f7f0e4;
+  --app-bg-image: none;
   --app-fg: #33291f;
   --app-muted: #8a7a67;
   --app-accent: #9c4a26;
@@ -23,7 +24,9 @@
 
 html {
   height: 100%;
-  background: var(--app-bg);
+  background-color: var(--app-bg);
+  background-image: var(--app-bg-image);
+  background-attachment: fixed;
   color: var(--app-fg);
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -32,7 +35,9 @@ html {
 body {
   height: 100%;
   margin: 0;
-  background: var(--app-bg);
+  background-color: var(--app-bg);
+  background-image: var(--app-bg-image);
+  background-attachment: fixed;
   color: var(--app-fg);
   font-family: var(--font-ui);
   font-size: 15px;

@@ -86,7 +86,8 @@ function onFontRange(event: Event): void {
           <span
             class="theme-card__preview"
             :style="{
-              background: READER_PALETTES[theme.value].bg,
+              backgroundColor: READER_PALETTES[theme.value].bg,
+              backgroundImage: READER_PALETTES[theme.value].bgImage ?? 'none',
               color: READER_PALETTES[theme.value].fg,
               borderColor: `${READER_PALETTES[theme.value].fg}26`,
             }"
@@ -110,7 +111,7 @@ function onFontRange(event: Event): void {
         </button>
       </div>
       <p class="tune__hint">
-        浅色可选纸白、护眼、青瓷等；夜间推荐夜读、靛蓝、省电。省电为纯黑背景，OLED 屏更省电。
+        纸白、护眼、青瓷等为纯色纸面；森林、薄荷、蜜蜂带清爽渐变。夜间推荐夜读、靛蓝、省电，省电为纯黑背景，OLED 屏更省电。
       </p>
     </div>
 

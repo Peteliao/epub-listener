@@ -25,6 +25,7 @@ watchEffect(() => {
   const palette = READER_PALETTES[settingsStore.settings.theme]
   const root = document.documentElement
   root.style.setProperty('--app-bg', palette.bg)
+  root.style.setProperty('--app-bg-image', palette.bgImage ?? 'none')
   root.style.setProperty('--app-fg', palette.fg)
   root.style.setProperty('--app-muted', palette.muted)
   root.style.setProperty('--app-accent', palette.accent)
@@ -91,7 +92,9 @@ onBeforeUnmount(() => {
   left: 0;
   z-index: 4;
   height: calc(env(safe-area-inset-top, 0px) + 1px);
-  background: var(--app-bg);
+  background-color: var(--app-bg);
+  background-image: var(--app-bg-image);
+  background-attachment: fixed;
   pointer-events: none;
 }
 

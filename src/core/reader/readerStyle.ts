@@ -5,15 +5,24 @@ export const READER_STYLE_ID = 'shusheng-reader-style'
 
 export function buildReaderCss(settings: ReaderSettings): string {
   const palette = READER_PALETTES[settings.theme]
+  // Textured themes paint the gradient on html only; a transparent body lets
+  // it run seamlessly past the 780px text column. Fixed attachment keeps the
+  // light steady while scrolling (iOS falls back to a document-stretched wash).
+  const htmlBackground = palette.bgImage
+    ? `background-color: ${palette.bg} !important;
+  background-image: ${palette.bgImage} !important;
+  background-attachment: fixed !important;`
+    : `background: ${palette.bg} !important;`
+  const bodyBackground = palette.bgImage ? 'transparent' : palette.bg
   return `
 :root { --tts-highlight: ${palette.highlight}; }
 html {
-  background: ${palette.bg} !important;
+  ${htmlBackground}
   overflow-x: hidden !important;
   touch-action: pan-y;
 }
 body {
-  background: ${palette.bg} !important;
+  background: ${bodyBackground} !important;
   color: ${palette.fg} !important;
   touch-action: pan-y;
   font-size: ${settings.fontSize}px !important;

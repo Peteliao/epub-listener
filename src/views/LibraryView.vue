@@ -555,6 +555,7 @@ onBeforeUnmount(() => {
   -webkit-overflow-scrolling: touch;
   background:
     radial-gradient(120% 55% at 100% 0%, color-mix(in srgb, var(--app-accent) 7%, transparent), transparent 60%),
+    var(--app-bg-image),
     var(--app-bg);
   color: var(--app-fg);
 }
