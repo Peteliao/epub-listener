@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>山岚「地」读音参考</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; padding: 24px 16px 48px; font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  .intro { margin: 0 0 20px; opacity: .78; }
+  .intro strong { opacity: 1; }
+  .card { padding: 14px 0 16px; border-top: 1px solid rgba(127,127,127,.28); }
+  .card h2 { font-size: 17px; margin: 0 0 2px; }
+  .card p { margin: 0 0 10px; font-size: 13px; opacity: .7; }
+  audio { width: 100%; }
+  .note { margin-top: 24px; padding: 12px 14px; border-radius: 10px; background: rgba(127,127,127,.12); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>山岚「地」读音参考</h1>
+  <p class="intro">全部音频由 <strong>同一个 model-steps-3.onnx</strong>、同一套 v6 词典和与 App 相同的 noise/length 配置生成。请用<strong>同一台设备、同一音量</strong>：先听「第（dì）」和「的（de）」，再听六句。</p>
+  
+    <section class="card">
+      <h2>第（参考：dì）</h2>
+      <p>单字「第」= di4，清晰 /i/；如果这个也听成 de，说明是外放/听感问题。</p>
+      <audio controls preload="none" src="di4.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>的（参考：de）</h2>
+      <p>单字「的」= 轻声 de，用来和 dì 对比。</p>
+      <audio controls preload="none" src="de.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>空地（单词）</h2>
+      <p>只读「空地」两个字。</p>
+      <audio controls preload="none" src="kongdi-word.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>村里把荒地开垦成了良田。</h2>
+      <p>荒地：覆盖表 tail 边界，地=di4。</p>
+      <audio controls preload="none" src="huangdi.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>楼前有一片空地可以停车。</h2>
+      <p>空地：覆盖表 lead 边界，地=di4。</p>
+      <audio controls preload="none" src="kongdi.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>这片林地受到严格保护。</h2>
+      <p>林地：覆盖表 tail 边界，地=di4。</p>
+      <audio controls preload="none" src="lindi.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>这家店只卖本地特产。</h2>
+      <p>本地：覆盖表 tail 边界，地=di4。</p>
+      <audio controls preload="none" src="bendi.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>他打开地图寻找路线。</h2>
+      <p>地图：覆盖表 both 边界，地=di4。</p>
+      <audio controls preload="none" src="ditu.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>科学家在研究地心的结构。</h2>
+      <p>地心：基础词典整词 di4，无边界。</p>
+      <audio controls preload="none" src="dixin.wav"></audio>
+    </section>
+
+    <section class="card">
+      <h2>兔子钻进地洞里躲了起来。</h2>
+      <p>地洞：基础词典整词 di4，无边界。</p>
+      <audio controls preload="none" src="didong.wav"></audio>
+    </section>
+  <p class="note">如果连「第（dì）」都听成 de，说明是外放/耳机或听感把高元音 /i/ 弱化了，不是 App 把地读成了 de；如果「第」是清楚的 dì、而某一句仍然是 de，请告诉我具体哪一条，我按那条的音频继续查。</p>
+</main>
+</body>
+</html>

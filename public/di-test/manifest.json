@@ -1,0 +1,82 @@
+[
+  {
+    "id": "di4",
+    "label": "第（参考：dì）",
+    "hint": "单字「第」= di4，清晰 /i/；如果这个也听成 de，说明是外放/听感问题。",
+    "text": "第。",
+    "file": "di4.wav",
+    "ms": 766
+  },
+  {
+    "id": "de",
+    "label": "的（参考：de）",
+    "hint": "单字「的」= 轻声 de，用来和 dì 对比。",
+    "text": "的。",
+    "file": "de.wav",
+    "ms": 940
+  },
+  {
+    "id": "kongdi-word",
+    "label": "空地（单词）",
+    "hint": "只读「空地」两个字。",
+    "text": "空地。",
+    "file": "kongdi-word.wav",
+    "ms": 1080
+  },
+  {
+    "id": "huangdi",
+    "label": "村里把荒地开垦成了良田。",
+    "hint": "荒地：覆盖表 tail 边界，地=di4。",
+    "text": "村里把荒地开垦成了良田。",
+    "file": "huangdi.wav",
+    "ms": 3239
+  },
+  {
+    "id": "kongdi",
+    "label": "楼前有一片空地可以停车。",
+    "hint": "空地：覆盖表 lead 边界，地=di4。",
+    "text": "楼前有一片空地可以停车。",
+    "file": "kongdi.wav",
+    "ms": 3053
+  },
+  {
+    "id": "lindi",
+    "label": "这片林地受到严格保护。",
+    "hint": "林地：覆盖表 tail 边界，地=di4。",
+    "text": "这片林地受到严格保护。",
+    "file": "lindi.wav",
+    "ms": 2856
+  },
+  {
+    "id": "bendi",
+    "label": "这家店只卖本地特产。",
+    "hint": "本地：覆盖表 tail 边界，地=di4。",
+    "text": "这家店只卖本地特产。",
+    "file": "bendi.wav",
+    "ms": 2577
+  },
+  {
+    "id": "ditu",
+    "label": "他打开地图寻找路线。",
+    "hint": "地图：覆盖表 both 边界，地=di4。",
+    "text": "他打开地图寻找路线。",
+    "file": "ditu.wav",
+    "ms": 2856
+  },
+  {
+    "id": "dixin",
+    "label": "科学家在研究地心的结构。",
+    "hint": "地心：基础词典整词 di4，无边界。",
+    "text": "科学家在研究地心的结构。",
+    "file": "dixin.wav",
+    "ms": 2949
+  },
+  {
+    "id": "didong",
+    "label": "兔子钻进地洞里躲了起来。",
+    "hint": "地洞：基础词典整词 di4，无边界。",
+    "text": "兔子钻进地洞里躲了起来。",
+    "file": "didong.wav",
+    "ms": 2763
+  }
+]
