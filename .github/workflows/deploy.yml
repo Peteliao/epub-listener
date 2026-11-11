@@ -26,6 +26,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run audit:all
+      # Job logs require authentication; check-run annotations are public, so a
+      # red audit:all must name the failing gate in an annotation.
+      - name: Report failed pronunciation gate
+        if: failure()
+        run: node scripts/ci-report-gate-failure.mjs
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
