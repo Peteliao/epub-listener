@@ -39,6 +39,8 @@ import { createMatchaSynth } from './lib/matchaSynth.mjs'
 import {
   WORD_FAMILY,
   EXCLUSIONS,
+  STEAL_CASES,
+  STEAL_EXCLUSIONS,
   FEEDBACK_SENTENCE,
   BOOK_BLOCK,
   DIPAN_SENTENCE,
@@ -364,6 +366,24 @@ async function main() {
       .every((item) => !lists.resetWords.includes(item.word)),
     lists.resetWords.join('、'))
 
+  // ---- 4b. X便 + 宜 steal contexts (2026-11-11 seventh round) ------------
+  attribution.stealCases = []
+  for (const item of STEAL_CASES) {
+    const result = readingAt(item.phrase, '便', 1, runtime.runtimeMap)
+    attribution.stealCases.push({ ...item, actualWord: result.word, actualPhone: result.phone })
+    check(checks, '抢词', `${item.phrase}：「便」不被「${item.stolen}」抢走`,
+      result.phone === 'pian2' && result.word === item.word,
+      `${result.word} -> ${result.phone}（修复前 ${item.stolen} -> ${item.stolenReading}）`)
+  }
+  attribution.stealExclusions = []
+  for (const item of STEAL_EXCLUSIONS) {
+    const result = readingAt(item.phrase, '便', 1, runtime.runtimeMap)
+    attribution.stealExclusions.push({ ...item, actualWord: result.word, actualPhone: result.phone })
+    check(checks, '抢词', `${item.phrase}：真正的 X便+宜 仍读 bian4`,
+      result.phone === item.phone && result.word === item.word,
+      `${result.word} -> ${result.phone}`)
+  }
+
   attribution.whyPreviousFixesFailed = [
     `人工表历史上只有 ${HISTORICAL_CURATED.join(' / ')} 四行；${attribution.dictionary.wordsNeverCuratedBefore.join(' / ')} 从未进表，基础词典「便宜」族全是 pian2 yi2 两个阳平连读，`,
     'AiModel.ts 把人工表拼在整书自动生成 overlay 之前，worker.patchLexicon 后写覆盖：整书表一旦含同名词即生效，而审计侧 parseOverlay 是首行生效，门禁永远看不到 App 实际用的那一行；',
@@ -572,8 +592,19 @@ function renderMarkdown(report) {
       : '—'
     lines.push(`| ${word} | ${base} | ${curated} | ${pick('词典', '最终词典读音')} | ${pick('整词命中', '短句')} | ${pick('运行时文本', '插入整词保护')} | ${states} |`)
   }
+  lines.push('', '## 抢词语境（X便 + 宜）', '',
+    '| 语境 | 修复前真实前端 | 整词覆盖后 | 结论 |',
+    '| --- | --- | --- | --- |')
+  for (const item of report.attribution.stealCases) {
+    lines.push(`| ${item.phrase} | ${item.stolen} -> ${item.stolenReading} + 宜 | ${item.actualWord} -> ${item.actualPhone} | ${item.actualPhone === 'pian2' ? '✓' : '✗'} |`)
+  }
+  lines.push('', '排除项（真正的 X便 + 宜，必须保持 bian4）：', '')
+  for (const item of report.attribution.stealExclusions) {
+    lines.push(`- ${item.phrase}：${item.actualWord} -> ${item.actualPhone}（期望 ${item.word} -> ${item.phone}）`)
+  }
   lines.push('', '## 适用词条范围', '',
     '- 纳入修复与逐词验收：小便宜、捡便宜、讨便宜、贪便宜（便=pian2，宜=训练过的轻声 yi）；便宜货（便=pian2，「宜」按逐词 A/B 保留 yi2）；抢地盘、占地盘、地盘（地=di4）。',
+    '- 抢词语境（第七轮）：不便宜、就便宜、以便宜、得便宜、趁便宜——前端会先命中「不便 / 就便 / 以便 / 得便 / 趁便」而把「便」读成 bian4，整词钉住后才回到 pian2。',
     '- 守住但不改：占便宜、大便宜、地盘之争、地点、完整反馈原句与书中整块。',
     '- 明确排除：便宜从事 / 便宜施行 / 便宜行事、小便、状语助词「长期地」的 de、单字「便 / 地」覆盖、piper 小雅 / 初晴 / AISHELL-3 词典、系统语音与英文音色。',
     '', '## 此前修复未生效的原因（运行时数据链路归因）', '')

@@ -154,6 +154,39 @@ describe('8 个词条的最终词典与排除项', () => {
   })
 })
 
+describe('X便 + 宜 的抢词语境（第七轮）', () => {
+  it('五个真实前端确认会抢词的组合，现在都回到 pian2', async () => {
+    const { loadMatchaAssets, readingAt } = await loadReading()
+    const wf = await loadWordFamily()
+    const assets = await loadMatchaAssets()
+    expect(wf.STEAL_CASES.length).toBe(5)
+    for (const item of wf.STEAL_CASES) {
+      const result = readingAt(item.phrase, '便', 1, assets.effective)
+      expect(result.word, item.phrase).toBe(item.word)
+      expect(result.phone, item.phrase).toBe('pian2')
+      expect(assets.overlay.entries.get(item.word), item.phrase).toContain('pian2')
+    }
+  })
+
+  it('真正的 X便 + 宜 不被扩散误伤，仍读 bian4', async () => {
+    const { loadMatchaAssets, readingAt } = await loadReading()
+    const wf = await loadWordFamily()
+    const assets = await loadMatchaAssets()
+    for (const item of wf.STEAL_EXCLUSIONS) {
+      const result = readingAt(item.phrase, '便', 1, assets.effective)
+      expect(result.word, item.phrase).toBe(item.word)
+      expect(result.phone, item.phrase).toBe(item.phone)
+    }
+  })
+
+  it('底层 X便 词条本身不被改动', async () => {
+    const { loadMatchaAssets, readingAt } = await loadReading()
+    const assets = await loadMatchaAssets()
+    expect(readingAt('甚为不便。', '便', 1, assets.effective).phone).toBe('bian4')
+    expect(readingAt('请顺便带回来。', '便', 1, assets.effective).phone).toBe('bian4')
+  })
+})
+
 describe('逐词门禁接线', () => {
   it('audit-all 把词族逐词可听性列为必需门禁', () => {
     const source = readFileSync(resolve(root, 'scripts/audit-all.mjs'), 'utf8')

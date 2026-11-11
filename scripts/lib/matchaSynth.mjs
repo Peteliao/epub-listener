@@ -41,6 +41,9 @@ export async function createMatchaSynth({
   quiet = true,
   minWordsInSentence = APP_MIN_WORDS_IN_SENTENCE,
   lexiconPath = join(MODEL_DIR, 'lexicon.v3.txt'),
+  // Front-end debug logs (real toy tokenisation) are the ground truth for
+  // longest-match questions; leave off for measurements.
+  debug = false,
 } = {}) {
   const gluePath = join(RUNTIME_DIR, 'sherpa-onnx-wasm-tts.js')
   const apiPath = join(RUNTIME_DIR, 'sherpa-onnx-tts.js')
@@ -63,7 +66,7 @@ export async function createMatchaSynth({
         lengthScale: 1,
       },
       numThreads: 1,
-      debug: 0,
+      debug: debug ? 1 : 0,
       provider: 'cpu',
     },
     ruleFsts: '',

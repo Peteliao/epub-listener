@@ -210,3 +210,13 @@
 {"id":"wf-0009","text":"正因如此，一些会占便宜的有钱人长期地用盐不给钱。","readings":[["便",1,"pian2"],["宜",1,"yi"],["地",1,"de"]]}
 {"id":"wf-0010","text":"遇到急事可以便宜行事。","readings":[["便",1,"bian4"]]}
 {"id":"wf-0011","text":"他去解了个小便。","readings":[["便",1,"bian4"]]}
+
+# 2026-11-11 第七轮：X便 + 宜 的最长匹配抢词。真实 WASM debug=1 日志确认
+# 「不便 / 就便 / 以便 / 得便 / 趁便」会先吃掉「便」，整词钉住后恢复 pián。
+{"id":"wf-steal-01","text":"这东西一点也不便宜。","readings":[["便",1,"pian2"]]}
+{"id":"wf-steal-02","text":"买得多了就便宜。","readings":[["便",1,"pian2"]]}
+{"id":"wf-steal-03","text":"他想以便宜的价格买下这批货。","readings":[["便",1,"pian2"]]}
+{"id":"wf-steal-04","text":"他总想得便宜，结果吃了大亏。","readings":[["便",1,"pian2"]]}
+{"id":"wf-steal-05","text":"趁便宜的时候多买一些。","readings":[["便",1,"pian2"]]}
+{"id":"wf-steal-ex1","text":"这地方干净方便宜人。","readings":[["便",1,"bian4"]]}
+{"id":"wf-steal-ex2","text":"便宜行事，方不失机。","readings":[["便",1,"bian4"]]}

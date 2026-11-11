@@ -270,3 +270,27 @@ export function spanOf(sentence, word, effective) {
   return tokenizeSpans(sentence, effective, maxWordLength(effective))
     .some((span) => span.word === word)
 }
+
+/**
+ * 2026-11-11 seventh round: 「X便 + 宜」被更长的 X便 词条抢走「便」。 These are
+ * NOT 便宜-family words; the pián reading belongs to the following 便宜. The
+ * real Matcha front end (debug=1) resolved each phrase as `stolen` + 宜 before
+ * the curated rows were added, so every one needs its own whole-word entry.
+ */
+export const STEAL_CASES = Object.freeze([
+  { phrase: '不便宜', word: '不便宜', stolen: '不便', stolenReading: 'bu2 bian4' },
+  { phrase: '就便宜', word: '就便宜', stolen: '就便', stolenReading: 'jiu4 bian4' },
+  { phrase: '以便宜', word: '以便宜', stolen: '以便', stolenReading: 'yi3 bian4' },
+  { phrase: '得便宜', word: '得便宜', stolen: '得便', stolenReading: 'de2 bian4' },
+  { phrase: '趁便宜', word: '趁便宜', stolen: '趁便', stolenReading: 'chen4 bian4' },
+])
+
+/**
+ * Genuine `X便 + 宜` contexts: the 便 here really is biàn, so they must never be
+ * captured by the steal-case rows. Guarding them keeps the diffusion honest.
+ */
+export const STEAL_EXCLUSIONS = Object.freeze([
+  { phrase: '方便宜人', word: '方便', phone: 'bian4' },
+  { phrase: '便宜行事', word: '便宜行事', phone: 'bian4' },
+  { phrase: '便宜从事', word: '便宜从事', phone: 'bian4' },
+])
