@@ -220,3 +220,22 @@
 {"id":"wf-steal-05","text":"趁便宜的时候多买一些。","readings":[["便",1,"pian2"]]}
 {"id":"wf-steal-ex1","text":"这地方干净方便宜人。","readings":[["便",1,"bian4"]]}
 {"id":"wf-steal-ex2","text":"便宜行事，方不失机。","readings":[["便",1,"bian4"]]}
+
+# 2026-11-11 第八轮：经历（OOV 双字词）的经=jing1；三处经都要守住。
+{"id":"wf-jing-01","text":"饱经风霜的张学良曾经用他一生的经历对日本的年轻人说：不要相信暴力。","readings":[["经",1,"jing1"],["经",2,"jing1"],["经",3,"jing1"]]}
+{"id":"wf-jing-02","text":"这段经历让他明白了许多。","readings":[["经",1,"jing1"]]}
+
+# 2026-11-11 第八轮：单字「长」比较义 cháng；zhǎng 语境作为排除项守住。
+{"id":"wf-chang-01","text":"修身养性，活得比他长就是了。","readings":[["长",1,"chang2"]]}
+{"id":"wf-chang-02","text":"时间一长，天也黑了。","readings":[["长",1,"chang2"]]}
+{"id":"wf-chang-03","text":"他指着皇长子。","readings":[["长",1,"zhang2"]]}
+{"id":"wf-chang-04","text":"难道他还长了翅膀？","readings":[["长",1,"zhang3"]]}
+
+# 2026-11-11 第九轮：七个「地」反馈句，音素都应为 di4（问题在声学时长）。
+{"id":"wf-di-01","text":"村里把荒地开垦成了良田。","readings":[["地",1,"di4"]]}
+{"id":"wf-di-02","text":"楼前有一片空地可以停车。","readings":[["地",1,"di4"]]}
+{"id":"wf-di-03","text":"这片林地受到严格保护。","readings":[["地",1,"di4"]]}
+{"id":"wf-di-04","text":"这家店只卖本地特产。","readings":[["地",1,"di4"]]}
+{"id":"wf-di-05","text":"他打开地图寻找路线。","readings":[["地",1,"di4"]]}
+{"id":"wf-di-06","text":"科学家在研究地心的结构。","readings":[["地",1,"di4"]]}
+{"id":"wf-di-07","text":"兔子钻进地洞里躲了起来。","readings":[["地",1,"di4"]]}

@@ -294,3 +294,94 @@ export const STEAL_EXCLUSIONS = Object.freeze([
   { phrase: '便宜行事', word: '便宜行事', phone: 'bian4' },
   { phrase: '便宜从事', word: '便宜从事', phone: 'bian4' },
 ])
+
+/**
+ * 2026-11-11 eighth round: single-character 长.
+ *
+ * The base lexicon's single-char fallback is `zhang3`, and bookLexicon only
+ * generates words of >= 2 Han characters, so a standalone/comparative 长 can
+ * never be fixed by the per-book overlay. These are the real book contexts
+ * (明朝那些事儿, 69 single-char 长 occurrences) that are unambiguously cháng; each
+ * needs a multi-character curated row.
+ */
+export const LONG_CASES = Object.freeze([
+  { phrase: '活得比他长就是了。', word: '比他长', phone: 'chang2' },
+  { phrase: '活得还要长，也真算是老天开眼。', word: '活得还要长', phone: 'chang2' },
+  { phrase: '比明朝的历史还要长，一直到清朝雍正。', word: '历史还要长', phone: 'chang2' },
+  { phrase: '待朱允炆年岁稍长，发现他很聪明。', word: '稍长', phone: 'chang2' },
+  { phrase: '既然如此，就以己之长，攻彼之短。', word: '之长', phone: 'chang2' },
+  { phrase: '时间一长，天也黑了。', word: '时间一长', phone: 'chang2' },
+  { phrase: '长此下去怎么得了。', word: '长此下去', phone: 'chang2' },
+  { phrase: '时间不长，四处仍然可见。', word: '时间不长', phone: 'chang2' },
+  { phrase: '因为她入宫不长，且皇帝之前已。', word: '入宫不长', phone: 'chang2' },
+  { phrase: '他们官龄也长，想当年他们中。', word: '官龄也长', phone: 'chang2' },
+  { phrase: '而这份合同的年限也实在有点长。', word: '有点长', phone: 'chang2' },
+  { phrase: '这场历时极长、影响极大的抗争。', word: '极长', phone: 'chang2' },
+  { phrase: '即所谓“一寸长，一寸强”。', word: '一寸长', phone: 'chang2' },
+  { phrase: '终于熬了过来，活得比朱元璋长。', word: '比朱元璋长', phone: 'chang2' },
+  { phrase: '幸福生活长不了。', word: '长不了', phone: 'chang2' },
+  { phrase: '霍维华感觉明熹宗怕是活不长了。', word: '活不长', phone: 'chang2' },
+  { phrase: '太有个性的人注定是混不长的。', word: '混不长', phone: 'chang2' },
+  { phrase: '因为石部长不但个子高（长八尺）。', word: '长八尺', phone: 'chang2', occurrence: 2 },
+  { phrase: '位置险要，东西长十五里，南北宽。', word: '长十五里', phone: 'chang2' },
+  { phrase: '这是一列长队，从前到后，长几十里。', word: '长几十里', phone: 'chang2', occurrence: 2 },
+  { phrase: '有枪管五个，各长一尺五寸。', word: '长一尺五寸', phone: 'chang2' },
+  { phrase: '在漳水两岸筑长堤四十余里。', word: '长堤', phone: 'chang2' },
+  { phrase: '拉出了几条长铁索，用火烧红。', word: '长铁索', phone: 'chang2' },
+  { phrase: '字长卿，万历二十六年。', word: '长卿', phone: 'chang2' },
+  { phrase: '这个女儿，叫做长平公主。', word: '长平公主', phone: 'chang2' },
+  { phrase: '怎么从长，喝西北风？', word: '从长', phone: 'chang2' },
+])
+
+/**
+ * 2026-11-11 ninth round: single-character 地 nouns. The phone is always di4;
+ * the failure is acoustic (the final 地 is compressed to 47–81ms and sounds like
+ * de). Two or three real contexts per word chose the boundary; 地心/地洞 measured
+ * normal with no boundary and are listed to keep them that way.
+ */
+export const DI_CASES = Object.freeze([
+  {
+    word: '荒地', boundary: 'tail',
+    contexts: ['村里把荒地开垦成了良田。', '这片荒地一直没人耕种。'],
+  },
+  {
+    word: '空地', boundary: 'lead',
+    contexts: ['楼前有一片空地可以停车。', '楼后的空地上堆满了杂物。'],
+  },
+  {
+    word: '林地', boundary: 'tail',
+    contexts: ['这片林地受到严格保护。', '这片林地归村里所有。'],
+  },
+  {
+    word: '本地', boundary: 'tail',
+    contexts: ['这家店只卖本地特产。', '本地特产很受欢迎。'],
+  },
+  {
+    word: '地图', boundary: 'both',
+    contexts: ['他打开地图寻找路线。', '墙上挂着一张地图。', '地图上标着路线。'],
+  },
+  {
+    word: '地心', boundary: 'none',
+    contexts: ['科学家在研究地心的结构。', '地心的温度非常高。', '地球的地心是滚烫的。'],
+  },
+  {
+    word: '地洞', boundary: 'none',
+    contexts: ['兔子钻进地洞里躲了起来。', '这个地洞通向山后。', '地洞里黑漆漆的。'],
+  },
+])
+
+/** zhǎng contexts that must keep the base reading; broad cháng rows must not eat them. */
+export const LONG_EXCLUSIONS = Object.freeze([
+  { phrase: '北大校长蒋梦麟', pattern: '^zhang' },
+  { phrase: '作为明军总参谋长', pattern: '^zhang' },
+  { phrase: '他是机要处处长。', pattern: '^zhang' },
+  { phrase: '难道他还长了翅膀？', pattern: '^zhang' },
+  { phrase: '复宇，辽东宁远人，生在宁远，长在宁远', pattern: '^zhang' },
+  { phrase: '根据明朝规定，皇子长到六岁', pattern: '^zhang' },
+  { phrase: '文皇少长习兵，据幽燕形胜', pattern: '^zhang' },
+  { phrase: '十几岁正好是少年儿童长身体的时候', pattern: '^zhang' },
+  { phrase: '长知识，长见识，长本事', pattern: '^zhang' },
+  { phrase: '◆ 不长记性啊', pattern: '^zhang' },
+  { phrase: '他指着皇长子', pattern: '^zhang' },
+  { phrase: '他成长了，从一个战争的爱好者', pattern: '^zhang' },
+])

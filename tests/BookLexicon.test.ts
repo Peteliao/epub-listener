@@ -139,7 +139,7 @@ describe('generateBookLexicon', () => {
     expect(offenders).toEqual([])
   })
 
-  it('rejects OOV words that contain characters the curated overlay guards', () => {
+  it('allows OOV words whose reading matches the curated base', () => {
     const synthetic = {
       lexiconText: ['尽 jin4', '管 guan3', '下 xia4', '雨 yu3'].join('\n'),
       tokensText: ['jin2', 'jin3', 'guan3', 'xia4', 'yu3'].join('\n'),
@@ -150,11 +150,18 @@ describe('generateBookLexicon', () => {
       { word: '尽管', reading: 'jin2 guan3', count: 1 },
     ])
 
+    // 2026-11-11 ninth round: the curated table pins 尽=jin3 (尽先), and
+    // 尽管 also reads jin3. The old blanket rejection blocked every OOV word
+    // containing a guarded character — which is exactly why 地-final nouns
+    // could never be generated and fell back to the single-character de. The
+    // context now agrees with the hand-verified base, so it may be generated.
     const guarded = generate(['尽管下雨。'], {
       ...synthetic,
       curatedOverlay: '尽先 jin3 xian1',
     })
-    expect(guarded.entries).toEqual([])
+    expect(guarded.entries).toEqual([
+      { word: '尽管', reading: 'jin2 guan3', count: 1 },
+    ])
   })
 
   it('applies 3+3 sandhi to the generated reading', () => {

@@ -1500,7 +1500,7 @@
 #    58/128→279/337、用户原句 233/256），且停顿落在「点｜地盘」这种词与词的
 #    接缝上，不在词内。与「占便宜」同一条规则：被压的音节放到短语开头。
 #    「地盘之争」是名词复合词，单独钉住整词，避免词首边界把它读断。
-地盘 " di4 pan2
+地盘 di4 pan2 "
 地盘之争 di4 pan2 zhi1 zheng1
 # 5. 上天：词尾静音边界让「天」不再被「上」吞并与读歪（A/B 151→256ms）；
 #    与「应天」同属分句合并后词内音节被压短的情况。
@@ -1599,3 +1599,74 @@
 # 整词钉住该组合，让纯词典门禁（黄金集、回归快照）也走 kuai4；运行时另有
 # protectedWords.v1.txt 的零宽边界兜底，保证任何语境都从「会计」开始匹配。
 学会计 xue2 kuai4 ji4
+
+# 2026-11-11 第八轮：OOV 双字词的词内两音节一起拖长/含混。
+# 反馈原句「饱经风霜的张学良曾经用他一生的经历对日本的年轻人说：不要相信暴力。」
+# 里三处「经」的真实 WASM（scripts/scratch/measure-jing.mjs、ab-jing.mjs）：
+#   饱经风霜 198ms、曾经 337ms、经历 的「经」371ms（merged）/「历」301ms。
+# 前两处 normal；「经历」是基础词典没有整词行的 OOV 双字词，短块里两个音节
+# 都被拖长、边界含混，听感像「经」被吞。
+# 边界 A/B（33 字短句 / 88 字 App 整块）：
+#   整词无边界 371/301、244/174；词首 69/-82、82/-23；词尾 209/70、58/23；
+#   双端无重置 151/82、360/256 —— 单独加边界都不稳定。
+# 语句重置后（worker 按 U+2060 分段，App 真实送入的尾段）：
+#   双端 短块 198/105、长块 256/116，全部 normal；单独念 221/174。
+# 所以「经历」必须同时登记 protectedWords（整词命中）、utteranceResets（新语句）
+# 和本行双端边界，三者缺一不可；只在覆盖表加边界会让「历」被吞。
+经历 " jing1 li4 "
+
+# 2026-11-11 第八轮：单字「长」兜底是 zhang3，比较/长度/时间语境会被读错。
+# 反馈句「修身养性，活得比他长就是了。」的「长」落成单字 zhang3；pinyin-pro
+# 在整句里给 chang2。基础词典有 411 个 chang2 词条、138 个 zhang3 词条，但
+# bookLexicon 只生成 ≥2 字词，单字多音字永远不会被整书自动 overlay 覆盖，
+# 所以只能按真实语境补多字条目。以下词条来自《明朝那些事儿》全书 69 处单字
+# 「长」的逐条人工归类（scripts/scratch/audit-chang.mjs），只收确认读 cháng 的
+# 语境；校长/参谋长/处长/长了/长在/长到/长身体 等 zhǎng 语境保持原样。
+比他长 bi3 ta1 chang2
+活得还要长 huo2 de hai2 yao4 chang2
+历史还要长 li4 shi3 hai2 yao4 chang2
+稍长 shao1 chang2
+之长 zhi1 chang2
+时间一长 shi2 jian1 yi4 chang2
+长此下去 chang2 ci3 xia4 qu4
+时间不长 shi2 jian1 bu4 chang2
+入宫不长 ru4 gong1 bu4 chang2
+官龄也长 guan1 ling2 ye3 chang2
+有点长 you2 dian3 chang2
+极长 ji2 chang2
+一寸长 yi2 cun4 chang2
+比朱元璋长 bi3 zhu1 yuan2 zhang1 chang2
+活不长 huo2 bu4 chang2
+混不长 hun4 bu4 chang2
+长八尺 chang2 ba1 chi3
+长十五里 chang2 shi2 wu3 li3
+长几十里 chang2 ji3 shi2 li3
+长一尺五寸 chang2 yi4 chi3 wu3 cun4
+长堤 chang2 di1
+长铁索 chang2 tie3 suo3
+长卿 chang2 qing1
+长平公主 chang2 ping2 gong1 zhu3
+从长 cong2 chang2
+长不了 chang2 bu4 liao3
+
+# 2026-11-11 第九轮：「地」的声学压缩与未收录地词退化。
+# 七句反馈的真实 WASM（scripts/scratch/measure-di.mjs、ab-di.mjs）：
+#   荒地 81ms 被吞、空地 81ms 被吞、林地 47/81ms 被吞；
+#   本地 139/174ms、地图 186/70ms（第二语境被吞）、地心 174/140/279ms、
+#   地洞 139/290/162ms。
+# 音素全部是 di4，问题在时长。逐词两/三语境 A/B 的稳定选择：
+#   荒地 tail 244/244（lead 220/244、both 313/267 也正常，取词尾完成边界）
+#   空地 lead 139/209（tail 47 反而吞、both 82 吞）
+#   林地 tail 128/116（lead 93 吞、both 198/139 也正常）
+#   本地 tail 116/162（none 139/174 也正常，取更稳的词尾）
+#   地图 both 151/151/104（none 186/70/174 第二语境被吞，lead/tail 也救不回）
+#   地心 none 174/140/279、地洞 none 139/290/162 已稳定，不加边界。
+# 地盘同时从词首边界改为词尾：重置尾段 lead 128/209/93（第三个语境 93 被吞），
+# tail 209/209/163 三个语境全部 normal（见 om-0003 与 rr-0008）。
+# 未收录地词（山脚地/盐碱滩地等）由 bookLexicon 的「OOV 前缀 + 地」合并与
+# reserved 基数偏好修复，不再落回单字 de；见 BOOK_LEXICON_VERSION = 6。
+荒地 huang1 di4 "
+空地 " kong4 di4
+林地 lin2 di4 "
+本地 ben3 di4 "
+地图 " di4 tu2 "

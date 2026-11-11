@@ -249,6 +249,10 @@ export function discoverOmissionLeads(text, assets, cases, { limit = 20 } = {}) 
   })
   const nasalCoda = /n(?:g)?[0-5]?$/
   const weakStop = /^(?:b|p|d|t|g|k|zh|ch|j|q)/
+  // 2026-11-11: the merged syllable can also be the FIRST syllable of an OOV
+  // two-character word (经历 jing1 + li4). Its own nasal coda plus the following
+  // sonorant onset has the same "no clear boundary" shape as the 占便宜 case.
+  const sonorantOnset = /^(?:l|r|m|n|f|h|w|y)/
   const buckets = new Map()
   for (const sentence of splitCorpus(text)) {
     const chars = Array.from(sentence)
@@ -269,8 +273,11 @@ export function discoverOmissionLeads(text, assets, cases, { limit = 20 } = {}) 
           if (/"/.test(reading)) continue
           if (assets.overlay.entries.has(word)) continue
           const sameChar = true
-          const sameAdjacency = nasalCoda.test(phones[rule.offset - 1] ?? '')
-            && weakStop.test(phones[rule.offset + 1] ?? '')
+          const sameAdjacency =
+            (nasalCoda.test(phones[rule.offset - 1] ?? '')
+              && weakStop.test(phones[rule.offset + 1] ?? ''))
+            || (rule.offset === 0 && nasalCoda.test(rule.phone)
+              && sonorantOnset.test(phones[1] ?? ''))
           const key = `${word}|${rule.id}`
           let bucket = buckets.get(key)
           if (!bucket) {

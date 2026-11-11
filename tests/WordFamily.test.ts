@@ -6,7 +6,9 @@ import {
   preparePronunciationText,
   protectPronunciations,
   PROTECTED_WORDS,
+  UTTERANCE_RESET,
   UTTERANCE_RESET_WORDS,
+  WORD_BOUNDARY,
 } from '../src/core/tts/pronunciationGuard'
 
 const root = process.cwd()
@@ -184,6 +186,102 @@ describe('X便 + 宜 的抢词语境（第七轮）', () => {
     const assets = await loadMatchaAssets()
     expect(readingAt('甚为不便。', '便', 1, assets.effective).phone).toBe('bian4')
     expect(readingAt('请顺便带回来。', '便', 1, assets.effective).phone).toBe('bian4')
+  })
+})
+
+describe('2026-11-11 第八轮：经历漏读（语句重置 + 双端边界）', () => {
+  it('经历同时登记整词保护与语句重置', () => {
+    expect(PROTECTED_WORDS).toContain('经历')
+    expect(UTTERANCE_RESET_WORDS).toContain('经历')
+    const prepared = preparePronunciationText('这是一段经历。')
+    expect(prepared).toContain(`${UTTERANCE_RESET}${WORD_BOUNDARY}经历`)
+  })
+
+  it('覆盖表行是双端边界，且 appSegments 取到含经历的尾段', async () => {
+    const { loadMatchaAssets } = await loadReading()
+    const wf = await loadWordFamily()
+    const assets = await loadMatchaAssets()
+    expect(assets.overlay.entries.get('经历')).toBe('" jing1 li4 "')
+    const sentence = '饱经风霜的张学良曾经用他一生的经历对日本的年轻人说：不要相信暴力。'
+    const segments = wf.appSegments(sentence, '经历', wf.loadWordLists())
+    expect(segments).toHaveLength(1)
+    expect(segments[0].split).toBe(true)
+    expect(segments[0].text).toContain('经历')
+    expect(segments[0].text.startsWith(wf.WORD_BOUNDARY)).toBe(true)
+  })
+
+  it('om-0004 在漏读案例表里并声明按 App 分段测量', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const lines = readFileSync(resolve(process.cwd(), 'src/core/tts/omissionCases.v1.jsonl'), 'utf8')
+      .split(/\r?\n/).filter((line) => line.startsWith('{'))
+    const item = lines.map((line) => JSON.parse(line)).find((entry) => entry.id === 'om-0004')
+    expect(item?.word).toBe('经历')
+    expect(item?.measureAppSegment).toBe(true)
+    expect(item?.repair?.kind).toBe('both')
+  })
+})
+
+describe('2026-11-11 第八轮：单字「长」', () => {
+  it('反馈句的「长」解析为 chang2', async () => {
+    const { loadMatchaAssets, readingAt } = await loadReading()
+    const assets = await loadMatchaAssets()
+    expect(assets.overlay.entries.get('比他长')).toBe('bi3 ta1 chang2')
+    const result = readingAt('修身养性，活得比他长就是了。', '长', 1, assets.effective)
+    expect(result.word).toBe('比他长')
+    expect(result.phone).toBe('chang2')
+  })
+
+  it('LONG_CASES 全部 cháng', async () => {
+    const { loadMatchaAssets, readingAt } = await loadReading()
+    const wf = await loadWordFamily()
+    const assets = await loadMatchaAssets()
+    for (const item of wf.LONG_CASES) {
+      const result = readingAt(item.phrase, '长', item.occurrence ?? 1, assets.effective)
+      expect(result.phone, item.phrase).toBe(item.phone)
+    }
+  })
+
+  it('LONG_EXCLUSIONS 全部保持 zhǎng', async () => {
+    const { loadMatchaAssets, readingAt } = await loadReading()
+    const wf = await loadWordFamily()
+    const assets = await loadMatchaAssets()
+    for (const item of wf.LONG_EXCLUSIONS) {
+      const result = readingAt(item.phrase, '长', 1, assets.effective)
+      expect(result.phone, item.phrase).toMatch(new RegExp(item.pattern))
+    }
+  })
+})
+
+describe('2026-11-11 第九轮：单字「地」', () => {
+  it('DI_CASES 全部 di4，边界与逐词 A/B 记录一致', async () => {
+    const { loadMatchaAssets, readingAt } = await loadReading()
+    const wf = await loadWordFamily()
+    const { currentBoundary } = await import('../scripts/lib/omission.mjs') as any
+    const assets = await loadMatchaAssets()
+    for (const item of wf.DI_CASES) {
+      const result = readingAt(item.contexts[0], '地', 1, assets.effective)
+      expect(result.word, item.word).toBe(item.word)
+      expect(result.phone, item.word).toBe('di4')
+      const boundary = currentBoundary(assets.overlay.entries.get(item.word) ?? '')
+      expect(boundary.kind, item.word).toBe(item.boundary)
+    }
+  })
+
+  it('词首/双端边界的词都有已确认漏读案例', async () => {
+    const wf = await loadWordFamily()
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const cases = readFileSync(
+      resolve(process.cwd(), 'src/core/tts/omissionCases.v1.jsonl'), 'utf8',
+    ).split(/\r?\n/).filter((line) => line.startsWith('{'))
+      .map((line) => JSON.parse(line))
+    for (const item of wf.DI_CASES) {
+      if (!['lead', 'both'].includes(item.boundary)) continue
+      const found = cases.find((entry) => entry.word === item.word && entry.status === 'confirmed')
+      expect(found, item.word).toBeTruthy()
+      expect(['lead', 'both']).toContain(found?.repair?.kind)
+    }
   })
 })
 

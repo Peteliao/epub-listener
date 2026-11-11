@@ -34,6 +34,9 @@ import {
   boundaryVariants, caseStream, currentBoundary, inWordBoundaries,
   parseOmissionCases, replayOmission, sentenceCoverage,
 } from './lib/omission.mjs'
+import {
+  loadWordLists, prepareRuntimeText, utteranceParts,
+} from './lib/wordFamily.mjs'
 
 const CASES = resolve(ROOT, 'src/core/tts/omissionCases.v1.jsonl')
 const OVERLAY = resolve(ROOT, 'src/core/tts/polyphones.v1.txt')
@@ -110,6 +113,23 @@ async function readCases() {
 
 function run(script, args) {
   return spawnSync(process.execPath, [script, ...args], { cwd: ROOT, encoding: 'utf8' })
+}
+
+const WORD_LISTS = loadWordLists()
+
+/**
+ * The app applies preparePronunciationText() and the worker splits at U+2060
+ * before synthesis. Measuring the raw feedback sentence would therefore fail a
+ * case the app never plays (经历 is fixed by a reset + two-sided boundary, but
+ * the unreset sentence still merges). Anti-truncation coverage stays on the
+ * original sentence; the acoustic measurement uses the segment the worker
+ * actually synthesises for this word.
+ */
+function appMeasurementText(sentence, word) {
+  const prepared = prepareRuntimeText(sentence, WORD_LISTS)
+  const parts = utteranceParts(prepared)
+  if (!parts) return prepared
+  return parts.find((part) => part.includes(word)) ?? prepared
 }
 
 function measureStream(synth, tokens, start, count, cache) {
@@ -189,7 +209,13 @@ async function verify(assets, options) {
           detail: `${coverage.phones}/${coverage.han} 汉字→音素`,
         })
         if (!stream || !coverage.ok) continue
-        const summary = measureStream(synth, stream.tokens, stream.range.start, stream.count, new Map())
+        // Cases whose repair depends on an utterance reset opt in explicitly:
+        // measure the segment the worker synthesises, not the raw sentence.
+        const measureText = c.measureAppSegment ? appMeasurementText(sentence, c.word) : sentence
+        const measuredStream = caseStream(measureText, c.word, assets) ?? stream
+        const summary = measureStream(
+          synth, measuredStream.tokens, measuredStream.range.start, measuredStream.count, new Map(),
+        )
         measured.push({
           sentence, book,
           values: summary.values, states: summary.states, score: summary.score,
@@ -321,7 +347,10 @@ async function measure(assets, options) {
         results.push({ ...target, accepted: false, reason: '完整反馈原句不足 2 条' })
         continue
       }
-      const streams = sentences.map((sentence) => caseStream(sentence, target.word, assets))
+      const streams = sentences.map((sentence) => caseStream(
+        target.measureAppSegment ? appMeasurementText(sentence, target.word) : sentence,
+        target.word, assets,
+      ))
       if (streams.some((stream) => !stream)) {
         console.log(`  ${target.word.padEnd(6)} 跳过：反馈原句中无法定位整词`)
         results.push({ ...target, accepted: false, reason: '反馈原句中无法定位整词' })

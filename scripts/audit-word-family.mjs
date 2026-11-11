@@ -34,6 +34,7 @@ import {
   TRAINED_NEUTRAL_PHONES,
 } from './lib/reading.mjs'
 import { phoneIndices } from './lib/fusionRisk.mjs'
+import { currentBoundary } from './lib/omission.mjs'
 import { summarizeContributions } from './lib/acousticScoring.mjs'
 import { createMatchaSynth } from './lib/matchaSynth.mjs'
 import {
@@ -41,6 +42,9 @@ import {
   EXCLUSIONS,
   STEAL_CASES,
   STEAL_EXCLUSIONS,
+  LONG_CASES,
+  LONG_EXCLUSIONS,
+  DI_CASES,
   FEEDBACK_SENTENCE,
   BOOK_BLOCK,
   DIPAN_SENTENCE,
@@ -384,6 +388,39 @@ async function main() {
       `${result.word} -> ${result.phone}`)
   }
 
+  // ---- 4c. Single-character 长 contexts (2026-11-11 eighth round) ---------
+  attribution.longCases = []
+  for (const item of LONG_CASES) {
+    const result = readingAt(item.phrase, '长', item.occurrence ?? 1, runtime.runtimeMap)
+    attribution.longCases.push({ ...item, actualWord: result.word, actualPhone: result.phone })
+    check(checks, '单字长', `${item.phrase.slice(0, 18)}：长=${item.phone}`,
+      result.phone === item.phone,
+      `${result.word} -> ${result.phone}（期望 ${item.word} -> ${item.phone}）`)
+  }
+  attribution.longExclusions = []
+  for (const item of LONG_EXCLUSIONS) {
+    const result = readingAt(item.phrase, '长', 1, runtime.runtimeMap)
+    attribution.longExclusions.push({ ...item, actualWord: result.word, actualPhone: result.phone })
+    check(checks, '单字长', `${item.phrase.slice(0, 18)}：长=zhǎng（排除项）`,
+      new RegExp(item.pattern).test(result.phone),
+      `${result.word} -> ${result.phone}`)
+  }
+
+  // ---- 4d. Single-character 地 contexts (2026-11-11 ninth round) ----------
+  attribution.diCases = []
+  for (const item of DI_CASES) {
+    const result = readingAt(item.contexts[0], '地', 1, runtime.runtimeMap)
+    const boundary = currentBoundary(runtime.runtimeMap.get(item.word) ?? '')
+    attribution.diCases.push({
+      ...item, actualWord: result.word, actualPhone: result.phone, actualBoundary: boundary.kind,
+    })
+    check(checks, '单字地', `${item.word} 整词命中且读 di4`,
+      result.word === item.word && result.phone === 'di4',
+      `${result.word} -> ${result.phone}`)
+    check(checks, '单字地', `${item.word} 边界为 ${item.boundary}`,
+      boundary.kind === item.boundary, `实际 ${boundary.kind}`)
+  }
+
   attribution.whyPreviousFixesFailed = [
     `人工表历史上只有 ${HISTORICAL_CURATED.join(' / ')} 四行；${attribution.dictionary.wordsNeverCuratedBefore.join(' / ')} 从未进表，基础词典「便宜」族全是 pian2 yi2 两个阳平连读，`,
     'AiModel.ts 把人工表拼在整书自动生成 overlay 之前，worker.patchLexicon 后写覆盖：整书表一旦含同名词即生效，而审计侧 parseOverlay 是首行生效，门禁永远看不到 App 实际用的那一行；',
@@ -467,6 +504,28 @@ async function main() {
           islands >= 2,
           `独立浊音段 ${islands}（≥2） · 音节 ${Array.from(item.word).length}`)
       }
+      // 2026-11-11 ninth round: measure the 地 syllable itself in every DI case
+      // context (2 per word in verify, all contexts in --measure).
+      for (const item of DI_CASES) {
+        const contexts = options.mode === 'measure' ? item.contexts : item.contexts.slice(0, 2)
+        for (const sentence of contexts) {
+          for (const segment of appSegments(sentence, item.word, lists)) {
+            const stream = streamFor(segment.text, item.word, runtime.runtimeMap)
+            if (!stream) {
+              check(checks, '声学', `${item.word} 单字地 ${sentence.slice(0, 10)}…`, false, '无法构造 token 序列')
+              continue
+            }
+            const offset = [...item.word].indexOf('地')
+            const indices = phoneIndices(stream.tokens, stream.range.start, stream.count)
+            const summary = summarizeContributions(synth.contributions(stream.tokens, [indices[offset]]))
+            acoustic.push({ word: item.word, label: `${item.word} 单字地`, sentence: segment.text,
+              phones: stream.phones, ...summary })
+            check(checks, '声学', `${item.word} 单字地可听（${sentence.slice(0, 10)}…）`,
+              summary.states[0] === 'normal',
+              `${summary.values[0]}ms ${summary.states[0]}`)
+          }
+        }
+      }
       for (const [label, sentence, word, advisory] of [
         ['反馈原句', FEEDBACK_SENTENCE, '占便宜', false],
         // Project policy (README 2026-11-11, om-0001 advisorySentences): all
@@ -477,17 +536,24 @@ async function main() {
         ['书中整块', BOOK_BLOCK, '占便宜', true],
         ['地盘原句', DIPAN_SENTENCE, '地盘', false],
       ]) {
-        const stream = streamFor(sentence, word, runtime.runtimeMap)
-        if (!stream) continue
-        const indices = phoneIndices(stream.tokens, stream.range.start, stream.count)
-        const summary = summarizeContributions(synth.contributions(stream.tokens, indices))
-        const entry = { word, label, sentence, phones: stream.phones, ...summary }
-        acoustic.push({ ...entry, advisory })
-        const detail = `${summary.values.join('/')}ms · ${summary.states.join('/')}`
-        if (advisory) {
-          advisories.push({ ...entry, detail, note: '三个音节同时 >350ms，代理指标与听感未定，待复听；不计入硬性门禁' })
-        } else {
-          check(checks, '声学', `${label} 真实 WASM 每个音节可听`, summary.states.every((state) => state === 'normal'), detail)
+        // 地盘 is in utteranceResets: the app synthesises the reset tail as its
+        // own utterance. Measuring the raw sentence with the new tail boundary
+        // would report 34ms, a sequence the app never plays. Use appSegments.
+        for (const segment of appSegments(sentence, word, lists)) {
+          const stream = streamFor(segment.text, word, runtime.runtimeMap)
+          if (!stream) continue
+          const indices = phoneIndices(stream.tokens, stream.range.start, stream.count)
+          const summary = summarizeContributions(synth.contributions(stream.tokens, indices))
+          const name = `${label}·${segment.label}`
+          const entry = { word, label: name, sentence: segment.text, phones: stream.phones, ...summary }
+          acoustic.push({ ...entry, advisory })
+          const detail = `${summary.values.join('/')}ms · ${summary.states.join('/')}`
+          if (advisory) {
+            advisories.push({ ...entry, detail, note: '三个音节同时 >350ms，代理指标与听感未定，待复听；不计入硬性门禁' })
+          } else {
+            check(checks, '声学', `${name} 真实 WASM 每个音节可听`,
+              summary.states.every((state) => state === 'normal'), detail)
+          }
         }
       }
 
@@ -602,7 +668,31 @@ function renderMarkdown(report) {
   for (const item of report.attribution.stealExclusions) {
     lines.push(`- ${item.phrase}：${item.actualWord} -> ${item.actualPhone}（期望 ${item.word} -> ${item.phone}）`)
   }
+  lines.push('', '## 单字「长」上下文（第八轮）', '',
+    '| 语境 | 期望 | 实际 | 结论 |',
+    '| --- | --- | --- | --- |')
+  for (const item of report.attribution.longCases) {
+    lines.push(`| ${item.phrase} | ${item.phone} | ${item.actualWord} -> ${item.actualPhone} | ${item.actualPhone === item.phone ? '✓' : '✗'} |`)
+  }
+  lines.push('', '排除项（必须保持 zhǎng）：', '')
+  for (const item of report.attribution.longExclusions) {
+    lines.push(`- ${item.phrase}：${item.actualWord} -> ${item.actualPhone}`)
+  }
+  lines.push('', '## 单字「地」上下文（第九轮）', '',
+    '| 词 | 边界 | 语境 | 地 (ms) | 结论 |',
+    '| --- | --- | --- | ---: | --- |')
+  for (const item of report.attribution.diCases) {
+    const rows = report.acoustic.filter(
+      (entry) => entry.word === item.word && entry.kind !== 'waveform',
+    )
+    for (const row of rows) {
+      lines.push(`| ${item.word} | ${item.actualBoundary} | ${row.sentence} | ${row.values[0]} | ${row.states[0]} |`)
+    }
+    if (!rows.length) lines.push(`| ${item.word} | ${item.actualBoundary} | — | — | — |`)
+  }
   lines.push('', '## 适用词条范围', '',
+    '- 单字「地」（第九轮）：荒地 / 空地 / 林地 / 本地 / 地图 按逐词语境 A/B 加边界；地心 / 地洞 实测无边界即 normal，保持原样；未收录地词由 reserved 基数修复（只允许人工表已钉的 di4）与 BOOK_LEXICON_VERSION=6 处理，状语助词「地」仍读 de。',
+    '- 单字「长」（第八轮）：比较/长度/时间语境按真实书本上下文补多字覆盖行；校长/参谋长/处长/长了/长在/长到/长身体 等 zhǎng 语境保持原样，不做单字全局覆盖。',
     '- 纳入修复与逐词验收：小便宜、捡便宜、讨便宜、贪便宜（便=pian2，宜=训练过的轻声 yi）；便宜货（便=pian2，「宜」按逐词 A/B 保留 yi2）；抢地盘、占地盘、地盘（地=di4）。',
     '- 抢词语境（第七轮）：不便宜、就便宜、以便宜、得便宜、趁便宜——前端会先命中「不便 / 就便 / 以便 / 得便 / 趁便」而把「便」读成 bian4，整词钉住后才回到 pian2。',
     '- 守住但不改：占便宜、大便宜、地盘之争、地点、完整反馈原句与书中整块。',

@@ -40,6 +40,7 @@ const CASE_BOUNDARY = {
   lead: 'lead',
   both: 'both',
   append: 'append',
+  tail: 'append',
   internal: 'internal',
   keep: 'keep',
   remove: 'keep',

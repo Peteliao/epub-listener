@@ -3,7 +3,7 @@ import { normalizeOverlayText } from './pinyinTones'
 import trainedNeutralsRaw from './trainedNeutrals.v1.txt?raw'
 
 // Bump when the rules change so cached per-book overlays are regenerated.
-export const BOOK_LEXICON_VERSION = 5
+export const BOOK_LEXICON_VERSION = 6
 export const MAX_BOOK_OVERLAY_ENTRIES = 2000
 
 const HAN = /\p{Script=Han}/u
@@ -222,14 +222,29 @@ function parseOverlay(source: string): Map<string, string> {
 
 /**
  * Characters whose reading in the curated overlay deviates from the lexicon's
- * single-character default. Their pinyin-pro reading cannot beat a human
- * choice, so generated entries must avoid touching them.
+ * single-character default, mapped to the bases the curated table pins.
+ *
+ * 2026-11-11 ninth round: the old Set blocked EVERY changed reading for these
+ * characters, so an OOV word such as 荒坡地 could never be generated and its 地
+ * fell back to the single-character de. But the curated table does pin a
+ * reading: 地点/地盘/抢地盘 all say di4. The correct rule is "an auto-generated
+ * entry may change a reserved character only to a base the curated table
+ * already pins". 便 stays pian2 (pinyin-pro's bian4 is rejected), 会 stays
+ * kuai4, 地 becomes di4, and adverbial 地 stays de via collectAdverbialDe().
  */
 function deriveReservedChars(
   curated: Map<string, string>,
   lexicon: Map<string, string>,
-): Set<string> {
-  const reserved = new Set<string>()
+): Map<string, Set<string>> {
+  const reserved = new Map<string, Set<string>>()
+  const prefer = (char: string, base: string): void => {
+    let bases = reserved.get(char)
+    if (!bases) {
+      bases = new Set<string>()
+      reserved.set(char, bases)
+    }
+    bases.add(base)
+  }
   for (const [word, reading] of curated) {
     const chars = Array.from(word)
     const phones = phonesOf(reading)
@@ -243,14 +258,14 @@ function deriveReservedChars(
       if (!base) continue
       const current = phones[index]
       if (current.base !== base.base) {
-        reserved.add(char)
+        prefer(char, current.base)
         continue
       }
       if (current.tone === base.tone) continue
       if (current.tone === null || base.tone === null) continue
       const next = phones[index + 1]
       if (current.tone === 2 && base.tone === 3 && next?.tone === 3) continue
-      reserved.add(char)
+      prefer(char, current.base)
     }
   }
   return reserved
@@ -634,7 +649,11 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
         let accepted = true
         for (const index of changed) {
           const char = wordChars[index]
-          if (reserved.has(char)) {
+          const preferred = reserved.get(char)
+          if (preferred) {
+            // The curated table already pins this base; the context reading
+            // agrees with the hand-verified choice, so it may be generated.
+            if (preferred.has(span[index].base)) continue
             accepted = false
             break
           }

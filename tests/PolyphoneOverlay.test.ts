@@ -438,7 +438,7 @@ describe('polyphone overlay', () => {
       率意而为: 'shuai4 yi4 er2 wei2',
       而为: 'er2 wei2',
       最先: 'zui4 xian1 "',
-      地盘: '" di4 pan2',
+      地盘: 'di4 pan2 "',
       地盘之争: 'di4 pan2 zhi1 zheng1',
       上天: 'shang4 tian1 "',
       应天: 'ying4 tian1 "',
@@ -501,7 +501,7 @@ describe('polyphone overlay', () => {
     }
     // 地 defaults to the adverbial particle; noun compounds keep di4.
     expect(effective.get('地')).toBe('de')
-    expect(effective.get('地图')).toBe('di4 tu2')
+    expect(effective.get('地图')).toBe('" di4 tu2 "')
     expect(effective.get('得')).toBe('de')
   })
 
