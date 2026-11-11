@@ -1,0 +1,6 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Model lexicons/tokens are hash-verified byte-for-byte; keep LF everywhere
+public/models/**/*.txt text eol=lf
+public/models/manifest.json text eol=lf

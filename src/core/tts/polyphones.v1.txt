@@ -1,0 +1,1583 @@
+# 山岚（matcha）多音字覆盖表：每行「词 音素...」，按最长词组匹配生效。
+# 同名条目会整行替换词库原读音；单字只覆盖「得」，助词「地」由整词表与本书自动规则处理。
+# 声调按词库连读惯例标注：3+3 → 2+3，一/不 按后字变调，得/教/背 按语义取音。
+# 轻声只能用 trainedNeutrals.v1.txt 里声学模型训练过的音素；tokens.txt 里存在
+# 无调 token 并不代表模型会读，未训练的轻声音素会发出怪音或让整字静音。
+# 少数两字词的第二音节会被声学模型压成近乎静音或与前一音节合并，读音本身
+# 没错。这里在「词之后」放一个引号 token「"」（tokens.txt ID 7，纯静音）：
+# 模型会把边界前的音节读完整（实测 jian1 从 35ms 恢复到 313ms），而该处的
+# 停顿与原句自然停顿重合，不会把词拆开。它不算读音，字数/音素数校验、黄金集
+# 与回归快照都会忽略它。
+# 两个已排除的位置：词内逗号「,」会把词读断（用户听成「选、择」）；blank「_」
+# 会被读成一个额外短音节（「多了一个音」）。边界必须放在词尾，不能放进词内。
+应声 ying4 sheng1
+牛圈 niu2 juan4
+时差 shi2 cha1
+短发 duan3 fa4
+发夹 fa4 jia1
+藏医 zang4 yi1
+抽空 chou1 kong4
+蒙骗 meng1 pian4
+铺开 pu1 kai1
+卷子 juan4 zi
+照片 zhao4 pian4
+相片 xiang4 pian4
+色子 shai3 zi
+尾巴 wei3 ba
+很长 hen3 chang2
+太长 tai4 chang2
+越长 yue4 chang2
+更长 geng4 chang2
+最长 zui4 chang2
+多长 duo1 chang2
+那么长 na4 me chang2
+这么长 zhe4 me chang2
+一样长 yi2 yang4 chang2
+变长 bian4 chang2
+全长 quan2 chang2
+长约 chang2 yue1
+长达 chang2 da2
+长凳 chang2 deng4
+长椅 chang2 yi3
+长桌 chang2 zhuo1
+长裙 chang2 qun2
+长靴 chang2 xue1
+长路 chang2 lu4
+长距离 chang2 ju4 li2
+长睫毛 chang2 jie2 mao2
+长筒 chang2 tong3
+长围巾 chang2 wei2 jin1
+长腿 chang2 tui3
+长得 zhang3 de
+长高 zhang3 gao1
+长满 zhang2 man3
+长胖 zhang3 pang4
+长壮 zhang3 zhuang4
+长霉 zhang3 mei2
+长草 zhang2 cao3
+长知识 zhang3 zhi1 shi2
+长身体 zhang3 shen1 ti3
+长见识 zhang3 jian4 shi2
+长本事 zhang2 ben3 shi4
+长本领 zhang2 ben2 ling3
+长记性 zhang3 ji4 xing4
+长心眼 zhang3 xin1 yan3
+长个子 zhang3 ge4 zi
+长不大 zhang3 bu2 da4
+长起来 zhang2 qi3 lai2
+长出来 zhang3 chu1 lai2
+长一岁 zhang3 yi2 sui4
+长皱纹 zhang3 zhou4 wen2
+长肉 zhang3 rou4
+应了一声 ying4 le yi4 sheng1
+应了一句 ying4 le yi2 ju4
+应道 ying4 dao4
+应下 ying4 xia4
+应下来 ying4 xia4 lai2
+背着 bei1 zhe
+背起 bei1 qi3
+背走 bei1 zou3
+背回 bei1 hui2
+背进 bei1 jin4
+背在 bei1 zai4
+背书包 bei1 shu1 bao1
+背一袋 bei1 yi2 dai4
+背一小袋 bei1 yi4 xiao3 dai4
+背米 bei1 mi3
+背柴 bei1 chai2
+背过身 bei4 guo4 shen1
+背对着 bei4 dui4 zhe
+背靠着 bei4 kao4 zhe
+得问 dei3 wen4
+得先 dei3 xian1
+得去 dei3 qu4
+得走 dei2 zou3
+得看 dei3 kan4
+得说 dei3 shuo1
+得做 dei3 zuo4
+得找 dei2 zhao3
+得回 dei3 hui2
+得让 dei3 rang4
+得给 dei2 gei3
+得等 dei2 deng3
+得花 dei3 hua1
+得靠 dei3 kao4
+得用 dei3 yong4
+得注意 dei3 zhu4 yi4
+得管 dei2 guan3
+得小心 dei2 xiao3 xin1
+得努力 dei2 nu3 li4
+教过 jiao1 guo4
+教了 jiao1 le
+教课 jiao1 ke4
+教学生 jiao1 xue2 sheng1
+教孩子 jiao1 hai2 zi
+教语文 jiao1 yu3 wen2
+教数学 jiao1 shu4 xue2
+教英语 jiao1 ying1 yu3
+教低年级 jiao1 di1 nian2 ji2
+教他 jiao1 ta1
+教我 jiao1 wo3
+教你 jiao1 ni3
+教我们 jiao1 wo3 men
+教你们 jiao1 ni3 men
+教他们 jiao1 ta1 men
+教书法 jiao1 shu1 fa3
+教钢琴 jiao1 gang1 qin2
+猪圈 zhu1 juan4
+圈养 juan4 yang3
+数一数 shu3 yi shu3
+数钱 shu3 qian2
+数日子 shu3 ri4 zi
+晃了一下 huang4 le yi2 xia4
+重来 chong2 lai2
+推倒 tui1 dao3
+为宜 wei2 yi2
+为准 wei2 zhun3
+为重 wei2 zhong4
+为佳 wei2 jia1
+种瓜 zhong4 gua1
+种豆 zhong4 dou4
+藏语 zang4 yu3
+量身高 liang2 shen1 gao1
+中意 zhong4 yi4
+发丝 fa4 si1
+发小 fa4 xiao3
+发梢 fa4 shao1
+系领带 ji4 ling3 dai4
+系扣子 ji4 kou4 zi
+待会 dai1 hui4
+待着 dai1 zhe
+弹奏 tan2 zou4
+蒙古 meng2 gu3
+掉色 diao4 shai3
+踏实 ta1 shi
+麻将 ma2 jiang4
+一辈子 yi2 bei4 zi
+削苹果 xiao1 ping2 guo3
+粘人 nian2 ren2
+得 de
+地里 di4 li3
+满地 man3 di4
+地堡 di4 bao3
+地窨子 di4 yin4 zi
+得闲 de2 xian2
+得计 de2 ji4
+得便 de2 bian4
+变得 bian4 de
+博得 bo2 de2
+取得 qu3 de2
+只得 zhi3 de2
+应得 ying1 de2
+引得 yin3 de2
+所得税 suo3 de2 shui4
+购得 gou4 de2
+赢得 ying2 de2
+难得 nan2 de2
+舍得 she3 de
+过得去 guo4 de qu4
+少不得 shao3 bu4 de
+不记得 bu2 ji4 de
+倏地 shu1 de
+霍地 huo4 de
+蓦地 mo4 de
+忽地 hu1 de
+怎地 zen3 de
+恁地 nen4 de
+突地 tu1 de
+啪地 pa1 de
+了不得 liao3 bu4 de
+使不得 shi3 bu4 de
+免不得 mian3 bu4 de
+哭笑不得 ku1 xiao4 bu4 de
+巴不得 ba1 bu4 de
+怨不得 yuan4 bu4 de
+怪不得 guai4 bu4 de
+恨不得 hen4 bu4 de
+来不得 lai2 bu4 de
+求之不得 qiu2 zhi1 bu4 de
+由不得 you2 bu4 de
+舍不得 she3 bu4 de
+要不得 yao4 bu4 de
+见不得 jian4 bu4 de
+说不得 shuo1 bu4 de
+老虎屁股摸不得 lao2 hu3 pi4 gu3 mo1 bu4 de
+此地无银三百两 ci3 di4 wu2 yin2 san1 bai2 liang3
+得趁早 dei3 chen4 zao3
+得赶紧 dei2 gan2 jin3
+得赶快 dei2 gan3 kuai4
+得抓紧 dei3 zhua1 jin3
+得马上 dei2 ma3 shang4
+得尽快 dei2 jin3 kuai4
+得回去 dei3 hui2 qu4
+得加油 dei3 jia1 you2
+得照顾 dei3 zhao4 gu4
+得坚持 dei3 jian1 chi2
+得准备 dei2 zhun3 bei4
+得相信 dei3 xiang1 xin4
+慢慢地 man4 man4 de
+轻轻地 qing1 qing1 de
+悄悄地 qiao1 qiao1 de
+静静地 jing4 jing4 de
+深深地 shen1 shen1 de
+默默地 mo4 mo4 de
+缓缓地 huan2 huan3 de
+微微地 wei1 wei1 de
+淡淡地 dan4 dan4 de
+紧紧地 jin2 jin3 de
+匆匆地 cong1 cong1 de
+渐渐地 jian4 jian4 de
+久久地 jiu2 jiu3 de
+早早地 zao2 zao3 de
+好好地 hao2 hao3 de
+细细地 xi4 xi4 de
+甜甜地 tian2 tian2 de
+呆呆地 dai1 dai1 de
+傻傻地 sha2 sha3 de
+冷冷地 leng2 leng3 de
+暖暖地 nuan2 nuan3 de
+牢牢地 lao2 lao2 de
+狠狠地 hen2 hen3 de
+偷偷地 tou1 tou1 de
+白白地 bai2 bai2 de
+暗暗地 an4 an4 de
+空空地 kong1 kong1 de
+平平地 ping2 ping2 de
+美美地 mei2 mei3 de
+湿湿地 shi1 shi1 de
+热热地 re4 re4 de
+黑黑地 hei1 hei1 de
+沙沙地 sha1 sha1 de
+草草地 cao2 cao3 de
+死死地 si2 si3 de
+生生地 sheng1 sheng1 de
+大大地 da4 da4 de
+高高地 gao1 gao1 de
+远远地 yuan2 yuan3 de
+小心地 xiao3 xin1 de
+开心地 kai1 xin1 de
+伤心地 shang1 xin1 de
+耐心地 nai4 xin1 de
+细心地 xi4 xin1 de
+安心地 an1 xin1 de
+热心地 re4 xin1 de
+专心地 zhuan1 xin1 de
+诚心地 cheng2 xin1 de
+虚心地 xu1 xin1 de
+真心地 zhen1 xin1 de
+精心地 jing1 xin1 de
+粗心地 cu1 xin1 de
+狠心地 hen3 xin1 de
+用心地 yong4 xin1 de
+关心地 guan1 xin1 de
+放心地 fang4 xin1 de
+认真地 ren4 zhen1 de
+仔细地 zi3 xi4 de
+好奇地 hao4 qi2 de
+惊讶地 jing1 ya4 de
+兴奋地 xing1 fen4 de
+疲惫地 pi2 bei4 de
+无奈地 wu2 nai4 de
+亲切地 qin1 qie4 de
+温柔地 wen1 rou2 de
+大声地 da4 sheng1 de
+小声地 xiao3 sheng1 de
+飞快地 fei1 kuai4 de
+努力地 nu3 li4 de
+高兴地 gao1 xing4 de
+赞许地 zan4 xu3 de
+满意地 man3 yi4 de
+深情地 shen1 qing2 de
+疑惑地 yi2 huo4 de
+犹豫地 you2 yu4 de
+迟疑地 chi2 yi2 de
+零零散散地 ling2 ling2 san2 san3 de
+断断续续地 duan4 duan4 xu4 xu4 de
+迷迷糊糊地 mi2 mi2 hu2 hu2 de
+清清楚楚地 qing1 qing1 chu2 chu3 de
+仔仔细细地 zi2 zi3 xi4 xi4 de
+高高兴兴地 gao1 gao1 xing4 xing4 de
+安安静静地 an1 an1 jing4 jing4 de
+匆匆忙忙地 cong1 cong1 mang2 mang2 de
+急急忙忙地 ji2 ji2 mang2 mang2 de
+认认真真地 ren4 ren4 zhen1 zhen1 de
+# 语境读音：落下来、水准连读、送上去，以及“行”作量词的常见搭配。
+落了 luo4 le
+落下 luo4 xia4
+水准 shui2 zhun3
+上去 shang4 qu4
+第一行 di4 yi1 hang2
+一行字 yi4 hang2 zi4
+一行小字 yi4 hang2 xiao3 zi4
+一行很小的字 yi4 hang2 hen2 xiao3 de zi4
+那一行 na4 yi4 hang2
+这一行 zhe4 yi4 hang2
+下一行 xia4 yi4 hang2
+上一行 shang4 yi4 hang2
+最后一行 zui4 hou4 yi4 hang2
+一行泪 yi4 hang2 lei4
+# 续写章节新增语境：量词“行”、“浅浅的”与“原处”。
+加了一行 jia1 le yi4 hang2
+两行 liang3 hang2
+几行 ji3 hang2
+浅浅的 qian2 qian3 de
+原处 yuan2 chu4
+# 多音字试读.txt 自查补充：“长”读 cháng 但词库会按单字 zhǎng 兜底或整词读错的组合。
+悠长 you1 chang2
+绵长 mian2 chang2
+长骨 chang2 gu3
+加长 jia1 chang2
+相当长 xiang1 dang1 chang2
+略长 lve4 chang2
+长胡子 chang2 hu2 zi
+长头发 chang2 tou2 fa4
+长尾巴 chang2 wei3 ba
+变得长 bian4 de chang2
+显得长 xian3 de chang2
+得长 de chang2
+长长地 chang2 chang2 de
+好长 hao3 chang2
+米长 mi3 chang2
+厘米长 li2 mi3 chang2
+公里长 gong1 li3 chang2
+# 专名：词库整词读音错误（长年三老）或未收录（地名/人名）。
+长葛 chang2 ge3
+长垣 chang2 yuan2
+# 2026-11-09：「子长」两字地名会跨词吃掉「小伙子长/孩子长/皇子长」里的「长」，
+# 使「长得/长相/长大」退回 cháng。改用带后缀的地名形式，避免污染普通词组。
+子长县 zi3 chang2 xian4
+子长市 zi3 chang2 shi4
+子长人 zi3 chang2 ren2
+陕西子长 shan3 xi1 zi3 chang2
+长沮 chang2 ju3
+长年三老 chang2 nian2 san1 lao3
+行唐 hang2 tang2
+乐陵 lao4 ling2
+仇英 qiu2 ying1
+单田芳 shan4 tian2 fang1
+解缙 xie4 jin4
+区寄 ou1 ji4
+查良镛 zha1 liang2 yong1
+# 其他多音字：词库按单字默认音兜底会读错的常见组合。
+为人民 wei4 ren2 min2
+量一下 liang2 yi2 xia4
+好喝酒 hao4 he1 jiu3
+# 行星与书名：词库把“行星”所在短语读成 háng；《悟空传》的“传”读 zhuàn。
+九大行星 jiu3 da4 xing2 xing1
+大行星 da4 xing2 xing1
+悟空传 wu4 kong1 zhuan4
+# 诗词句尾的「还」读 huán：春风又绿江南岸，明月何时照我还。
+照我还 zhao4 wo3 huan2
+# 「没」在“隐没”里读 mò，不是 méi。
+隐没 yin3 mo4
+# 「着」的四种读音：着重/着火等词库已有，下面补足“动词 + 着”的助词读法。
+# 缺少这些整词时，贪婪匹配会先切出“看/着火”“看/着重”，把助词读错。
+看着 kan4 zhe
+听着 ting1 zhe
+笑着 xiao4 zhe
+说着 shuo1 zhe
+走着 zou3 zhe
+坐着 zuo4 zhe
+站着 zhan4 zhe
+躺着 tang3 zhe
+拿着 na2 zhe
+放着 fang4 zhe
+开着 kai1 zhe
+关着 guan1 zhe
+等着 deng3 zhe
+守着 shou3 zhe
+拉着 la1 zhe
+抱着 bao4 zhe
+牵着 qian1 zhe
+扶着 fu2 zhe
+靠着 kao4 zhe
+哭着 ku1 zhe
+喊着 han3 zhe
+唱着 chang4 zhe
+跳着 tiao4 zhe
+跑着 pao3 zhe
+飞着 fei1 zhe
+流着 liu2 zhe
+亮着 liang4 zhe
+响着 xiang3 zhe
+忙着 mang2 zhe
+忍着 ren3 zhe
+藏着 cang2 zhe
+记着 ji4 zhe
+带着 dai4 zhe
+陪着 pei2 zhe
+围着 wei2 zhe
+顺着 shun4 zhe
+随着 sui2 zhe
+盯着 ding1 zhe
+望着 wang4 zhe
+凝视着 ning2 shi4 zhe
+注视着 zhu4 shi4 zhe
+微笑着 wei1 xiao4 zhe
+借着 jie4 zhe
+趁着 chen4 zhe
+仗着 zhang4 zhe
+凭着 ping2 zhe
+依着 yi1 zhe
+就着 jiu4 zhe
+捧着 peng3 zhe
+握着 wo4 zhe
+刷着 shua1 zhe
+玩着 wan2 zhe
+瞧着 qiao2 zhe
+瞅着 chou3 zhe
+瞪着 deng4 zhe
+含着 han2 zhe
+怀着 huai2 zhe
+对着 dui4 zhe
+冲着 chong4 zhe
+顶着 ding3 zhe
+低着头 di1 zhe tou2
+抬着头 tai2 zhe tou2
+摇着头 yao2 zhe tou2
+点着头 dian3 zhe tou2
+咬着牙 yao3 zhe ya2
+皱着眉 zhou4 zhe mei2
+红着脸 hong2 zhe lian3
+板着脸 ban3 zhe lian3
+打量着 da3 liang4 zhe
+盼着 pan4 zhe
+念着 nian4 zhe
+提着 ti2 zhe
+扛着 kang2 zhe
+拖着 tuo1 zhe
+推着 tui1 zhe
+骑着 qi2 zhe
+躲着 duo3 zhe
+趴着 pa1 zhe
+蹲着 dun1 zhe
+跪着 gui4 zhe
+排着 pai2 zhe
+挤着 ji3 zhe
+摸着 mo1 zhe
+# 样本书里被“着火/着手/着笔/着落”截走的助词组合。
+打着 da3 zhe
+打着了 da3 zhao2 le
+变着 bian4 zhe
+戴着 dai4 zhe
+揉着 rou2 zhe
+咬着 yao3 zhe
+凭借着 ping2 jie4 zhe
+找着什么 zhao3 zhe shen2 me
+有着落 you3 zhuo2 luo4
+闭着 bi4 zhe
+睁着 zheng1 zhe
+眯着 mi1 zhe
+垂着 chui2 zhe
+低着 di1 zhe
+抬着 tai2 zhe
+红着 hong2 zhe
+斜着 xie2 zhe
+侧着 ce4 zhe
+烤着 kao3 zhe
+迎着 ying2 zhe
+闪着 shan3 zhe
+透着 tou4 zhe
+压着 ya1 zhe
+憋着 bie1 zhe
+# “险着”读 zhāo：这一手是步险着。
+险着 xian3 zhao1
+# 19 组多音字回归：逐字核对词库、贪婪分词与语境读音。
+# 好：词库会把“好学生/好学校”截成“好学”，另有几处 hǎo/hào 混淆。
+好学生 hao3 xue2 sheng1
+好学校 hao3 xue2 xiao4
+好问 hao4 wen4
+好管闲事 hao4 guan3 xian2 shi4
+好面子 hao4 mian4 zi
+好赌 hao4 du3
+# 着：火着起来；“着火/着重/看着/险着”词库与覆盖表已正确。
+着起来 zhao2 qi3 lai2
+# 调：词库把“调经”读成 diào，且缺少一批固定读 tiáo 的常用词。
+调经 tiao2 jing1
+调休 tiao2 xiu1
+调酒 tiao2 jiu3
+调酒师 tiao2 jiu3 shi1
+调薪 tiao2 xin1
+调低 tiao2 di1
+调高 tiao2 gao1
+调大 tiao2 da4
+调小 tiao2 xiao3
+调快 tiao2 kuai4
+调慢 tiao2 man4
+调校 tiao2 jiao4
+调速 tiao2 su4
+调压 tiao2 ya1
+调弦 tiao2 xian2
+调减 tiao2 jian3
+调增 tiao2 zeng1
+# 塞：软木塞整体读 sāi；边塞/要塞/闭塞/瓶塞/塞得词库已正确。
+软木塞 ruan3 mu4 sai1
+# 落：词库“落下”是 là，但“落了下来”需要 luò；遗留物品与固定搭配用长词覆盖。
+落下钥匙 la4 xia4 yao4 shi
+落下了钥匙 la4 xia4 le yao4 shi
+落下手机 la4 xia4 shou3 ji1
+落下了手机 la4 xia4 le shou3 ji1
+落下钱包 la4 xia4 qian2 bao1
+落下了钱包 la4 xia4 le qian2 bao1
+落下行李 la4 xia4 xing2 li
+落下了行李 la4 xia4 le xing2 li
+落下书包 la4 xia4 shu1 bao1
+落下了书包 la4 xia4 le shu1 bao1
+落在家里 la4 zai4 jia1 li3
+落在车上 la4 zai4 che1 shang4
+落在后面 la4 zai4 hou4 mian4
+落埋怨 lao4 man2 yuan4
+不落忍 bu4 lao4 ren3
+# 澄：澄清池与“澄清事实”读 chéng；“黄澄澄/澄清石灰水”读 dèng。
+黄澄澄 huang2 deng1 deng1
+澄清石灰水 deng4 qing1 shi2 hui1 shui3
+把水澄清 ba2 shui3 deng4 qing1
+# 爪：词库“爪子”声调错误；“鸡爪子”正确，机械手爪按“手爪”读 zhǎo。
+爪子 zhua3 zi
+机械手爪 ji1 xie4 shou2 zhao3
+# 熨：熨平；熨斗、熨帖词库已正确。
+熨平 yun4 ping2
+# 单：姓氏、单县读 shàn；单于 chán、单靠 dān 词库已正确。
+单老师 shan4 lao3 shi1
+单先生 shan4 xian1 sheng1
+单女士 shan4 nv3 shi4
+单氏 shan4 shi4
+单县 shan4 xian4
+# 六：南京六合、六合区/县读 lù；通用词语“六合”仍保留 liù hé。
+南京六合 nan2 jing1 lu4 he2
+六合区 lu4 he2 qu1
+六合县 lu4 he2 xian4
+# 解：姓氏读 xiè；解释 jiě、押解 jiè 词库已正确。
+解巡捕 xie4 xun2 bu3
+解先生 xie4 xian1 sheng1
+解女士 xie4 nv3 shi4
+解老师 xie4 lao3 shi1
+# 区：姓氏读 ōu；开发区、居民区的“区”读 qū。
+区先生 ou1 xian1 sheng1
+区女士 ou1 nv3 shi4
+区老师 ou1 lao3 shi1
+# 仇：姓氏读 qiú；仇恨、结仇读 chóu。
+仇先生 qiu2 xian1 sheng1
+仇女士 qiu2 nv3 shi4
+仇老师 qiu2 lao3 shi1
+# 峙：繁峙读 shì；对峙仍读 zhì。
+繁峙 fan2 shi4
+繁峙县 fan2 shi4 xian4
+# 度：审时度势、以己度人词库已正确，补足独立的“度势”。
+度势 duo2 shi4
+# 臭：臭味相投读 chòu（词库误读 xiù）；铜臭、乳臭读 xiù。
+臭味相投 chou4 wei4 xiang1 tou2
+铜臭味 tong2 xiu4 wei4
+# 勒：勒痕、勒紧读 lēi；勒马、悬崖勒马读 lè。
+勒痕 lei1 hen2
+勒马 le4 ma3
+勒住马 le4 zhu4 ma3
+# 盛：盛满、盛汤、盛水读 chéng；盛器、盛饭、盛菜词库已正确；盛大、盛老师读 shèng。
+盛满 cheng2 man3
+盛汤 cheng2 tang1
+盛水 cheng2 shui3
+盛老师 sheng4 lao3 shi1
+盛大 sheng4 da4
+# 样本书全量扫描补充：词库明确读错的常用词，以及贪婪分词跨词误切。
+骨头 gu3 tou
+灰蒙蒙 hui1 meng2 meng2
+指缝 zhi3 feng4
+古朴 gu2 pu3
+刨平 pao2 ping2
+摩挲 mo2 suo1
+未成行 wei4 cheng2 xing2
+红白相间 hong2 bai2 xiang1 jian4
+想过重逢 xiang3 guo4 chong2 feng2
+结实累累 jie1 shi lei2 lei2
+# 词库条目错误与“长出/长出气”语义歧义；按字族补齐。
+反差 fan3 cha1
+差分放大器 cha1 fen1 fang4 da4 qi4
+差失 cha1 shi1
+差误 cha1 wu4
+差官 chai1 guan1
+长出了一口气 chang2 chu1 le yi4 kou3 qi4
+长出一口气 chang2 chu1 yi4 kou3 qi4
+长出了口气 chang2 chu1 le kou3 qi4
+长舒一口气 chang2 shu1 yi4 kou3 qi4
+长舒了一口气 chang2 shu1 le yi4 kou3 qi4
+长吐一口气 chang2 tu3 yi4 kou3 qi4
+长吐了一口气 chang2 tu3 le yi4 kou3 qi4
+长吁一口气 chang2 xu1 yi4 kou3 qi4
+长吁了一口气 chang2 xu1 le yi4 kou3 qi4
+# Matcha 对重复词条是后到先得，以下词在基础词典里首条是修正读音、
+# 末条却是旧读音，必须显式钉住，否则实际发音会退回末条。
+了解 liao2 jie3
+可以 ke2 yi3
+长者 zhang2 zhe3
+姥姥 lao2 lao3
+总得 zong2 dei3
+地表水 di4 biao2 shui3
+大夫 dai4 fu1
+见得 jian4 de
+# 2026-11-02 听音反馈：归还义“还”、年岁义“载”，以及长/溜/奘等。
+# 还 = huan2：短语嵌在“不还/有还”里，不会与副词 hai2 的“还有”冲突。
+有借有还 you3 jie4 you3 huan2
+借了不还 jie4 le bu4 huan2
+欠债不还 qian4 zhai4 bu4 huan2
+欠钱不还 qian4 qian2 bu4 huan2
+借钱不还 jie4 qian2 bu4 huan2
+久借不还 jiu3 jie4 bu4 huan2
+久欠不还 jiu3 qian4 bu4 huan2
+到期不还 dao4 qi1 bu4 huan2
+逾期不还 yu2 qi1 bu4 huan2
+迟迟不还 chi2 chi2 bu4 huan2
+一去不还 yi2 qu4 bu4 huan2
+背约不还 bei4 yue1 bu4 huan2
+# 载 = zai3（年岁/记载）；zai4（装载）的错条一并修正。
+十载 shi2 zai3
+数载 shu4 zai3
+几载 ji2 zai3
+两载 liang2 zai3
+三载 san2 zai3
+五载 wu2 zai3
+千载 qian1 zai3
+一年半载 yi4 nian2 ban4 zai3
+三年五载 san1 nian2 wu2 zai3
+十年八载 shi2 nian2 ba1 zai3
+千秋万载 qian1 qiu1 wan4 zai3
+万载千秋 wan4 zai3 qian1 qiu1
+连载 lian2 zai3
+载入史册 zai3 ru4 shi3 ce4
+卸载 xie4 zai4
+荷载 he4 zai4
+# 以下词基础词典本就正确，钉住以防上下文或后到词条把读音带偏。
+偷偷 tou1 tou1
+偷偷摸摸 tou1 tou1 mo1 mo1
+则填着 ze2 tian2 zhe
+灰尘 hui1 chen2
+长信 chang2 xin4
+地址 di4 zhi3
+一溜烟 yi2 liu4 yan1
+玄奘 xuan2 zang4
+# 2026-11-07 轻声补齐 → 2026-11-09 回退：这些词的末字曾被改成无调音素，
+# 但 Baker 声学模型没训练过它们，听感是怪音/吞字（时候、地方、知道、
+# 衣服、明白、爷爷等）。全部恢复全调；只有白名单里的轻声（shi/ba/zi/jia）保留。
+# 「告诉」不在此列：它的怪音另有原因（词内第二音节被压缩），见文末 blank 说明。
+答应 da1 ying4
+结实 jie1 shi
+作坊 zuo1 fang1
+提防 di1 fang2
+累赘 lei2 zhui4
+扫帚 sao4 zhou3
+头发 tou2 fa4
+称呼 cheng1 hu1
+恶心 e3 xin1
+吓唬 xia4 hu3
+应酬 ying4 chou2
+折腾 zhe1 teng2
+薄荷 bo4 he2
+伺候 ci4 hou4
+咳嗽 ke2 sou4
+衣服 yi1 fu2
+哑巴 ya3 ba
+拾掇 shi2 duo1
+约摸 yue1 mo1
+模糊 mo2 hu2
+浆糊 jiang4 hu2
+脊梁 ji3 liang2
+打量 da3 liang4
+要是 yao4 shi
+# 词库缺条：单字兜底会把“朝鲜”读成 chao2 xian1、“吹倒”读成 dao4。
+朝鲜 chao2 xian3
+吹倒 chui1 dao3
+撞倒 zhuang4 dao3
+# 2026-11-07 样书语料审计：词库把“通红”标成 tong4、“散发”标成头发义的 fa4。
+通红 tong1 hong2
+散发 san4 fa1
+# 2026-11-07 高频口语词：末字全调，避免未训练轻声；保留词库已证实的轻声。
+爸爸 ba4 ba
+妈妈 ma1 ma
+哥哥 ge1 ge1
+姐姐 jie3 jie3
+弟弟 di4 di4
+妹妹 mei4 mei4
+爷爷 ye2 ye2
+奶奶 nai3 nai3
+谢谢 xie4 xie4
+星星 xing1 xing1
+时候 shi2 hou4
+喜欢 xi3 huan1
+眼睛 yan3 jing1
+月亮 yue4 liang4
+朋友 peng2 you3
+师傅 shi1 fu4
+东西 dong1 xi1
+告诉 gao4 su4 "
+明白 ming2 bai2
+味道 wei4 dao4
+力气 li4 qi4
+聪明 cong1 ming2
+耳朵 er3 duo3
+喇叭 la3 ba
+庄稼 zhuang1 jia
+婆家 po2 jia
+样子 yang4 zi
+舒服 shu1 fu2
+认识 ren4 shi
+漂亮 piao4 liang4
+地方 di4 fang1
+知道 zhi1 dao4
+多少 duo1 shao3
+什么地方 shen2 me di4 fang1
+占地方 zhan4 di4 fang1
+# 2026-11-08 《明朝那些事儿》专项：用户点名的多音字，以及明代人名、地名、官署与科举语境。
+# 可汗、恐吓、单于、乐工词库本已正确，仍钉住防止基础词典更新后回归。
+朱重八 zhu1 chong2 ba1
+重八 chong2 ba1
+朱祐樘 zhu1 you4 cheng1
+祐樘 you4 cheng1
+可汗 ke4 han2
+恐吓 kong3 he4
+铁骑 tie3 qi2
+卒中 cu4 zhong4
+司礼监 si1 li3 jian4
+胪朐河 lu2 qu2 he2
+亳州 bo2 zhou1
+# 明代人名（含蒙古汗号与日本战国人名）。
+朱由校 zhu1 you2 jiao4
+朱载垕 zhu1 zai3 hou4
+申时行 shen1 shi2 xing2
+小西行长 xiao3 xi1 xing2 chang2
+李善长 li3 shan4 chang2
+徐文长 xu2 wen2 chang2
+黑田长政 hei1 tian2 chang2 zheng4
+陆万龄 lu4 wan4 ling2
+王艮 wang2 gen4
+缪昌期 miao4 chang1 qi1
+仇鸾 qiu2 luan2
+仇成 qiu2 cheng2
+翟銮 zhai2 luan2
+杨镐 yang2 hao4
+织田信长 zhi1 tian2 xin4 chang2
+解纶 xie4 lun2
+解家沟 xie4 jia1 gou1
+达延汗 da2 yan2 han2
+满都鲁汗 man3 du1 lu3 han2
+卓里克图汗 zhuo1 li3 ke4 tu2 han2
+单于 chan2 yu2
+乐工 yue4 gong1
+# 地名、部族与都城。中都只按明代都城短语覆盖，避免截走“书中都/朝中都是”。
+瓦剌 wa3 la4
+土木堡 tu3 mu4 bu3
+洪都 hong2 du1
+# 应天：词尾静音边界让「天」在分句合并后仍被完整读出（2026-11-09 三次反馈）。
+应天 ying4 tian1 "
+应昌 ying4 chang1
+应州 ying4 zhou1
+阿剌 a1 la4
+土剌河 tu3 la4 he2
+八剌 ba1 la4
+哈剌 ha1 la4
+处州 chu3 zhou1
+长洲 chang2 zhou1
+东都和西都 dong1 du1 he2 xi1 du1
+小西都 xiao3 xi1 du1
+为中都 wei2 zhong1 du1
+中都皇城 zhong1 du1 huang2 cheng2
+回中都 hui2 zhong1 du1
+所谓中都 suo3 wei4 zhong1 du1
+一个中都 yi2 ge4 zhong1 du1
+遍游塞上 bian4 you2 sai4 shang4
+广渠门 guang3 qu2 men2
+# 明代官署与勋官。
+给事中 ji3 shi4 zhong1
+都给事中 du1 ji3 shi4 zhong1
+都御史 du1 yu4 shi3
+都指挥使 du1 zhi3 hui1 shi3
+都指挥同知 du1 zhi3 hui1 tong2 zhi1
+都指挥佥事 du1 zhi3 hui1 qian1 shi4
+都司 du1 si1
+御马监 yu4 ma3 jian4
+内官监 nei4 guan1 jian4
+尚膳监 shang4 shan4 jian4
+直殿监 zhi2 dian4 jian4
+都知监 du1 zhi1 jian4
+少监 shao4 jian4
+监丞 jian4 cheng2
+矿监税使 kuang4 jian4 shui4 shi3
+少保 shao4 bao3
+少师 shao4 shi1
+少傅 shao4 fu4
+少卿 shao4 qing1
+太仆寺 tai4 pu2 si4
+# 科举与史书语境：中、载、靖难。
+考中 kao3 zhong4
+高考中 gao1 kao3 zhong1
+中举人 zhong4 ju3 ren2
+乡试中举 xiang1 shi4 zhong4 ju3
+同时中举 tong2 shi2 zhong4 ju3
+岁中举 sui4 zhong4 ju3
+中举对他 zhong4 ju3 dui4 ta1
+中进士 zhong4 jin4 shi4
+高中进士 gao1 zhong4 jin4 shi4
+高中解元 gao1 zhong4 jie4 yuan2
+考题高中 kao3 ti2 gao1 zhong4
+中状元 zhong4 zhuang4 yuan2
+中榜 zhong4 bang3
+中埋伏 zhong4 mai2 fu2
+中箭 zhong4 jian4
+一举中第 yi4 ju3 zhong4 di4
+中第的最佳 zhong4 di4 de zui4 jia1
+让他中第 rang4 ta1 zhong4 di4
+能够中第 neng2 gou4 zhong4 di4
+科举中第 ke1 ju3 zhong4 di4
+张嗣修中第 zhang1 si4 xiu1 zhong4 di4
+载入历史 zai3 ru4 li4 shi3
+载入史书 zai3 ru4 shi3 shu1
+载入军事史册 zai3 ru4 jun1 shi4 shi3 ce4
+靖难 jing4 nan4
+靖难之役 jing4 nan4 zhi1 yi4
+# 结构助词与跨词误切：的、了、地、着。
+打的 da3 de
+打的去 da3 di1 qu4
+打的到 da3 di1 dao4
+打的回 da3 di1 hui2
+打的走 da3 di1 zou3
+打的上班 da3 di1 shang4 ban1
+打的回家 da3 di1 hui2 jia1
+打的费 da3 di1 fei4
+打的吧 da3 di1 ba
+了当 le dang1
+的当 de dang1
+的哥哥 de ge1 ge1
+的当天 de dang4 tian1
+的当晚 de dang4 wan3
+的当铺 de dang4 pu4
+他的当 ta1 de dang4
+哥哥的当 ge1 ge1 de dang4
+方孝孺的当 fang1 xiao4 ru2 de dang4
+海瑞的当 hai3 rui4 de dang4
+沉着地 chen2 zhuo2 de
+着地质 zhe di4 zhi4
+着地上 zhe di4 shang4
+# “还、行、没、朝、为”等高频搭配。
+还给自己 hai2 gei3 zi4 ji3
+还给了自己 hai2 gei3 le zi4 ji3
+还给当时 hai2 gei3 dang1 shi2
+还给解缙派 hai2 gei3 xie4 jin4 pai4
+还给他的子孙 hai2 gei3 ta1 de zi3 sun1
+还给对方留 hai2 gei3 dui4 fang1 liu2
+还给马文升派 hai2 gei2 ma3 wen2 sheng1 pai4
+还给了他几个随从 hai2 gei3 le ta1 ji3 ge4 sui2 cong2
+还给了他一个前所未有 hai2 gei3 le ta1 yi2 ge4 qian2 suo3 wei4 you3
+还给他追加 hai2 gei3 ta1 zhui1 jia1
+还给他修了坛 hai2 gei3 ta1 xiu1 le tan2
+还给朱元璋生 hai2 gei3 zhu1 yuan2 zhang1 sheng1
+还给他们分 hai2 gei3 ta1 men fen1
+还给纸币 hai2 gei2 zhi3 bi4
+还给张居正送 hai2 gei3 zhang1 ju1 zheng4 song4
+还给郭松龄跪 hai2 gei3 guo1 song1 ling2 gui4
+还给皇帝讲 hai2 gei3 huang2 di4 jiang3
+还给过我 hai2 gei3 guo4 wo3
+还给李成梁打 hai2 gei2 li3 cheng2 liang2 da3
+还给首辅大人下 hai2 gei2 shou2 fu3 da4 ren2 xia4
+还给皇上奉送 hai2 gei3 huang2 shang4 feng4 song4
+在行军 zai4 xing2 jun1
+在行骗 zai4 xing2 pian4
+在行人 zai4 xing2 ren2
+在行进 zai4 xing2 jin4
+在行刑 zai4 xing2 xing2
+在行动 zai4 xing2 dong4
+没过 mei2 guo4
+没过膝盖 mo4 guo4 xi1 gai4
+没过脚踝 mo4 guo4 jiao3 huai2
+没过小腿 mo4 guo4 xiao2 tui3
+没过腰 mo4 guo4 yao1
+没过顶 mo4 guo4 ding3
+没过脖子 mo4 guo4 bo2 zi
+大王 da4 wang2
+朝会 chao2 hui4
+质的 zhi4 de
+# 词库整词读音错误或未收录（按字族补齐）。
+作乐 zuo4 le4
+不得了 bu4 de2 liao3
+赶得上 gan3 de shang4
+乡长 xiang1 zhang3
+私了 si1 liao3
+最为 zui4 wei2
+为例 wei2 li4
+化为 hua4 wei2
+中肯 zhong4 ken3
+重整 chong2 zheng3
+着实 zhuo2 shi2
+查查 cha2 cha2
+正着 zheng4 zhao2
+三行 san1 hang2
+第二行 di4 er4 hang2
+第三行 di4 san1 hang2
+二三行 er4 san1 hang2
+流放重犯 liu2 fang4 zhong4 fan4
+东林重犯 dong1 lin2 zhong4 fan4
+必是重犯 bi4 shi4 zhong4 fan4
+内传抄 nei4 chuan2 chao1
+内传来 nei4 chuan2 lai2
+成行动 cheng2 xing2 dong4
+力见长 li4 jian4 chang2
+见长安 jian4 chang2 an1
+小角色 xiao3 jue2 se4
+一角色 yi4 jue2 se4
+送还 song4 huan2
+送还管 song4 hai2 guan3
+兴冲冲 xing4 chong1 chong1
+号哭 hao2 ku1
+晕过去 yun1 guo4 qu4
+处处 chu4 chu4
+马尾 ma2 wei3
+九重 jiu3 chong2
+胶着 jiao1 zhuo2
+简朴 jian2 pu3
+质朴 zhi4 pu3
+见世面 jian4 shi4 mian4
+故伎重演 gu4 ji4 chong2 yan3
+反省 fan2 xing3
+薄礼 bo2 li3
+混蛋 hun2 dan4
+缘分 yuan2 fen4
+血缘分配 xue4 yuan2 fen1 pei4
+压根 ya4 gen1
+处变不惊 chu3 bian4 bu4 jing1
+悄无声息 qiao3 wu2 sheng1 xi1
+直奔 zhi2 ben4
+点中的考生 dian3 zhong4 de kao3 sheng1
+点中几个 dian3 zhong4 ji3 ge4
+点中了 dian3 zhong4 le
+点中严嵩 dian3 zhong4 yan2 song1
+满头大汗 man3 tou2 da4 han4
+满身大汗 man3 shen1 da4 han4
+一身大汗 yi4 shen1 da4 han4
+大汗淋漓 da4 han4 lin2 li2
+出大汗 chu1 da4 han4
+冒大汗 mao4 da4 han4
+大汗直冒 da4 han4 zhi2 mao4
+汗位 han2 wei4
+为汗 wei2 han2
+# 容量单位“石”“斗”与更次。
+石米 dan4 mi3
+一石米 yi2 dan4 mi3
+贩卖一石 fan4 mai4 yi2 dan4
+一石就 yi2 dan4 jiu4
+米一石 mi3 yi2 dan4
+石粮 dan4 liang2
+万石 wan4 dan4
+千石 qian1 dan4
+十石 shi2 dan4
+七石 qi1 dan4
+三石 san1 dan4
+两石 liang3 dan4
+八斗 ba1 dou3
+几斗 ji2 dou3
+庶几 shu4 ji1
+升斗 sheng1 dou3
+一更 yi4 geng1
+二更 er4 geng1
+四更 si4 geng1
+初更 chu1 geng1
+# 不得了 family stolen by base 可不/哭笑不得/顾不得/动不得/了不得
+可不得了 ke3 bu4 de2 liao3
+哭笑不得了 ku1 xiao4 bu4 de2 liao3
+顾不得了 gu4 bu4 de2 liao3
+动不得了 dong4 bu4 de2 liao3
+了不得了 liao3 bu4 de2 liao3
+# 十万 steals 十 so the stone measure needs the full phrase
+十万石 shi2 wan4 dan4
+# 减少 is absent from base, so 少保/少监 stole it
+减少 jian2 shao3
+# 助词“了”被词库多字词吞掉：默认按助词读，真正读 liǎo 的短语单独保护
+了无 le wu2
+了无牵挂 liao3 wu2 qian1 gua4
+了无音信 liao3 wu2 yin1 xin4
+了局 le ju2
+了了 le liao3
+了账 le zhang4
+一了 yi1 le
+了事情 le shi4 qing2
+了事物 le shi4 wu4
+了事态 le shi4 tai4
+了事实 le shi4 shi2
+了事件 le shi4 jian4
+出了事 chu1 le shi4
+闹了事 nao4 le shi4
+犯了事 fan4 le shi4
+错了事 cuo4 le shi4
+了结论 le jie2 lun4
+了结局 le jie2 ju2
+了结果 le jie2 guo3
+输了却 shu1 le que4
+# 词库缺少这些动词，导致“X明了”被切成“X + 明了(liǎo)”
+证明 zheng4 ming2
+表明 biao3 ming2
+摆明 bai3 ming2
+列明 lie4 ming2
+辨明 bian4 ming2
+探明 tan4 ming2
+# 残余的“X明+了”与“照说”跨词吞并
+朱厚照 zhu1 hou4 zhao4
+精明 jing1 ming2
+光明 guang1 ming2
+文明 wen2 ming2
+柳暗花明 liu3 an4 hua1 ming2
+却说明 que4 shuo1 ming2
+了结盟 le jie2 meng2
+# 2026-11-08 整书扫描：跨词边界与词库错读
+徐时行 xu2 shi2 xing2
+时行 shi2 xing2
+朱见深 zhu1 jian4 shen1
+和面前 he2 mian4 qian2
+和药材 he2 yao4 cai2
+和乐工 he2 yue4 gong1
+和了解 he2 liao2 jie3
+和了一把 huo4 le yi4 ba3
+地和稀泥 de huo4 xi1 ni2
+中长大 zhong1 zhang3 da4
+大便宜 da4 pian2 yi
+寻找着 xun2 zhao3 zhe
+分行李 fen1 xing2 li
+过重重 guo4 chong2 chong2
+还手握 hai2 shou3 wo4
+必得 bi4 de2
+何曾 he2 ceng2
+藏人 cang2 ren2
+从重围 cong2 chong2 wei2
+大都会动用 da4 dou1 hui4 dong4 yong4
+过长子 guo4 zhang2 zi3
+算了了 suan4 le liao3
+和面试 he2 mian4 shi4
+和药理 he2 yao4 li3
+# 2026-11-08 音调候选复核
+还要 hai2 yao4
+要好 yao4 hao3
+忍无可忍 ren3 wu2 ke2 ren3
+知识分子 zhi1 shi fen4 zi3
+你来我往 ni3 lai2 wo2 wang3
+何处 he2 chu4
+无处 wu2 chu4
+分散 fen1 san4
+更深 geng4 shen1
+一发生 yi4 fa1 sheng1
+一发子弹 yi4 fa1 zi3 dan4
+一发火炮 yi4 fa1 huo3 pao4
+一发火 yi4 fa1 huo3
+一发不可收拾 yi4 fa1 bu4 ke3 shou1 shi
+# 2026-11-08 词库音调复核
+只见 zhi3 jian4
+只当不知道 zhi3 dang4 bu4 zhi1 dao4
+只当是 zhi3 dang4 shi4
+一帆风顺 yi4 fan1 feng1 shun4
+一哄而散 yi2 hong4 er2 san4
+一肚子 yi2 du4 zi
+肚子 du4 zi
+大肚子 da4 du4 zi
+拉肚子 la1 du4 zi
+伸手不见五指 shen1 shou3 bu2 jian4 wu2 zhi3
+开花结果 kai1 hua1 jie1 guo3
+软骨头 ruan2 gu3 tou
+老骨头 lao2 gu3 tou
+不切实际 bu2 qie4 shi2 ji4
+不遂人愿 bu2 sui4 ren2 yuan4
+读书种子 du2 shu1 zhong3 zi
+碰钉子 peng4 ding1 zi
+土生土长 tu3 sheng1 tu2 zhang3
+有鼻子有眼 you3 bi2 zi you2 yan3
+更名改姓 geng1 ming2 gai3 xing4
+可怜相 ke3 lian2 xiang4
+空当 kong4 dang4
+空位 kong4 wei4
+累加 lei3 jia1
+闷雷 men4 lei2
+闹哄哄 nao4 hong1 hong1
+是非曲直 shi4 fei1 qu1 zhi2
+温差 wen1 cha1
+用处 yong4 chu4
+万户侯 wan4 hu4 hou2
+大吃大喝 da4 chi1 da4 he1
+吐口水 tu2 kou2 shui3
+受累 shou4 lei4
+难处 nan2 chu4
+塞门 sai1 men2
+被难倒 bei4 nan2 dao3
+从难民 cong2 nan4 min2
+解解元 xie4 jie4 yuan2
+亮晃晃 liang4 huang2 huang3
+士大夫 shi4 da4 fu1
+御史大夫 yu4 shi3 da4 fu1
+卿大夫 qing1 da4 fu1
+资善大夫 zi1 shan4 da4 fu1
+光禄大夫 guang1 lu4 da4 fu1
+# 2026-11-08 一/不 变调（词库按本调收录的高频词）
+一切 yi2 qie4
+一句话 yi2 ju4 hua4
+一片 yi2 pian4
+一份 yi2 fen4
+一副 yi2 fu4
+一会 yi2 hui4
+一会儿 yi2 hui4 er
+一共 yi2 gong4
+一大堆 yi2 da4 dui1
+一系列 yi2 xi4 lie4
+一大批 yi2 da4 pi1
+一触即溃 yi2 chu4 ji2 kui4
+一动不动 yi2 dong4 bu2 dong4
+一视同仁 yi2 shi4 tong2 ren2
+一大把 yi2 da4 ba3
+一并 yi2 bing4
+一败涂地 yi2 bai4 tu2 di4
+一见如故 yi2 jian4 ru2 gu4
+一觉 yi2 jiao4
+一大半 yi2 da4 ban4
+一病不起 yi2 bing4 bu4 qi3
+一卷 yi2 juan4
+一去不复返 yi2 qu4 bu2 fu4 fan3
+一大早 yi2 da4 zao3
+一字一句 yi2 zi4 yi2 ju4
+一棍子打死 yi2 gun4 zi da2 si3
+一落千丈 yi2 luo4 qian1 zhang4
+一路顺风 yi2 lu4 shun4 feng1
+一意孤行 yi2 yi4 gu1 xing2
+一脉相承 yi2 mai4 xiang1 cheng2
+一见钟情 yi2 jian4 zhong1 qing2
+一代不如一代 yi2 dai4 bu4 ru2 yi2 dai4
+一块石头落了地 yi2 kuai4 shi2 tou luo4 le di4
+一念之差 yi2 nian4 zhi1 cha1
+一掷百万 yi2 zhi4 bai3 wan4
+一服药 yi2 fu4 yao4
+一步一个脚印 yi2 bu4 yi2 ge4 jiao3 yin4
+一窍不通 yi2 qiao4 bu4 tong1
+一笑了之 yi2 xiao4 liao3 zhi1
+一地鸡毛 yi2 di4 ji1 mao2
+一亩三分地 yi4 mu3 san1 fen1 di4
+一模一样 yi4 mu2 yi2 yang4
+有朝一日 you3 zhao1 yi2 ri4
+不一而足 bu4 yi1 er2 zu2
+大喝 da4 he4
+一声 yi4 sheng1
+# 2026-11-08 补充复核
+垛子 duo4 zi
+入土为安 ru4 tu3 wei2 an1
+与偶像同行 yu2 ou3 xiang4 tong2 xing2
+
+# 2026-11-08 《悟空传》专项：整书多音字核查补充
+# 语料 138,109 字；按最长匹配生效，不替换、不重排上方任何既有条目。
+# 按流程只增加/优化多字条目：单字覆盖会污染所有书，且会把该字标为 reserved 而阻断按书自动覆盖。
+# 1. 佛 = fó（基础词典单字误设 fu2；改用书中整词，保留「仿佛 fang3 fu2」等既有读法）
+成佛 cheng2 fo2
+成了佛 cheng2 le fo2
+佛是 fo2 shi4
+佛在 fo2 zai4
+佛就 fo2 jiu4
+是佛 shi4 fo2
+这佛 zhe4 fo2
+论佛 lun4 fo2
+有佛 you3 fo2
+我佛 wo3 fo2
+诸佛 zhu1 fo2
+众佛 zhong4 fo2
+佛即 fo2 ji2
+即佛 ji2 fo2
+心佛 xin1 fo2
+法身佛 fa3 shen1 fo2
+一佛国 yi4 fo2 guo2
+# 单字「佛」被跨词切分截出时，用更长的书中短语钉住（避免退回 fu2）
+了佛 le fo2
+无处不是佛 wu2 chu4 bu2 shi4 fo2
+虚无的佛 xu1 wu2 de fo2
+升佛 sheng1 fo2
+万佛朝宗 wan4 fo2 chao2 zong1
+可是佛不 ke3 shi4 fo2 bu4
+佛不让 fo2 bu2 rang4
+自在佛 zi4 zai4 fo2
+这个佛 zhe4 ge4 fo2
+一尊巨佛 yi4 zun1 ju4 fo2
+西天为佛 xi1 tian1 wei2 fo2
+西天佛与 xi1 tian1 fo2 yu3
+一批佛 yi4 pi1 fo2
+只因佛道 zhi1 yin1 fo2 dao4
+# 咳：叹词「咳！」属单字语境，按流程不做全局覆盖；只钉住咳嗽叠词
+咳咳咳 ke2 ke2 ke2
+
+# 2. 长 = cháng（词库单字默认 zhǎng，书中多为「长短/久长」义）
+长吻 chang2 wen3
+长挂 chang2 gua4
+长鼻子 chang2 bi2 zi
+老长 lao3 chang2
+那么地长 na4 me de chang2
+几千里长 ji3 qian1 li3 chang2
+一段长路 yi2 duan4 chang2 lu4
+
+# 3. 重 = chóng（词库单字默认 zhòng）
+重回 chong2 hui2
+重被 chong2 bei4
+重抬 chong2 tai2
+重坠 chong2 zhui4
+重走 chong2 zou3
+
+# 4. 为 = wéi / wèi（词库单字默认 wèi）
+转正为 zhuan3 zheng4 wei2
+敬为 jing4 wei2
+斥为 chi4 wei2
+为父 wei2 fu4
+为着 wei4 zhe
+
+# 5. 卷 = juàn / juǎn（卷次读 juàn；卷帘、卷走读 juǎn）
+第一卷 di4 yi1 juan4
+第二卷 di4 er4 juan4
+第三卷 di4 san1 juan4
+卷帘 juan3 lian2
+
+# 6. 倒 = dǎo（倒影/倒像/倒茶仍读 dào；只用书中具体短语钉住倒下义，避免抢读「倒了一杯茶」）
+倒了下去 dao3 le xia4 qu4
+倒了一片 dao3 le yi2 pian4
+醉倒了 zui4 dao3 le
+倒下 dao3 xia4
+打倒 da3 dao3
+摔倒 shuai1 dao3
+
+# 7. 其它单字多音字语境读音
+可曾 ke3 ceng2
+教不了 jiao1 bu4 liao3
+负尽 fu4 jin4
+不敢应 bu4 gan3 ying4
+摇摇晃晃 yao2 yao2 huang4 huang4
+晃晃悠悠 huang4 huang4 you1 you1
+晃晃 huang4 huang4
+太闷了 tai4 men1 le
+万载常青 wan4 zai3 chang2 qing1
+小脏马 xiao3 zang1 ma3
+弄脏 nong4 zang1
+不似 bu2 si4
+好似 hao3 si4
+小爪 xiao3 zhua3
+弹起来 tan2 qi3 lai2
+卜第一签 bu3 di4 yi1 qian1
+出落成 chu1 luo4 cheng2
+落伽洞 luo4 jia1 dong4
+呷着 xia1 zhe
+左肋 zuo3 lei4
+被嚼 bei4 jiao2
+法相 fa3 xiang4
+供着 gong4 zhe
+晕乎乎 yun1 hu1 hu1
+拽了 zhuai4 le
+嘴一撇 zui3 yi4 pie3
+一场梦 yi4 chang3 meng4
+一发毛 yi4 fa1 mao2
+不怀好意 bu4 huai2 hao3 yi4
+千种花 qian1 zhong3 hua1
+百种果 bai3 zhong3 guo3
+情切切 qing2 qie4 qie4
+过家家 guo4 jia1 jia1
+女大不中留 nv3 da4 bu4 zhong1 liu2
+掌掴 zhang3 guo2
+大模大样 da4 mu2 da4 yang4
+朝歌 zhao1 ge1
+迦叶 jia1 she4
+
+# 8. 跨词边界误切（长词钉住，避免词典里同形的双字词抢读）
+一地和尚 yi2 di4 he2 shang
+当天蓬 dang1 tian1 peng2
+当月亮 dang1 yue4 liang4
+小白发现 xiao3 bai2 fa1 xian4
+老虎跑了 lao2 hu3 pao3 le
+一趟地府 yi2 tang4 di4 fu3
+还要求 hai2 yao1 qiu2
+要击中 yao4 ji1 zhong4
+女相邀 nv3 xiang1 yao1
+上相见 shang4 xiang1 jian4
+标明 biao1 ming2
+紧拄着地 jin3 zhu3 zhe di4
+高着 gao1 zhe
+
+# 9. 轻声（2026-11-09 回退未训练音素：这个/那个/师父/部分/丈夫/唠叨等）
+这个 zhe4 ge4
+那个 na4 ge4
+师父 shi1 fu4
+路上 lu4 shang
+部分 bu4 fen4
+大部分 da4 bu4 fen4
+道行 dao4 heng2
+灯笼 deng1 long2
+丈夫 zhang4 fu1
+吆喝 yao1 he1
+唠叨 lao2 dao1
+不好意思 bu4 hao3 yi4 si1
+不可收拾 bu4 ke3 shou1 shi
+血肉模糊 xue4 rou4 mo2 hu2
+
+# 2026-11-09 听感反馈：名词「地」不能被读成助词 de。
+# 基础词典的单字「地」默认是状语助词 de；量词/面积词后面是名词，最长匹配
+# 没命中整词时会退回单字。用书中实际短语钉住 di4，状语「地」仍走原有轻声规则。
+一块地 yi2 kuai4 di4
+这块地 zhe4 kuai4 di4
+那块地 na4 kuai4 di4
+几块地 ji3 kuai4 di4
+占块地 zhan4 kuai4 di4
+挑块地 tiao1 kuai4 di4
+到块地 dao4 kuai4 di4
+一亩地 yi4 mu3 di4
+两亩地 liang3 mu3 di4
+几亩地 ji3 mu3 di4
+十亩地 shi2 mu3 di4
+十顷地 shi2 qing3 di4
+一里地 yi4 li3 di4
+十里地 shi2 li3 di4
+百里地 bai3 li3 di4
+八里地 ba1 li3 di4
+离地 li2 di4
+何地 he2 di4
+置自己于何地 zhi4 zi4 ji3 yu2 he2 di4
+遁地之术 dun4 di4 zhi1 shu4
+缩地之法 suo1 di4 zhi1 fa3
+
+# 2026-11-09 二次反馈修正：上一轮把「漏读间」归因于整词缺失是错的。真实
+# WASM A/B 显示词典里明明是 zhi1 jian1，但含 jian1 的句子只比删掉该 token
+# 的版本长 35ms（换成 qi1 长 116ms），「告诉他」三个音节只剩两个能量组。
+# 即读音完全正确，是声学模型把词内第二音节压成近乎静音 / 与前一音节合并。
+# 边界必须放在词尾，不能放进词内：词内逗号「,」会把词读断（「选、择」），
+# blank「_」会多出一个短音节（「多了一个音」）。改放词尾引号「"」后，第二
+# 音节恢复（jian1 35ms → 313ms），且停顿与原句自然停顿重合（195ms vs 基线
+# 200ms），词本身保持连贯。「告诉」「选择」同样处理。
+之间 zhi1 jian1 "
+彼此之间 bi3 ci3 zhi1 jian1 "
+相互之间 xiang1 hu4 zhi1 jian1 "
+两人之间 liang3 ren2 zhi1 jian1 "
+他们之间 ta1 men zhi1 jian1 "
+我们之间 wo3 men zhi1 jian1 "
+选择 xuan3 ze2 "
+
+# 已训练轻声的补齐：儿化 er 在基础词典里被标成 er2，参考读音是轻声。
+自个儿 zi4 ge3 er
+
+# 2026-11-09 听音反馈（《明朝那些事儿》）：按用户点名的 13 处逐条排查，
+# 并把同一字族在全书中由单字兜底导致的同类错误一起钉住。
+# 1. 狐狸精：词库只有「狐狸尾巴」，「狐/狸/精」按单字读时 li2 会被压成轻声。
+狐狸 hu2 li2
+狐狸精 hu2 li2 jing1
+# 2. 名词「地」：单字默认是状语助词 de；「之地/等地」等结构必须显式读 di4。
+#    全书扫描还发现「之于地」「地包天」「化缘地」三处同类名词用法。
+之地 zhi1 di4
+等地 deng3 di4
+之于地 zhi1 yu2 di4
+地包天 di4 bao1 tian1
+化缘地 hua4 yuan2 di4
+# 3. 应立即：2026-11-09 复听发现「整词合并」其实不改变任何 token，句首
+#    多出的「应」由分句合并修（见文末与 worker 的 min_words_in_sentence）；
+#    词尾静音边界负责把被压成嘶哑短音的「立/即」读完整（A/B 105→139ms、
+#    151→197ms）。
+建议 jian4 yi4
+立即 li4 ji2
+应立即 ying1 li4 ji2 "
+# 4. 占便宜：2026-11-11 第五次复听。用户反馈整句里仍然听不到「便」。
+#    音素级诊断（scripts/scratch/diagnose-pian2.mjs + analyze_pian2_f0.py，真实 WASM）：
+#      单独「便」pian2 → 1 段 319ms 升调（F0 260→354Hz），音素本身是好的；
+#      pian2 + yi2    → 1 段 659ms 连续升调，两个阳平音节融成一个长音，「便」被吞；
+#      pian2 + yi     → 2 段独立浊音（220/130ms），「便」「宜」都发声。
+#    病根不是韵律、也不是模型发不好 pian2，而是覆盖表把「宜」钉成了全调 yi2：
+#    两个阳平连读被声学模型合并。标准读音本就是 pián·yi（宜轻声），基础词典
+#    「便宜 pian2 yi」也是轻声。词内/词尾边界、停顿、语句重置都救不了这个合并，
+#    只有改音素有效。词首边界保留：完整反馈原句实测 pian2 279ms/normal，
+#    去掉边界会涨到 406ms 与邻音合并。
+#    上一轮的教训仍在：词内边界（zhan4 pian2 " yi2）会截断上扬调尾，全局禁用。
+占便宜 " zhan4 pian2 yi
+# 5. 生意：词库的轻声 yi 在此处发怪音，改用全调。
+生意 sheng1 yi4
+# 6. 的的确确：单字「的」默认 de，四字叠词必须整体钉住 di2 di2 que4 que4。
+#    同一句里的「确实」词库缺条，两条单字会被读断（全书 465 处）。
+确实 que4 shi2
+的的确确 di2 di2 que4 que4
+# 7. 原已：整词合并不改变 token，「原原已」是短分句被切成独立 utterance 后
+#    句首碎裂出的多余音节；由 min_words_in_sentence 并回上一分句消除
+#    （A/B：该句浊音岛 6 段 → 3 段）。整词条目仍保留以钉住 yi3。
+原已 yuan2 yi3
+# 8. 所以：两条单字会被读断，整词连读；按 3+3 变调标 2+3。
+所以 suo2 yi3
+# 9. 倒是：词库把「倒是」标成 dao3 shi4，正文是转折副词 dào。
+倒是 dao4 shi4
+# 10. 长时间：单字「长」默认 zhang3；全书 45 处「长时间」及同类长度义一起钉住。
+长时间 chang2 shi2 jian1
+时间长 shi2 jian1 chang2
+并不长 bing4 bu4 chang2
+也不长 ye3 bu4 chang2
+都不长 dou1 bu4 chang2
+特别长 te4 bie2 chang2
+比较长 bi3 jiao4 chang2
+长戈 chang2 ge1
+长围 chang2 wei2
+长棍 chang2 gun4
+长刀 chang2 dao1
+长铁棍 chang2 tie3 gun4
+长钉 chang2 ding1
+长陵 chang2 ling2
+长盛不衰 chang2 sheng4 bu4 shuai1
+长住 chang2 zhu4
+优长 you1 chang2
+体长 ti3 chang2
+耳大且长 er3 da4 qie3 chang2
+长及腹 chang2 ji2 fu4
+长五尺 chang2 wu2 chi3
+长十五丈 chang2 shi2 wu3 zhang4
+长三十七丈 chang2 san1 shi2 qi1 zhang4
+长四十四丈 chang2 si4 shi2 si4 zhang4
+长十一米 chang2 shi2 yi1 mi3
+# 「长」作首领/年长者读 zhang3；3+3 按惯例标 2+3。
+长史 zhang2 shi3
+长姐 zhang2 jie3
+立长 li4 zhang3
+立嫡不立长 li4 di2 bu2 li4 zhang3
+此消彼长 ci3 xiao1 bi2 zhang3
+吃一堑长一智 chi1 yi2 qian4 zhang3 yi2 zhi4
+长翅膀 zhang3 chi4 bang3
+长着 zhang3 zhe
+九人长 jiu3 ren2 zhang3
+亲兵长 qin1 bing1 zhang3
+伍长 wu2 zhang3
+粮长 liang2 zhang3
+检察长 jian3 cha2 zhang3
+大队长 da4 dui4 zhang3
+监狱长 jian1 yu4 zhang3
+关长 guan1 zhang3
+役长 yi4 zhang3
+# 11. 「应」的单字默认 ying1 只适合「应当」；接应、适应、应验等读 ying4。
+接应 jie1 ying4
+不适应 bu2 shi4 ying4
+应了 ying4 le
+叫天不应 jiao4 tian1 bu2 ying4
+# 12. 「倒」的单字默认 dao4 只适合转折副词；动补结构读 dao3。
+#     全书中「不倒」「病倒」「斗倒」「搞倒」「整倒」等均为高频组合。
+不倒 bu4 dao3
+病倒 bing4 dao3
+斗倒 dou4 dao3
+搞倒 gao3 dao3
+整倒 zheng3 dao3
+击倒 ji1 dao3
+吓倒 xia4 dao3
+哭倒 ku1 dao3
+射倒 she4 dao3
+迷倒 mi2 dao3
+批倒 pi1 dao3
+钩倒 gou1 dao3
+顺风倒 shun4 feng1 dao3
+随风倒 sui2 feng1 dao3
+倒时差 dao3 shi2 cha1
+倒了霉 dao3 le mei2
+倒抽 dao3 chou1
+
+# 2026-11-09 三次听音反馈（同一批句子复听）：上一轮把「应应立即 / 原原已 /
+# 漏读便」当成「整词缺失」是错的。真实 WASM 日志显示 Matcha 前端最终只把一条
+# 扁平的音素 token 序列交给声学模型，词条边界根本不进模型：「应」+「立即」与
+# 「应立即」的 token 完全相同。所以整词合并既挡不住句首多出的音节，也挡不住
+# 词内音节被压掉。有效的修复只有三类：
+#   a) 改音素（多音字从单字兜底取错音）；
+#   b) 调整词尾静音引号「"」（tokens.txt ID 7）给声学模型一个完成边界；
+#   c) 把不足 12 个词的短分句并回同一 utterance（workers/sherpa-tts.worker.js
+#      的 min_words_in_sentence），消除独立句首被切碎出来的多余音节。
+# 下面按用户复听点名的 9 处逐条钉住；引号只放词尾，词内放会把词读断。
+# 1. 千军易得：「得」作「获得」义读 de2；单字兜底是助词 de（本表第 159 行）。
+千军易得 qian1 jun1 yi4 de2
+易得 yi4 de2
+# 2. 率意而为：单字「率」默认 lv4（效率），「为」默认 wei4（为了）；
+#    全书原句「而是率意而为，打到哪儿算哪儿」应读 shuài yì ér wéi。
+率意 shuai4 yi4
+率意而为 shuai4 yi4 er2 wei2
+而为 er2 wei2
+# 3. 最先：「最」被拉成长音吞掉「先」，听成一个别的音调；词库无整词条目，
+#    词尾静音边界把两个音节分开并让「先」读完整（A/B zui4 383→301ms、
+#    xian1 186→232ms）。
+最先 zui4 xian1 "
+# 4. 名词「地」：2026-11-11 复听仍未修复，但原因不是读音选错。词库一直是
+#    di4 pan2，真实前端日志也确认匹配到「地盘 -> di4 pan2」，所以只查音素的
+#    黄金集、只测短窗口的声学审计都会判它「已修好」。真正的问题是声学层：
+#    App 实际发送的整块「朱元璋对张士诚极为头疼，自己只是占了点地盘，」
+#    （20 个音节）里「地」只有 105ms（被吞阈值 100ms），「盘」却拿到 256ms；
+#    换一个真实语境（「当时徐寿辉的地盘很小，…」）更差：58/128ms，「地」直接
+#    被吞。听感就是一个含混的 de。
+#    词尾边界只救后一个字，所以「地」一直没救回来；双端边界（" di4 pan2 "）
+#    在长块里最好，但在别的真实语境里会把两个字一起压没（实测 -46/0ms），
+#    不稳定，不能用。**词首**边界在三条真实语境里都稳定（105/256→128/198、
+#    58/128→279/337、用户原句 233/256），且停顿落在「点｜地盘」这种词与词的
+#    接缝上，不在词内。与「占便宜」同一条规则：被压的音节放到短语开头。
+#    「地盘之争」是名词复合词，单独钉住整词，避免词首边界把它读断。
+地盘 " di4 pan2
+地盘之争 di4 pan2 zhi1 zheng1
+# 5. 上天：词尾静音边界让「天」不再被「上」吞并与读歪（A/B 151→256ms）；
+#    与「应天」同属分句合并后词内音节被压短的情况。
+上天 shang4 tian1 "
+
+# 2026-11-10 音节融合（P3 自动巡检首例）。基础词典有「到了 dao4 le」，最长匹配
+# 把「来到了」切成「来」+「到了」，前字落单；lai2 的声母 l 与 dao4 的韵母 ao
+# 恰好拼成模型训练过的音节 lao，声学模型把「来/到」协同发音成一个「老」音。
+# 真实 WASM 在反馈原句窗口下消融实测 lai2/dao4 = 140/302ms（dao4 吞并前字），
+# 整词钉住并在「了」之后放词尾静音边界后为 174/290ms，均衡度评分 206.3 → 243.6。
+# 「来到洪都」不带「了」时 163/116ms 已均衡，加边界反而 151/58ms，因此「来到」
+# 只整词钉住、不加边界。同类「X到了」由 npm run pronunciation:auto 自动发现并
+# A/B 验证，不再等逐条听音反馈；验收见 tests/FusionRisk.test.ts。
+来到 lai2 dao4
+来到了 lai2 dao4 le "
+
+# 2026-11-11 第六轮：词组级多音字（便宜族 / 地盘族）。前五轮只钉住
+# 占便宜 / 大便宜 / 地盘 / 地盘之争，本轮把用户列出的整个词族纳入人工表。
+#
+# 归因换了思路：不再问「该读哪个音」，而是重建 App 的运行时数据链路 ——
+# AiModel 合并 overlay → worker.patchLexicon（同一词最后一行生效）→
+# preparePronunciationText 的 U+200B / U+2060 → Matcha 最长匹配 →
+# 真实 WASM 逐音节消融。逐词证据见 scripts/out/word-family-report.json。
+#
+# 1. 五个「便宜」词在基础词典里全是 pian2 yi2，两个阳平连读合并成一个长升调。
+#    修复前真实 WASM（整块语境，各音节贡献 ms）：
+#      小便宜 197/209/417（「宜」417 吞并邻音）  捡便宜 255/93/267（「便」93 被吞）
+#      讨便宜 407/279/360（首音 407）            贪便宜 256/244/418
+#    与「占便宜」同构，整词把「宜」改回训练过的轻声 yi（标准 pián·yi）。
+#    不加词首静音边界：这些词没有 confirmed 漏读案例，词首边界是强声学改动，
+#    按项目规则只允许 omissionCases.v1.jsonl 已确认的词使用。
+# 2. 抢地盘 / 占地盘 基础词典没有整词行，最长匹配拆成「抢 / 占地 + 地盘」，
+#    单字「地」兜底是 de。它们从未进入人工表、omissionCases 与回归快照，
+#    所以任何门禁都测不到（修复前验收直接报「无法构造 token 序列」）。
+#    整词钉住 di4，并同步加入整词保护与语句重置，让整词落在新语句开头。
+# 3. AiModel.ts 原来把人工表拼在整书自动生成 overlay 之前，worker 后写覆盖；
+#    pinyin-pro 对「便宜」给出 yi0（tokens.txt 与 trainedNeutrals.v1.txt 都没有），
+#    整书表一旦含同名词就在 App 里生效，而审计侧 parseOverlay 是首行生效，
+#    门禁永远看到人工表。这就是「音素全绿、听感仍是怪音」的结构性原因；
+#    现由 mergeLexiconOverlays() 去重并让人工表最后生效。
+#
+# 排除（不得扩散）：便宜从事 / 便宜施行 / 便宜行事（文言 biàn yí）、小便 xiao3 bian4、
+# 状语助词「长期地」的 de、单字「便 / 地」、其它含「地」词、piper 词典与系统语音。
+小便宜 xiao3 pian2 yi
+捡便宜 jian3 pian2 yi
+讨便宜 tao3 pian2 yi
+贪便宜 tan1 pian2 yi
+# 逐词例外（真实 WASM A/B，scripts/scratch/ab-word-family.mjs）：「便宜货」后面
+# 还有 huo4，第三音节已经打断两个阳平的连读；改成轻声 yi 反而让前两音节被吞
+# （短句 93/93/128ms、整块 46/93/174ms），保留 yi2 则两种语境都稳定
+# （244/256/140ms、244/267/197ms）。词族扩散不能一刀切，此词只整词钉住防抢词。
+便宜货 pian2 yi2 huo4
+# 抢地盘 / 占地盘 的词尾静音边界是逐词 A/B 选出来的：三字长词在语句重置后
+# 落到新语句开头，整块语境里首音节或中间的「地」仍会被压短（无边界时
+# 58/104/151ms、291/93/163ms）。真实 WASM 四组 A/B（短句 + 整块 × 两个词）：
+#   词首边界 163/70/163、290/69/127（「地」被吞）  双端边界 465/302/407（吞并）
+#   词尾边界 255/255/348、186/151/244、163/117/267、267/151/255 全部 normal。
+# 边界只在词尾，不在词内；词尾边界不需要 confirmed 漏读案例。
+抢地盘 qiang3 di4 pan2 "
+占地盘 zhan4 di4 pan2 "
+
+# P3 自迭代产物 2026-11-10T01:03:55.796Z（WASM A/B + 零意外变化）
+# 音节融合：前字声母 + 后字韵母拼成模型训练过的另一个音节。
+看到了 kan4 dao4 le "
+回到了 hui2 dao4 le "
+
+# 自迭代产物 2026-11-10T02:03:15.509Z（WASM A/B + 零意外变化）
+# 词尾静音边界：音素正确但音节被吞并/压短，来自全量历史自迭代。
+弹劾 tan2 he2 "
+几乎 ji1 hu1 "
+
+# P4 漏读自迭代产物 2026-11-10T06:24:44.516Z
+地点 " di4 dian3
+
+# 2026-11-11 抢词修复（会计）：Matcha 前端按词典最长匹配，基础词典的「学会」
+# 会把「学会计」切成「学会 / 计」，「会」于是落回单字 hui4，正确读音是 kuai4。
+# 真实 WASM debug 日志：'学会' -> 'xue2 hui4 '，'计' -> 'ji4 '。
+# 整词钉住该组合，让纯词典门禁（黄金集、回归快照）也走 kuai4；运行时另有
+# protectedWords.v1.txt 的零宽边界兜底，保证任何语境都从「会计」开始匹配。
+学会计 xue2 kuai4 ji4

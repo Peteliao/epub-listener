@@ -1,0 +1,319 @@
+{
+  "samples": {
+    "noise-0.5": [
+      0.318,
+      0.312,
+      0.311,
+      0.309,
+      0.316,
+      0.314,
+      0.311,
+      0.313,
+      0.313,
+      0.31,
+      0.31,
+      0.308
+    ],
+    "noise-0.667": [
+      0.306,
+      0.3,
+      0.301,
+      0.304,
+      0.301,
+      0.3,
+      0.301,
+      0.301,
+      0.301,
+      0.3,
+      0.298,
+      0.303
+    ],
+    "silence-0.8": [
+      0.1779,
+      0.1769,
+      0.1766,
+      0.1793,
+      0.1792,
+      0.1781
+    ],
+    "silence-1": [
+      0.1855,
+      0.19,
+      0.1886,
+      0.1913,
+      0.1861,
+      0.1865
+    ],
+    "silence-1.2": [
+      0.2217,
+      0.2191,
+      0.2141,
+      0.2161,
+      0.2165,
+      0.2191
+    ],
+    "group-60": [
+      2561,
+      2474,
+      2207
+    ],
+    "group-90": [
+      5529,
+      5612,
+      5843
+    ],
+    "group-120": [
+      7139,
+      6860,
+      6948
+    ],
+    "noise-0.8": [
+      0.313,
+      0.313,
+      0.303,
+      0.324,
+      0.314,
+      0.308,
+      0.323,
+      0.32,
+      0.309,
+      0.31,
+      0.315,
+      0.313
+    ]
+  },
+  "noise-0.5": {
+    "initMs": 1863,
+    "warmupMs": 670,
+    "heapBytes": 536870912,
+    "releasedModelBytes": 129508212,
+    "memfs": [
+      {
+        "name": "model-steps-3.onnx",
+        "exists": false
+      },
+      {
+        "name": "vocos-22khz-univ.onnx",
+        "exists": false
+      },
+      {
+        "name": "lexicon.v3.txt",
+        "exists": true
+      },
+      {
+        "name": "tokens.txt",
+        "exists": true
+      },
+      {
+        "name": "phone.fst",
+        "exists": true
+      },
+      {
+        "name": "date.fst",
+        "exists": true
+      },
+      {
+        "name": "number.fst",
+        "exists": true
+      }
+    ],
+    "sentences": {
+      "n": 24,
+      "synthMsMean": 1232,
+      "synthMsP95": 1430,
+      "rtfMean": 0.328,
+      "audioMsMean": 3775,
+      "silenceRatio": 0.1444,
+      "pauses": 1,
+      "rms": 0.1144,
+      "peak": 0.7303
+    },
+    "durationDrift": 0.0024
+  },
+  "noise-0.667": {
+    "initMs": 1843,
+    "warmupMs": 651,
+    "heapBytes": 536870912,
+    "releasedModelBytes": 129508212,
+    "memfs": [
+      {
+        "name": "model-steps-3.onnx",
+        "exists": false
+      },
+      {
+        "name": "vocos-22khz-univ.onnx",
+        "exists": false
+      },
+      {
+        "name": "lexicon.v3.txt",
+        "exists": true
+      },
+      {
+        "name": "tokens.txt",
+        "exists": true
+      },
+      {
+        "name": "phone.fst",
+        "exists": true
+      },
+      {
+        "name": "date.fst",
+        "exists": true
+      },
+      {
+        "name": "number.fst",
+        "exists": true
+      }
+    ],
+    "sentences": {
+      "n": 24,
+      "synthMsMean": 1163,
+      "synthMsP95": 1401,
+      "rtfMean": 0.309,
+      "audioMsMean": 3781,
+      "silenceRatio": 0.1434,
+      "pauses": 1.08,
+      "rms": 0.114,
+      "peak": 0.7364
+    },
+    "durationDrift": 0.0024
+  },
+  "silence-0.8": {
+    "n": 6,
+    "synthMsMean": 1236,
+    "synthMsP95": 1364,
+    "rtfMean": 0.31,
+    "audioMsMean": 3999,
+    "silenceRatio": 0.1322,
+    "pauses": 1,
+    "rms": 0.1141,
+    "peak": 0.7609
+  },
+  "silence-1": {
+    "n": 6,
+    "synthMsMean": 1297,
+    "synthMsP95": 1605,
+    "rtfMean": 0.32,
+    "audioMsMean": 4058,
+    "silenceRatio": 0.1424,
+    "pauses": 1.17,
+    "rms": 0.1141,
+    "peak": 0.7162
+  },
+  "silence-1.2": {
+    "n": 6,
+    "synthMsMean": 1275,
+    "synthMsP95": 1548,
+    "rtfMean": 0.303,
+    "audioMsMean": 4193,
+    "silenceRatio": 0.17,
+    "pauses": 1.17,
+    "rms": 0.1141,
+    "peak": 0.7309
+  },
+  "group-60": {
+    "chars": 37,
+    "n": 3,
+    "synthMsMean": 2414,
+    "synthMsP95": 2561,
+    "rtfMean": 0.309,
+    "audioMsMean": 7800,
+    "silenceRatio": 0.2046,
+    "pauses": 3.67,
+    "rms": 0.1143,
+    "peak": 0.7051
+  },
+  "group-90": {
+    "chars": 83,
+    "n": 3,
+    "synthMsMean": 5661,
+    "synthMsP95": 5843,
+    "rtfMean": 0.324,
+    "audioMsMean": 17466,
+    "silenceRatio": 0.1934,
+    "pauses": 7.33,
+    "rms": 0.1141,
+    "peak": 0.8033
+  },
+  "group-120": {
+    "chars": 105,
+    "n": 3,
+    "synthMsMean": 6982,
+    "synthMsP95": 7139,
+    "rtfMean": 0.316,
+    "audioMsMean": 22087,
+    "silenceRatio": 0.1936,
+    "pauses": 10,
+    "rms": 0.1139,
+    "peak": 0.8212
+  },
+  "noise-0.8": {
+    "initMs": 1976,
+    "warmupMs": 667,
+    "heapBytes": 536870912,
+    "releasedModelBytes": 129508212,
+    "memfs": [
+      {
+        "name": "model-steps-3.onnx",
+        "exists": false
+      },
+      {
+        "name": "vocos-22khz-univ.onnx",
+        "exists": false
+      },
+      {
+        "name": "lexicon.v3.txt",
+        "exists": true
+      },
+      {
+        "name": "tokens.txt",
+        "exists": true
+      },
+      {
+        "name": "phone.fst",
+        "exists": true
+      },
+      {
+        "name": "date.fst",
+        "exists": true
+      },
+      {
+        "name": "number.fst",
+        "exists": true
+      }
+    ],
+    "sentences": {
+      "n": 24,
+      "synthMsMean": 1181,
+      "synthMsP95": 1407,
+      "rtfMean": 0.314,
+      "audioMsMean": 3778,
+      "silenceRatio": 0.1396,
+      "pauses": 1.04,
+      "rms": 0.1138,
+      "peak": 0.7461
+    },
+    "durationDrift": 0.0018
+  },
+  "synthesisAfterRelease": true,
+  "grid": {
+    "seed": 733047248,
+    "noiseOrder": [
+      0.5,
+      0.667,
+      0.8
+    ],
+    "silenceOrder": [
+      0.8,
+      1,
+      1.2
+    ],
+    "groupOrder": [
+      60,
+      90,
+      120
+    ],
+    "repeats": 12,
+    "sentences": 20
+  }
+}

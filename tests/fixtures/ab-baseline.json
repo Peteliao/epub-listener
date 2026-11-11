@@ -1,0 +1,234 @@
+{
+  "noise-0.5": {
+    "initMs": 1935,
+    "warmupMs": 676,
+    "heapBytes": 536870912,
+    "releasedModelBytes": 129508212,
+    "memfs": [
+      {
+        "name": "model-steps-3.onnx",
+        "exists": false
+      },
+      {
+        "name": "vocos-22khz-univ.onnx",
+        "exists": false
+      },
+      {
+        "name": "lexicon.v3.txt",
+        "exists": true
+      },
+      {
+        "name": "tokens.txt",
+        "exists": true
+      },
+      {
+        "name": "phone.fst",
+        "exists": true
+      },
+      {
+        "name": "date.fst",
+        "exists": true
+      },
+      {
+        "name": "number.fst",
+        "exists": true
+      }
+    ],
+    "sentences": {
+      "n": 24,
+      "synthMsMean": 1225,
+      "synthMsP95": 1537,
+      "rtfMean": 0.326,
+      "audioMsMean": 3775,
+      "silenceRatio": 0.1441,
+      "pauses": 1.04,
+      "rms": 0.1144,
+      "peak": 0.7339
+    },
+    "durationDrift": 0.0009
+  },
+  "noise-0.667": {
+    "initMs": 1870,
+    "warmupMs": 643,
+    "heapBytes": 536870912,
+    "releasedModelBytes": 129508212,
+    "memfs": [
+      {
+        "name": "model-steps-3.onnx",
+        "exists": false
+      },
+      {
+        "name": "vocos-22khz-univ.onnx",
+        "exists": false
+      },
+      {
+        "name": "lexicon.v3.txt",
+        "exists": true
+      },
+      {
+        "name": "tokens.txt",
+        "exists": true
+      },
+      {
+        "name": "phone.fst",
+        "exists": true
+      },
+      {
+        "name": "date.fst",
+        "exists": true
+      },
+      {
+        "name": "number.fst",
+        "exists": true
+      }
+    ],
+    "sentences": {
+      "n": 24,
+      "synthMsMean": 1158,
+      "synthMsP95": 1387,
+      "rtfMean": 0.308,
+      "audioMsMean": 3778,
+      "silenceRatio": 0.1431,
+      "pauses": 1,
+      "rms": 0.1141,
+      "peak": 0.7423
+    },
+    "durationDrift": 0.0014
+  },
+  "silence-0.8": {
+    "n": 6,
+    "synthMsMean": 1223,
+    "synthMsP95": 1349,
+    "rtfMean": 0.307,
+    "audioMsMean": 4002,
+    "silenceRatio": 0.1338,
+    "pauses": 1,
+    "rms": 0.1141,
+    "peak": 0.7599
+  },
+  "silence-1": {
+    "n": 6,
+    "synthMsMean": 1204,
+    "synthMsP95": 1328,
+    "rtfMean": 0.297,
+    "audioMsMean": 4062,
+    "silenceRatio": 0.1447,
+    "pauses": 1,
+    "rms": 0.1141,
+    "peak": 0.7375
+  },
+  "silence-1.2": {
+    "n": 6,
+    "synthMsMean": 1207,
+    "synthMsP95": 1321,
+    "rtfMean": 0.288,
+    "audioMsMean": 4193,
+    "silenceRatio": 0.1712,
+    "pauses": 1.17,
+    "rms": 0.114,
+    "peak": 0.7481
+  },
+  "group-60": {
+    "chars": 37,
+    "n": 1,
+    "synthMsMean": 2208,
+    "synthMsP95": 2208,
+    "rtfMean": 0.283,
+    "audioMsMean": 7802,
+    "silenceRatio": 0.2062,
+    "pauses": 4,
+    "rms": 0.1144,
+    "peak": 0.6951
+  },
+  "group-90": {
+    "chars": 83,
+    "n": 1,
+    "synthMsMean": 5056,
+    "synthMsP95": 5056,
+    "rtfMean": 0.29,
+    "audioMsMean": 17463,
+    "silenceRatio": 0.1938,
+    "pauses": 7,
+    "rms": 0.1141,
+    "peak": 0.7538
+  },
+  "group-120": {
+    "chars": 105,
+    "n": 1,
+    "synthMsMean": 6787,
+    "synthMsP95": 6787,
+    "rtfMean": 0.307,
+    "audioMsMean": 22087,
+    "silenceRatio": 0.1921,
+    "pauses": 10,
+    "rms": 0.1139,
+    "peak": 0.8306
+  },
+  "noise-0.8": {
+    "initMs": 1853,
+    "warmupMs": 654,
+    "heapBytes": 536870912,
+    "releasedModelBytes": 129508212,
+    "memfs": [
+      {
+        "name": "model-steps-3.onnx",
+        "exists": false
+      },
+      {
+        "name": "vocos-22khz-univ.onnx",
+        "exists": false
+      },
+      {
+        "name": "lexicon.v3.txt",
+        "exists": true
+      },
+      {
+        "name": "tokens.txt",
+        "exists": true
+      },
+      {
+        "name": "phone.fst",
+        "exists": true
+      },
+      {
+        "name": "date.fst",
+        "exists": true
+      },
+      {
+        "name": "number.fst",
+        "exists": true
+      }
+    ],
+    "sentences": {
+      "n": 24,
+      "synthMsMean": 1171,
+      "synthMsP95": 1367,
+      "rtfMean": 0.312,
+      "audioMsMean": 3779,
+      "silenceRatio": 0.1396,
+      "pauses": 0.96,
+      "rms": 0.1138,
+      "peak": 0.7359
+    },
+    "durationDrift": 0.0027
+  },
+  "synthesisAfterRelease": true,
+  "grid": {
+    "noiseScales": [
+      0.5,
+      0.667,
+      0.8
+    ],
+    "silenceScales": [
+      0.8,
+      1,
+      1.2
+    ],
+    "groupChars": [
+      60,
+      90,
+      120
+    ],
+    "sentences": 20
+  }
+}

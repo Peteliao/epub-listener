@@ -1,0 +1,739 @@
+{
+  "schemaVersion": 4,
+  "runtime": {
+    "version": "sherpa-onnx-wasm-tts-2.0.0",
+    "baseUrl": "sherpa/runtime/",
+    "glue": "sherpa-onnx-wasm-tts.js",
+    "api": "sherpa-onnx-tts.js",
+    "wasm": "sherpa-onnx-wasm-tts.wasm",
+    "bytes": 15315445,
+    "glueBytes": 102396,
+    "apiBytes": 41427,
+    "wasmBytes": 15171622,
+    "glueSha256": "5cbe89fbd3c5c6862ecb82a8ec4d45b3c9f85be8fd5716a2a7a40ef31884e726",
+    "wasmSha256": "b50b1184c77a8cfa1f0198d9fdd34e7b708b4eb77f0b39c393fcdd05e5f2be79",
+    "apiSha256": "0f66769feeb012282c984014c56c7e3b5239d4ef9559298d196affda3b9e751e"
+  },
+  "packs": [
+    {
+      "id": "matcha-icefall-zh-baker",
+      "lang": "zh",
+      "name": "山岚",
+      "version": "2026.10.26",
+      "description": "22.05 kHz 清晰女声，咬字干净，语调自然",
+      "license": {
+        "label": "仅限非商业",
+        "commercialUse": false,
+        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/tts-models",
+        "notice": "音色数据来自 Baker 中文语料，仅限非商业使用。"
+      },
+      "baseUrl": "models/matcha-icefall-zh-baker/",
+      "model": {
+        "type": "matcha",
+        "config": {
+          "acousticModel": "model-steps-3.onnx",
+          "vocoder": "vocos-22khz-univ.onnx",
+          "lexicon": "lexicon.v3.txt",
+          "tokens": "tokens.txt",
+          "noiseScale": 0.667,
+          "lengthScale": 1
+        },
+        "ruleFsts": [
+          "phone.fst",
+          "date.fst",
+          "number.fst"
+        ],
+        "warmupText": "你好，欢迎收听。"
+      },
+      "voices": [
+        {
+          "id": "shanlan",
+          "speakerId": 0,
+          "sampleRate": 22050,
+          "label": "山岚",
+          "description": "清晰女声，咬字干净，语调自然，适合长时间听书"
+        }
+      ],
+      "totalBytes": 131120242,
+      "files": [
+        {
+          "name": "model-steps-3.onnx",
+          "url": "models/matcha-icefall-zh-baker/model-steps-3.onnx",
+          "bytes": 75624188,
+          "sha256": "47e82b11454edeeb65adc4e44a24fd54c6715cd4d875cc2a20f75545ecc32d4d"
+        },
+        {
+          "name": "vocos-22khz-univ.onnx",
+          "url": "models/matcha-icefall-zh-baker/vocos-22khz-univ.onnx",
+          "bytes": 53884024,
+          "sha256": "0574a135aa1db2de6e181050db2ec528496cacd4a4701fc5d7faf9f9804c0081"
+        },
+        {
+          "name": "lexicon.v3.txt",
+          "url": "models/matcha-icefall-zh-baker/lexicon.v3.txt",
+          "bytes": 1380173,
+          "sha256": "a6b88b9d2d993b3ea796c8cf4d219811875042060ef1047d30b61c4ce06eaa87"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "models/matcha-icefall-zh-baker/tokens.txt",
+          "bytes": 19591,
+          "sha256": "56209b2bf609d5ac1d66ede6dae7bf5254bd3f8aa24c4a6823713d5b884d87ba"
+        },
+        {
+          "name": "phone.fst",
+          "url": "models/matcha-icefall-zh-baker/phone.fst",
+          "bytes": 88630,
+          "sha256": "1ac2b6fa56b1442320c4de7db08353bab8963a2b57f365eebcdd3a2d3562f8d7"
+        },
+        {
+          "name": "date.fst",
+          "url": "models/matcha-icefall-zh-baker/date.fst",
+          "bytes": 59154,
+          "sha256": "eb8aa079ae3cb81d8f4404992f39d61a0cb990947512b5b8d1e54d1f6980e718"
+        },
+        {
+          "name": "number.fst",
+          "url": "models/matcha-icefall-zh-baker/number.fst",
+          "bytes": 64482,
+          "sha256": "743f402181fcfebf76cc2f0546b71fa26476e626fbe4e460fb7b4c3a7a8bd5bd"
+        }
+      ],
+      "engine": "sherpa"
+    },
+    {
+      "id": "piper-zh-xiaoya",
+      "lang": "zh",
+      "name": "小雅",
+      "version": "2026.10.27",
+      "description": "与山岚同属标贝女声语料的 Piper 版本，22.05 kHz，停顿自然、吐字清楚",
+      "license": {
+        "label": "仅限非商业",
+        "commercialUse": false,
+        "url": "https://www.data-baker.com/data/index/TNtts/",
+        "notice": "音色基于 BZNSYP（标贝女声）语料训练，明确标注仅限非商业使用；Piper 模型仓库与前处理文件为 MIT。"
+      },
+      "baseUrl": "models/piper-zh-xiaoya/",
+      "model": {
+        "type": "vits",
+        "config": {
+          "model": "zh_CN-xiao_ya-medium.onnx",
+          "lexicon": "lexicon.txt",
+          "tokens": "tokens.txt",
+          "noiseScale": 0.667,
+          "noiseScaleW": 0.8,
+          "lengthScale": 1
+        },
+        "ruleFsts": [
+          "phone.fst",
+          "date.fst",
+          "number.fst"
+        ],
+        "warmupText": "你好，欢迎收听。"
+      },
+      "voices": [
+        {
+          "id": "xiaoya",
+          "speakerId": 0,
+          "sampleRate": 22050,
+          "label": "小雅",
+          "description": "清晰女声，停顿自然，适合长时间听书"
+        }
+      ],
+      "totalBytes": 65499397,
+      "files": [
+        {
+          "name": "zh_CN-xiao_ya-medium.onnx",
+          "url": "models/piper-zh-xiaoya/zh_CN-xiao_ya-medium.onnx",
+          "bytes": 63222141,
+          "sha256": "c8882021fe2da5440870c4d18a45ffd8036ee3219660b0eef8a1f57cc3f0c166"
+        },
+        {
+          "name": "lexicon.txt",
+          "url": "models/piper-zh-xiaoya/lexicon.txt",
+          "bytes": 2064505,
+          "sha256": "003e76f89fec389ec109b557f47cc315a1ac31a99091f0cc9d15949f9024416b"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "models/piper-zh-xiaoya/tokens.txt",
+          "bytes": 485,
+          "sha256": "e9e6d2838a2676749adbf0376c4cf3c3cd28eb27ed953dcc2adcab8db3c33ba7"
+        },
+        {
+          "name": "phone.fst",
+          "url": "models/piper-zh-xiaoya/phone.fst",
+          "bytes": 88630,
+          "sha256": "1ac2b6fa56b1442320c4de7db08353bab8963a2b57f365eebcdd3a2d3562f8d7"
+        },
+        {
+          "name": "date.fst",
+          "url": "models/piper-zh-xiaoya/date.fst",
+          "bytes": 59154,
+          "sha256": "eb8aa079ae3cb81d8f4404992f39d61a0cb990947512b5b8d1e54d1f6980e718"
+        },
+        {
+          "name": "number.fst",
+          "url": "models/piper-zh-xiaoya/number.fst",
+          "bytes": 64482,
+          "sha256": "743f402181fcfebf76cc2f0546b71fa26476e626fbe4e460fb7b4c3a7a8bd5bd"
+        }
+      ],
+      "engine": "sherpa"
+    },
+    {
+      "id": "piper-zh-chaowen",
+      "lang": "zh",
+      "name": "初晴",
+      "version": "2026.10.26",
+      "description": "22.05 kHz 轻快女声，声线明亮，吐字清楚",
+      "license": {
+        "label": "CC0 / MIT",
+        "commercialUse": true,
+        "url": "https://huggingface.co/rhasspy/piper-voices/tree/main/zh/zh_CN/chaowen/medium",
+        "notice": "基于 Piper 超文（chaowen）模型，数据集以 CC0 释出，Piper 模型仓库采用 MIT 许可。"
+      },
+      "baseUrl": "models/piper-zh-chaowen/",
+      "model": {
+        "type": "vits",
+        "config": {
+          "model": "zh_CN-chaowen-medium.onnx",
+          "lexicon": "lexicon.txt",
+          "tokens": "tokens.txt",
+          "noiseScale": 0.667,
+          "noiseScaleW": 0.8,
+          "lengthScale": 1
+        },
+        "ruleFsts": [
+          "phone.fst",
+          "date.fst",
+          "number.fst"
+        ],
+        "warmupText": "你好，欢迎收听。"
+      },
+      "voices": [
+        {
+          "id": "chuqing",
+          "speakerId": 0,
+          "sampleRate": 22050,
+          "label": "初晴",
+          "description": "轻快明亮的女声，咬字清楚，适合日常听书"
+        }
+      ],
+      "totalBytes": 65499397,
+      "files": [
+        {
+          "name": "zh_CN-chaowen-medium.onnx",
+          "url": "models/piper-zh-chaowen/zh_CN-chaowen-medium.onnx",
+          "bytes": 63222141,
+          "sha256": "1cb646ea826a6ee73e329ea06319fb8d459da8a35be6c1ba30210387deb3bc55"
+        },
+        {
+          "name": "lexicon.txt",
+          "url": "models/piper-zh-chaowen/lexicon.txt",
+          "bytes": 2064505,
+          "sha256": "003e76f89fec389ec109b557f47cc315a1ac31a99091f0cc9d15949f9024416b"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "models/piper-zh-chaowen/tokens.txt",
+          "bytes": 485,
+          "sha256": "e9e6d2838a2676749adbf0376c4cf3c3cd28eb27ed953dcc2adcab8db3c33ba7"
+        },
+        {
+          "name": "phone.fst",
+          "url": "models/piper-zh-chaowen/phone.fst",
+          "bytes": 88630,
+          "sha256": "1ac2b6fa56b1442320c4de7db08353bab8963a2b57f365eebcdd3a2d3562f8d7"
+        },
+        {
+          "name": "date.fst",
+          "url": "models/piper-zh-chaowen/date.fst",
+          "bytes": 59154,
+          "sha256": "eb8aa079ae3cb81d8f4404992f39d61a0cb990947512b5b8d1e54d1f6980e718"
+        },
+        {
+          "name": "number.fst",
+          "url": "models/piper-zh-chaowen/number.fst",
+          "bytes": 64482,
+          "sha256": "743f402181fcfebf76cc2f0546b71fa26476e626fbe4e460fb7b4c3a7a8bd5bd"
+        }
+      ],
+      "engine": "sherpa"
+    },
+    {
+      "id": "piper-zh-aishell3",
+      "lang": "zh",
+      "name": "AISHELL-3 精选",
+      "version": "2026.10.26",
+      "description": "Apache-2.0 开源多说话人模型，内含四种不同风格",
+      "license": {
+        "label": "Apache-2.0",
+        "commercialUse": true,
+        "url": "https://huggingface.co/writeAPoemForYou/piper-voices-zh-AISHELL-3",
+        "notice": "音色基于 AISHELL-3 语料训练，语料与模型以 Apache-2.0 许可释出；Piper 前处理文件采用 MIT 许可。"
+      },
+      "baseUrl": "models/piper-zh-aishell3/",
+      "model": {
+        "type": "vits",
+        "config": {
+          "model": "zh_CN-cn_aishell3-medium.onnx",
+          "lexicon": "lexicon.txt",
+          "tokens": "tokens.txt",
+          "noiseScale": 0.333,
+          "noiseScaleW": 0.333,
+          "lengthScale": 1
+        },
+        "ruleFsts": [
+          "phone.fst",
+          "date.fst",
+          "number.fst"
+        ],
+        "warmupText": "你好，欢迎收听。"
+      },
+      "voices": [
+        {
+          "id": "aishell3-qinghe",
+          "speakerId": 170,
+          "sampleRate": 22050,
+          "label": "青禾",
+          "description": "温柔女声，音色温暖，适合叙事类作品"
+        },
+        {
+          "id": "aishell3-zhaoyue",
+          "speakerId": 71,
+          "sampleRate": 22050,
+          "label": "照月",
+          "description": "清亮女声，语调轻快，适合散文与小说"
+        },
+        {
+          "id": "aishell3-songtao",
+          "speakerId": 14,
+          "sampleRate": 22050,
+          "label": "松涛",
+          "description": "低沉男声，声线厚实，适合历史与悬疑"
+        },
+        {
+          "id": "aishell3-yuanchuan",
+          "speakerId": 36,
+          "sampleRate": 22050,
+          "label": "远川",
+          "description": "沉稳男声，叙述自然，适合长时间听书"
+        }
+      ],
+      "totalBytes": 79916874,
+      "files": [
+        {
+          "name": "zh_CN-cn_aishell3-medium.onnx",
+          "url": "models/piper-zh-aishell3/zh_CN-cn_aishell3-medium.onnx",
+          "bytes": 77639618,
+          "sha256": "f46e009dcfcaa0f8c5e6eefe23dabc36296c69123ea22df82d31078ab6e0174f"
+        },
+        {
+          "name": "lexicon.txt",
+          "url": "models/piper-zh-aishell3/lexicon.txt",
+          "bytes": 2064505,
+          "sha256": "003e76f89fec389ec109b557f47cc315a1ac31a99091f0cc9d15949f9024416b"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "models/piper-zh-aishell3/tokens.txt",
+          "bytes": 485,
+          "sha256": "e9e6d2838a2676749adbf0376c4cf3c3cd28eb27ed953dcc2adcab8db3c33ba7"
+        },
+        {
+          "name": "phone.fst",
+          "url": "models/piper-zh-aishell3/phone.fst",
+          "bytes": 88630,
+          "sha256": "1ac2b6fa56b1442320c4de7db08353bab8963a2b57f365eebcdd3a2d3562f8d7"
+        },
+        {
+          "name": "date.fst",
+          "url": "models/piper-zh-aishell3/date.fst",
+          "bytes": 59154,
+          "sha256": "eb8aa079ae3cb81d8f4404992f39d61a0cb990947512b5b8d1e54d1f6980e718"
+        },
+        {
+          "name": "number.fst",
+          "url": "models/piper-zh-aishell3/number.fst",
+          "bytes": 64482,
+          "sha256": "743f402181fcfebf76cc2f0546b71fa26476e626fbe4e460fb7b4c3a7a8bd5bd"
+        }
+      ],
+      "engine": "sherpa"
+    },
+    {
+      "id": "piper-en-kristin",
+      "lang": "en",
+      "name": "英文 · Kristin",
+      "version": "2026.10.29",
+      "description": "22.05 kHz 英文女声，LibriVox 公有领域录音，中英混排时可与中文音色同时使用",
+      "license": {
+        "label": "公有领域 / MIT",
+        "commercialUse": true,
+        "url": "https://brycebeattie.com/files/tts/",
+        "notice": "Kristin 音色基于 LibriVox 公有领域录音训练；英文词典由 CMUDict（BSD-2-Clause）等词表生成。"
+      },
+      "baseUrl": "models/piper-en-kristin/",
+      "model": {
+        "type": "vits",
+        "config": {
+          "model": "en_US-kristin-medium.onnx",
+          "lexicon": "lexicon-en-us.txt",
+          "tokens": "tokens.txt",
+          "noiseScale": 0.667,
+          "noiseScaleW": 0.8,
+          "lengthScale": 1
+        },
+        "ruleFsts": [],
+        "warmupText": "Hello, welcome to listen."
+      },
+      "voices": [
+        {
+          "id": "kristin",
+          "speakerId": 0,
+          "sampleRate": 22050,
+          "label": "Kristin",
+          "description": "英文女声，发音清晰，适合英文书与中英混排"
+        }
+      ],
+      "totalBytes": 25656499,
+      "files": [
+        {
+          "name": "en_US-kristin-medium.onnx",
+          "url": "models/piper-en-kristin/en_US-kristin-medium.onnx",
+          "bytes": 19349786,
+          "sha256": "1ad109f578f24dc0008bcf5d2f6e2812ebde2572cf3aa6ce36569a074ee2258a"
+        },
+        {
+          "name": "lexicon-en-us.txt",
+          "url": "models/piper-en-kristin/lexicon-en-us.txt",
+          "bytes": 6305773,
+          "sha256": "8b67ae549a465eee78f92ecb74644ad90c3c58ce65f19c68baf85878a10ef73a"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "models/piper-en-kristin/tokens.txt",
+          "bytes": 940,
+          "sha256": "ef3a7e4a8d1af0c9d4dc45aaae1a6242ebe24a7ed6f3d025a49eb29682784c6d"
+        }
+      ],
+      "engine": "sherpa"
+    },
+    {
+      "id": "hojo-light",
+      "engine": "hojo",
+      "lang": "bi",
+      "name": "Hojo 双语",
+      "version": "2026.11.06",
+      "description": "40M 参数中英双语模型，中英混读自然；桌面端使用完整版，移动端自动使用 int8 轻量版",
+      "license": {
+        "label": "Apache-2.0",
+        "commercialUse": true,
+        "url": "https://huggingface.co/HojoAI/Hojo-TTS-Light-40M",
+        "notice": "Hojo-TTS-Light-40M 以 Apache-2.0 释出；移动版 LM 采用社区 int8 量化，解码器与 FineLocal 保持 fp32 以保护音质。"
+      },
+      "baseUrl": "models/hojo/",
+      "model": {
+        "type": "hojo",
+        "config": {
+          "temperature": 0.8,
+          "topP": 0.95,
+          "seed": 42
+        }
+      },
+      "voices": [
+        {
+          "id": "hojo-en-f-01",
+          "lang": "en",
+          "speakerId": 0,
+          "sampleRate": 24000,
+          "label": "英文女声 01",
+          "description": "Hojo 英文女声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-f-02",
+          "lang": "en",
+          "speakerId": 1,
+          "sampleRate": 24000,
+          "label": "英文女声 02",
+          "description": "Hojo 英文女声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-f-03",
+          "lang": "en",
+          "speakerId": 2,
+          "sampleRate": 24000,
+          "label": "英文女声 03",
+          "description": "Hojo 英文女声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-f-04",
+          "lang": "en",
+          "speakerId": 3,
+          "sampleRate": 24000,
+          "label": "英文女声 04",
+          "description": "Hojo 英文女声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-f-05",
+          "lang": "en",
+          "speakerId": 4,
+          "sampleRate": 24000,
+          "label": "英文女声 05",
+          "description": "Hojo 英文女声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-f-06",
+          "lang": "en",
+          "speakerId": 5,
+          "sampleRate": 24000,
+          "label": "英文女声 06",
+          "description": "Hojo 英文女声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-f-07",
+          "lang": "en",
+          "speakerId": 6,
+          "sampleRate": 24000,
+          "label": "英文女声 07",
+          "description": "Hojo 英文女声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-m-01",
+          "lang": "en",
+          "speakerId": 7,
+          "sampleRate": 24000,
+          "label": "英文男声 01",
+          "description": "Hojo 英文男声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-m-02",
+          "lang": "en",
+          "speakerId": 8,
+          "sampleRate": 24000,
+          "label": "英文男声 02",
+          "description": "Hojo 英文男声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-m-03",
+          "lang": "en",
+          "speakerId": 9,
+          "sampleRate": 24000,
+          "label": "英文男声 03",
+          "description": "Hojo 英文男声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-m-04",
+          "lang": "en",
+          "speakerId": 10,
+          "sampleRate": 24000,
+          "label": "英文男声 04",
+          "description": "Hojo 英文男声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-m-05",
+          "lang": "en",
+          "speakerId": 11,
+          "sampleRate": 24000,
+          "label": "英文男声 05",
+          "description": "Hojo 英文男声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-en-u-01",
+          "lang": "en",
+          "speakerId": 12,
+          "sampleRate": 24000,
+          "label": "英文中性声 01",
+          "description": "Hojo 英文中性声，适合中英混排与英文朗读"
+        },
+        {
+          "id": "hojo-zh-f-01",
+          "lang": "zh",
+          "speakerId": 13,
+          "sampleRate": 24000,
+          "label": "岚一",
+          "description": "Hojo 中文女声，声线清亮，适合叙事"
+        },
+        {
+          "id": "hojo-zh-f-02",
+          "lang": "zh",
+          "speakerId": 14,
+          "sampleRate": 24000,
+          "label": "岚二",
+          "description": "Hojo 中文女声，语调柔和，适合长时间听书"
+        }
+      ],
+      "totalBytes": 283504338,
+      "variants": [
+        {
+          "id": "full",
+          "label": "桌面完整版",
+          "description": "完整 LM，音质与稳定性优先",
+          "totalBytes": 283504338,
+          "files": [
+            {
+              "name": "llm.onnx",
+              "url": "models/hojo/llm.onnx",
+              "bytes": 125813561,
+              "sha256": "cdbb946b740096ef0ec609f2274b464659ee94b574acadbaef539fba7663d3f7",
+              "parts": [
+                {
+                  "name": "llm.onnx.part1",
+                  "url": "models/hojo/llm.onnx.part1",
+                  "bytes": 67108864,
+                  "sha256": "0fc297cb00891f91df26adb8e248f134fc1dd133d2299051df7d39a8d667bf32"
+                },
+                {
+                  "name": "llm.onnx.part2",
+                  "url": "models/hojo/llm.onnx.part2",
+                  "bytes": 58704697,
+                  "sha256": "36ed71990c1d7274fdffedd9b736efa03c48debb74e5d29aa9f62166ba1796fb"
+                }
+              ]
+            },
+            {
+              "name": "fine_local.onnx",
+              "url": "models/hojo/fine_local.onnx",
+              "bytes": 13470490,
+              "sha256": "1a07eb95c04060541453c9a5b8601312d92cb81f26117059539d4470bb40e758"
+            },
+            {
+              "name": "decoder.onnx",
+              "url": "models/hojo/decoder.onnx",
+              "bytes": 123148065,
+              "sha256": "f66b86ecbc5cd619e0fd223c06a43e7838ee6af3c42e3fcd41ab68591e05e2e8",
+              "parts": [
+                {
+                  "name": "decoder.onnx.part1",
+                  "url": "models/hojo/decoder.onnx.part1",
+                  "bytes": 67108864,
+                  "sha256": "f98175b4bd339452e19400f31547e6751f0d0b111dae6bca267013c101eee084"
+                },
+                {
+                  "name": "decoder.onnx.part2",
+                  "url": "models/hojo/decoder.onnx.part2",
+                  "bytes": 56039201,
+                  "sha256": "eaa15b77ad9508d142a1249f67a62cd38aa37eddae812bf9d4c8a485e7228535"
+                }
+              ]
+            },
+            {
+              "name": "token_embedding.f16",
+              "url": "models/hojo/token_embedding.f16",
+              "bytes": 18109440,
+              "sha256": "c50cf3adb4c76ce20430240f73ea0176513a04ef2c96122df652df2dd4eb1763"
+            },
+            {
+              "name": "voices.json",
+              "url": "models/hojo/voices.json",
+              "bytes": 2618533,
+              "sha256": "a816adcc903e2cceb37a5b68027b199fced57664e9adc1233354b4a964e6d95b"
+            },
+            {
+              "name": "tok.json",
+              "url": "models/hojo/tok.json",
+              "bytes": 344249,
+              "sha256": "4e6860b5b1c53d90ec1821fb285fe946c81505987e8bed0bfdfe2ee17523302f"
+            }
+          ]
+        },
+        {
+          "id": "int8",
+          "label": "移动轻量版",
+          "description": "int8 LM，下载与内存更小；解码器保持 fp32",
+          "totalBytes": 190049392,
+          "files": [
+            {
+              "name": "llm-int8.onnx",
+              "url": "models/hojo/llm-int8.onnx",
+              "bytes": 32358615,
+              "sha256": "e43fc9b10ccfecc7044eded41bed88c1e5f81fdd3e955a200e340246eeb0ee2c"
+            },
+            {
+              "name": "fine_local.onnx",
+              "url": "models/hojo/fine_local.onnx",
+              "bytes": 13470490,
+              "sha256": "1a07eb95c04060541453c9a5b8601312d92cb81f26117059539d4470bb40e758"
+            },
+            {
+              "name": "decoder.onnx",
+              "url": "models/hojo/decoder.onnx",
+              "bytes": 123148065,
+              "sha256": "f66b86ecbc5cd619e0fd223c06a43e7838ee6af3c42e3fcd41ab68591e05e2e8",
+              "parts": [
+                {
+                  "name": "decoder.onnx.part1",
+                  "url": "models/hojo/decoder.onnx.part1",
+                  "bytes": 67108864,
+                  "sha256": "f98175b4bd339452e19400f31547e6751f0d0b111dae6bca267013c101eee084"
+                },
+                {
+                  "name": "decoder.onnx.part2",
+                  "url": "models/hojo/decoder.onnx.part2",
+                  "bytes": 56039201,
+                  "sha256": "eaa15b77ad9508d142a1249f67a62cd38aa37eddae812bf9d4c8a485e7228535"
+                }
+              ]
+            },
+            {
+              "name": "token_embedding.f16",
+              "url": "models/hojo/token_embedding.f16",
+              "bytes": 18109440,
+              "sha256": "c50cf3adb4c76ce20430240f73ea0176513a04ef2c96122df652df2dd4eb1763"
+            },
+            {
+              "name": "voices.json",
+              "url": "models/hojo/voices.json",
+              "bytes": 2618533,
+              "sha256": "a816adcc903e2cceb37a5b68027b199fced57664e9adc1233354b4a964e6d95b"
+            },
+            {
+              "name": "tok.json",
+              "url": "models/hojo/tok.json",
+              "bytes": 344249,
+              "sha256": "4e6860b5b1c53d90ec1821fb285fe946c81505987e8bed0bfdfe2ee17523302f"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "hojoRuntime": {
+    "version": "hojo-web-2026.11.06-2",
+    "baseUrl": "hojo/runtime/",
+    "bytes": 11988461,
+    "files": [
+      {
+        "name": "ort.wasm.min.js",
+        "url": "hojo/runtime/ort.wasm.min.js",
+        "bytes": 49926,
+        "sha256": "c6bc9f8e1d0ecc3983a57910e6a30b2230a512bcd2e0207cd64306459c3de7b4"
+      },
+      {
+        "name": "ort-wasm-simd-threaded.mjs",
+        "url": "hojo/runtime/ort-wasm-simd-threaded.mjs",
+        "bytes": 20321,
+        "sha256": "90a557d15c02bac4504d95b67f431d8594635ed2a0a62a7f2cd83d090ff91d3e"
+      },
+      {
+        "name": "ort-wasm-simd-threaded.wasm",
+        "url": "hojo/runtime/ort-wasm-simd-threaded.wasm",
+        "bytes": 11905541,
+        "sha256": "45eaee27761ad883742a8d4b8fce1538d60ce43b51adf1726fafccc59b8c1a15"
+      },
+      {
+        "name": "hojo-core.js",
+        "url": "hojo/runtime/hojo-core.js",
+        "bytes": 10423,
+        "sha256": "a0c14e50e90417ffdf738d380d6909084f9cea763bcdd39506e00f34f7de030b"
+      },
+      {
+        "name": "hojo-tok.js",
+        "url": "hojo/runtime/hojo-tok.js",
+        "bytes": 2250,
+        "sha256": "a5f47dae460f1ff7795bdc992275e6e1f6a63c3f1f3ffe08bf23caa7b804aa18"
+      }
+    ]
+  }
+}

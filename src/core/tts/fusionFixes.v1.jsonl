@@ -1,0 +1,27 @@
+# 山岚「音节融合修复」资产（P3 自迭代闭环）。开发期由
+# scripts/auto-pronunciation-loop.mjs 维护，应用运行时不加载。
+#
+# 记录「音素正确、但相邻音节会被声学模型协同发音成另一个音节」的词。与
+# polyphones.v1.txt 的关系：覆盖表是运行时词典，本文件是自迭代的回归清单——
+# --verify 会把这些词从有效词典里临时删掉，重新扫描证据句，确认扫描器仍能
+# 在修复前发现它们、且覆盖表里的修复行没有漂移。
+#
+# 字段：
+#   word/phones      整词与每字音素（不含词尾边界）
+#   boundary         append（词尾 "）| none
+#   blend            前字声母 + 后字韵母拼出的、会被听成的音节
+#   pinWords         同一批修复引入的「整词钉住、不加边界」词条；验证时一并删除
+#   evidence         真实证据句，验证召回用
+#   baselineMs/fixedMs  首个证据句真实 WASM 消融实测的前两音节时长贡献
+#   deltas/meanDelta    每个真实上下文的 A/B 评分差与均值
+#   status              confirmed（已写入覆盖表）| needs-listening（复验冲突，已撤销）
+#   source/confidence/createdAt/note
+#
+# 新增同类词请走 npm run pronunciation:auto -- --measure --apply；自动应用要求
+# ≥2 个真实上下文都不显著变差（Δ ≥ -20）且均值 Δ ≥ 20，再由全书影响面 diff
+# 与 audit:all 把关。复验冲突的词保留为 needs-listening，不会被自动写回。
+
+{"word":"来到了","phones":["lai2","dao4","le"],"boundary":"append","blend":"lao","fromPhone":"lai2","toPhone":"dao4","pinWords":["来到"],"source":"feedback-20261110-01","status":"confirmed","confidence":"confirmed","evidence":["也就是在此前不久，一个人来到了洪都，他是受朱元璋委派来此地镇守的。"],"baselineMs":[140,302],"fixedMs":[174,290],"createdAt":"2026-11-10"}
+{"word":"看到了","phones":["kan4","dao4","le"],"boundary":"append","blend":"kao","fromPhone":"kan4","toPhone":"dao4","pinWords":[],"source":"auto-loop-2026-11-10","status":"confirmed","confidence":"confirmed","evidence":["皇帝看到了报告，深感自己做了大好事，于…","此时，他看到了脸色阴晴不定的刘基，似乎有话…","朱文正和他的将领们看到了最恐怖的景象，几十万人将城池…"],"baselineMs":[221,163],"fixedMs":[232,186],"createdAt":"2026-11-10"}
+{"word":"回到了","phones":["hui2","dao4","le"],"boundary":"append","blend":"hao","fromPhone":"hui2","toPhone":"dao4","pinWords":[],"source":"auto-loop-2026-11-10","status":"confirmed","confidence":"confirmed","evidence":["朱元璋的思绪又回到了二十年前，他接到汤和来信的时…","双方回到了僵持状态。","刘基只好回到了乡下。"],"baselineMs":[11,116],"fixedMs":[140,151],"createdAt":"2026-11-10"}
+{"word":"受到了","phones":["shou4","dao4","le"],"boundary":"none","blend":"shao","fromPhone":"shou4","toPhone":"dao4","pinWords":[],"source":"auto-loop-2026-11-10","status":"needs-listening","confidence":"review","evidence":["朱元璋深切地感受到了这一点，在这个小县城不可能有…","他们在合州遭受到了最大的挫折。","…商害过有关，几乎所有的商人都受到了歧视。"],"baselineMs":[128,116],"fixedMs":[221,232],"deltas":[136.4,-52],"meanDelta":42.2,"note":"多上下文复验反例：证据句1 加词尾边界 +136.4，证据句2 反而 -52.0（221/163→150/127ms）。已撤销自动写入，等待人工复听；单上下文 A/B 不足以支撑自动修复。","createdAt":"2026-11-10"}

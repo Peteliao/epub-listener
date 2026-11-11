@@ -1,0 +1,71 @@
+# 2026-11-11 第五次复听（rr-0009 / 占便宜）：病根不再是边界。音素级诊断
+# （scripts/scratch/diagnose-pian2.mjs，真实 WASM）证明单独 pian2 是标准阳平，
+# pian2+yi2 两个阳平才在声学模型里融成一个长音，「便」因此被吞。覆盖表已改为
+# 「占便宜 " zhan4 pian2 yi」（宜轻声，即标准读音 pián·yi）。旧 note 里的 yi2
+# 是当时的历史配置，保留作返工记录；当前一律以 polyphones.v1.txt 为准。
+# 2026-11-11 第六轮已把上述「待复听线索」逐词做完真实 WASM 验收并纳入人工表，
+# 详见本文件末尾 rr-wf-* 与 scripts/out/word-family-report.json。
+#
+# 山岚读音「归因规则」资产（P1）。开发期由 scripts/compile-overlay.mjs 消费，
+# 应用运行时不加载。每行一条 JSON 记录，# 开头为注释。
+#
+# 与 polyphones.v1.txt 的关系：现有 1300+ 行人工覆盖表继续手工管理，本文件只
+# 承接「归因结论」——为什么错、属于哪一类、证据是什么、作用范围多大。编译产物
+# 与人工表一致时输出「已生效」，不重复改写；不一致才产出候选行供人工复核。
+#
+# 字段：
+#   id          唯一编号
+#   status      approved（已听音确认，可编译）| candidate（待确认）| rejected
+#   class       phone（音素选错）| boundary（静音边界）| frontend（文本前端/分句）
+#   word        作用的整词；frontend 类可省略
+#   char/offset 目标字及其在词中的位置（0 基）
+#   phone       期望音素；scope=family 时为字族期望音
+#   boundary    keep | append（词尾加 "）| lead（词首加 "）| both（词首+词尾）
+#               | remove（去掉边界）| internal（词内，已禁用，仅留档）
+#               词内边界会让被截断的音节丢掉调尾（占便宜「便」221ms 的返工），
+#               `npm run audit:omission -- --verify` 会对覆盖表直接判失败。
+#   scope       word（生成整词条目）| family（仅统计，禁止生成单字条目）
+#   source      反馈 id / 扫描批次 / manual
+#   confidence  confirmed | likely | review
+#   evidence    证据句
+#   note        归因说明与失效条件
+#
+# 编译器只处理 status=approved 且 scope=word 的 phone / boundary 规则；
+# frontend 类转交文本前端配置，family 类必须人工给出适用词后才可编译。
+
+{"id":"rr-0001","status":"approved","class":"phone","word":"易得","char":"得","offset":1,"phone":"de2","boundary":"keep","scope":"word","source":"feedback-20261109-41","confidence":"confirmed","evidence":["千军易得，一将难求。","从以上情况我们可以得出千军易得、一将难求的结论。"],"note":"「得」作获得义读 de2；单字兜底是助词 de（覆盖表第 159 行）。","createdAt":"2026-11-09"}
+{"id":"rr-0002","status":"approved","class":"phone","word":"千军易得","char":"得","offset":3,"phone":"de2","boundary":"keep","scope":"word","source":"feedback-20261109-41","confidence":"confirmed","evidence":["千军易得，一将难求。"],"note":"整词钉住，避免「易得」在其它句子被最长匹配截走。","createdAt":"2026-11-09"}
+{"id":"rr-0003","status":"approved","class":"phone","word":"率意","char":"率","offset":0,"phone":"shuai4","boundary":"keep","scope":"word","source":"feedback-20261109-42","confidence":"confirmed","evidence":["而是率意而为，打到哪儿算哪儿。"],"note":"单字「率」默认 lv4（效率）；pinyin-pro 也读 lv4，因此静态扫描发现不了，必须靠人工反馈。","createdAt":"2026-11-09"}
+{"id":"rr-0004","status":"approved","class":"phone","word":"率意而为","char":"率","offset":0,"phone":"shuai4","boundary":"keep","scope":"word","source":"feedback-20261109-42","confidence":"confirmed","evidence":["而是率意而为，打到哪儿算哪儿。"],"note":"与 rr-0006 同词，编译器须合并为一行。","createdAt":"2026-11-09"}
+{"id":"rr-0005","status":"approved","class":"phone","word":"而为","char":"为","offset":1,"phone":"wei2","boundary":"keep","scope":"word","source":"feedback-20261109-42","confidence":"confirmed","evidence":["而是率意而为，打到哪儿算哪儿。"],"note":"单字「为」默认 wei4（为了）；「…而为」读 wéi。","createdAt":"2026-11-09"}
+{"id":"rr-0006","status":"approved","class":"phone","word":"率意而为","char":"为","offset":3,"phone":"wei2","boundary":"keep","scope":"word","source":"feedback-20261109-42","confidence":"confirmed","evidence":["而是率意而为，打到哪儿算哪儿。"],"note":"与 rr-0004 同词，编译器须合并为一行。","createdAt":"2026-11-09"}
+{"id":"rr-0007","status":"approved","class":"phone","word":"应天","char":"应","offset":0,"phone":"ying4","boundary":"append","scope":"word","generalize":false,"source":"feedback-20261109-43","confidence":"confirmed","evidence":["太平被攻破了，应天就像一个赤裸的孩子。"],"note":"明代地名读 ying4；基础词典无整词，单字兜底 ying1。词尾静音边界让「天」读完整。","createdAt":"2026-11-09"}
+{"id":"rr-0008","status":"approved","class":"boundary","word":"地盘","char":"地","offset":0,"phone":"di4","boundary":"lead","scope":"word","source":"feedback-20261109-40","confidence":"confirmed","evidence":["朱元璋对张士诚极为头疼，自己只是占了点地盘，干吗总和自己过不去，本来兵力已经不敷使用。"],"note":"音素一直是 di4，问题在声学层：App 实际发送的 20 音节整块里「地」只有 105ms（被吞阈值 100ms），「盘」有 256ms；「当时徐寿辉的地盘很小」更差，58/128ms。词尾边界只救后一个字；双端边界在别的语境会把两字一起压没（-46/0ms），不稳定；词首边界在三条真实语境里都稳定（105/256→128/198、58/128→279/337）。复合词「地盘之争」另立整词条目。","createdAt":"2026-11-09","updatedAt":"2026-11-11"}
+{"id":"rr-0009","status":"approved","class":"boundary","word":"占便宜","char":"便","offset":1,"phone":"pian2","boundary":"lead","scope":"word","source":"feedback-20261109-37","confidence":"confirmed","evidence":["正因如此，一些会占便宜的有钱人长期地用盐不给钱。","一些会占便宜的有钱人家长期地用盐不给钱。"],"note":"2026-11-11 第四次复听：词内边界（pian2 \" yi2）让「便」按短语末处理，真实原句里只剩 221ms 且调尾被截断，用户听到「读了但读音不准」。词内边界同时违反项目规则，已全局禁止。改为词首边界（\" zhan4 pian2 yi2）后 占/便/宜 163/221/186 → 198/337/267ms。","createdAt":"2026-11-09","updatedAt":"2026-11-11"}
+{"id":"rr-0010","status":"approved","class":"boundary","word":"最先","char":"先","offset":1,"phone":"xian1","boundary":"append","scope":"word","source":"feedback-20261109-39","confidence":"confirmed","evidence":["所有最先于朱元璋发生冲突的是张士诚。"],"note":"「最」被拉成长音吞掉「先」；词尾边界使两音节时长恢复均衡。","createdAt":"2026-11-09"}
+{"id":"rr-0011","status":"approved","class":"boundary","word":"上天","char":"天","offset":1,"phone":"tian1","boundary":"append","scope":"word","source":"feedback-20261109-44","confidence":"confirmed","evidence":["看来上天要抛弃朱元璋了。"],"note":"词尾边界让「天」不被「上」吞并（A/B 151→256ms）。","createdAt":"2026-11-09"}
+{"id":"rr-0012","status":"approved","class":"boundary","word":"应立即","char":"立","offset":1,"phone":"li4","boundary":"append","scope":"word","source":"feedback-20261109-36","confidence":"confirmed","evidence":["他向朱元璋建议，应立即度过长江。"],"note":"词尾边界把被压成嘶哑短音的「立/即」读完整；句首重复音另见 rr-0014。","createdAt":"2026-11-09"}
+{"id":"rr-0013","status":"approved","class":"boundary","word":"原已","char":"已","offset":1,"phone":"yi3","boundary":"keep","scope":"word","source":"feedback-20261109-38","confidence":"confirmed","evidence":["重新壮大自己，原已处于低潮的起义开始转入高潮。"],"note":"整词钉住 yi3；句首「原原已」属分句切分，见 rr-0015。","createdAt":"2026-11-09"}
+{"id":"rr-0014","status":"approved","class":"frontend","target":"min_words_in_sentence=12","source":"feedback-20261109-36","confidence":"confirmed","evidence":["他向朱元璋建议，应立即度过长江。"],"note":"短分句被切成独立 utterance 后句首碎裂出多余音节。已在 public/workers/sherpa-tts.worker.js 落地，编译器不生成覆盖行。","createdAt":"2026-11-09"}
+{"id":"rr-0015","status":"approved","class":"frontend","target":"min_words_in_sentence=12","source":"feedback-20261109-38","confidence":"confirmed","evidence":["重新壮大自己，原已处于低潮的起义开始转入高潮。"],"note":"同上；A/B 该句浊音岛 6 段 → 3 段。","createdAt":"2026-11-09"}
+{"id":"rr-c01","status":"candidate","class":"phone","word":"行","char":"行","offset":0,"phone":"hang2","boundary":"keep","scope":"family","source":"scan-2026-11-09","confidence":"likely","evidence":["在行，","中行被"],"note":"P0 扫描的单字兜底线索；「中行」可能是人名，pinyin-pro 有误判风险。未听音确认，且 family 规则禁止生成单字条目——须先给出适用词。","createdAt":"2026-11-09"}
+{"id":"rr-c02","status":"candidate","class":"phone","word":"给","char":"给","offset":0,"phone":"ji3","boundary":"keep","scope":"family","source":"scan-2026-11-09","confidence":"likely","evidence":["配给了","自给他"],"note":"基础词典已有「配给 pei4 ji3」「供给 gong1 ji3」，需先确认是切分问题还是真的漏读；不得全局改成 ji3。","createdAt":"2026-11-09"}
+{"id":"rr-r01","status":"rejected","class":"phone","word":"长期地","char":"地","offset":2,"phone":"di4","boundary":"keep","scope":"word","source":"scan-2026-11-09","confidence":"review","evidence":["一些会占便宜的有钱人长期地用盐不给钱。"],"note":"pinyin-pro 把状语助词「地」误读为 di4；人工表与声学模型均用轻声 de。误报，保留以展示归因结论。","createdAt":"2026-11-09"}
+{"id":"rr-0016","status":"approved","class":"boundary","word":"来到","char":"来","offset":0,"phone":"lai2","boundary":"keep","scope":"word","source":"feedback-20261110-01","confidence":"confirmed","evidence":["也就是在此前不久，一个人来到了洪都，他是受朱元璋委派来此地镇守的。"],"note":"基础词典「到了 dao4 le」把「来」截成单字，整词钉住防止最长匹配截走。不加词尾边界：真实 WASM 在「来到洪都」上下文下 163/116ms 已均衡，加边界反降为 151/58ms。","createdAt":"2026-11-10"}
+{"id":"rr-0017","status":"approved","class":"boundary","word":"来到了","char":"到","offset":1,"phone":"dao4","boundary":"append","scope":"word","source":"feedback-20261110-01","confidence":"confirmed","evidence":["也就是在此前不久，一个人来到了洪都，他是受朱元璋委派来此地镇守的。"],"note":"lai2 的声母 l + dao4 的韵母 ao = lao，模型把两字协同发音成「老」。词尾静音边界放在「了」之后与原句自然停顿重合，WASM 原句窗口 140/302ms → 174/290ms、评分 206.3 → 243.6。三字词例外见 acousticExceptions.v1.jsonl。","createdAt":"2026-11-10"}
+{"id":"rr-auto-看到了-1","status":"approved","class":"boundary","word":"看到了","char":"看","offset":0,"phone":"kan4","boundary":"append","scope":"word","source":"auto-loop-2026-11-10","confidence":"confirmed","evidence":["皇帝看到了报告，深感自己做了大好事，于…"],"note":"P3 自动巡检：kan4 + dao4 可融合成 kao；真实 WASM 原句窗口 221/163ms → 232/186ms。","createdAt":"2026-11-10"}
+{"id":"rr-auto-回到了-2","status":"approved","class":"boundary","word":"回到了","char":"回","offset":0,"phone":"hui2","boundary":"append","scope":"word","source":"auto-loop-2026-11-10","confidence":"confirmed","evidence":["朱元璋的思绪又回到了二十年前，他接到汤和来信的时…"],"note":"P3 自动巡检：hui2 + dao4 可融合成 hao；真实 WASM 原句窗口 11/116ms → 140/151ms。","createdAt":"2026-11-10"}
+{"id":"rr-auto-弹劾-1","status":"approved","class":"boundary","word":"弹劾","char":"弹","offset":0,"phone":"tan2","boundary":"append","scope":"word","source":"self-iterate-2026-11-10","confidence":"confirmed","evidence":["并且还向皇帝上奏，弹劾道同一大堆罪状。"],"note":"全量自迭代边界 A/B：音素不变，仅词尾静音边界；3 个真实上下文均值 Δ41.5，首例 302/197ms → 302/209ms。","createdAt":"2026-11-10"}
+{"id":"rr-auto-几乎-2","status":"approved","class":"boundary","word":"几乎","char":"几","offset":0,"phone":"ji1","boundary":"append","scope":"word","source":"self-iterate-2026-11-10","confidence":"confirmed","evidence":["…两眼炯炯有神，耳大且长，几乎垂到肩膀上，嘴大口宽，下…"],"note":"全量自迭代边界 A/B：音素不变，仅词尾静音边界；3 个真实上下文均值 Δ68.8，首例 244/139ms → 302/279ms。","createdAt":"2026-11-10"}
+
+# 2026-11-11 第六轮：词组级多音字。归因不再是「音素选错」，而是重建运行时
+# 数据链路后逐词做真实 WASM 验收。便宜族是 pian2+yi2 两个阳平连读合并（宜改
+# 训练过的轻声 yi）；地盘族是整词未命中 + 长句韵律压字（整词钉 di4 + 语句重置）。
+# 逐词数值、修复前后 WAV 与排除项见 scripts/audit-word-family.mjs 的报告。
+{"id":"rr-wf-0001","status":"approved","class":"phone","word":"小便宜","char":"便","offset":1,"phone":"pian2","boundary":"keep","scope":"word","source":"word-family-2026-11-11","confidence":"confirmed","evidence":["他这个人最爱占小便宜，一点点亏都不肯吃，大家背后都懒得跟他计较。"],"note":"基础 xiao3 pian2 yi2 双阳平连读；修复前真实 WASM 197/209/417ms（宜 417 吞并邻音）。整词改轻声 yi，不加词首边界。","createdAt":"2026-11-11"}
+{"id":"rr-wf-0002","status":"approved","class":"phone","word":"捡便宜","char":"便","offset":1,"phone":"pian2","boundary":"keep","scope":"word","source":"word-family-2026-11-11","confidence":"confirmed","evidence":["别人打仗他躲得远远的，等到分战利品时倒第一个跑来捡便宜，谁也不傻。"],"note":"修复前 255/93/267ms，「便」只有 93ms 被吞（<100ms 阈值），是用户听到的怪音典型。整词改轻声 yi。","createdAt":"2026-11-11"}
+{"id":"rr-wf-0003","status":"approved","class":"phone","word":"讨便宜","char":"便","offset":1,"phone":"pian2","boundary":"keep","scope":"word","source":"word-family-2026-11-11","confidence":"confirmed","evidence":["徐寿辉本想讨便宜，结果反倒把自己赔了进去，账算得一点也不精。"],"note":"修复前 407/279/360ms，首音 407ms 吞并邻音。整词改轻声 yi。","createdAt":"2026-11-11"}
+{"id":"rr-wf-0004","status":"approved","class":"phone","word":"贪便宜","char":"便","offset":1,"phone":"pian2","boundary":"keep","scope":"word","source":"word-family-2026-11-11","confidence":"confirmed","evidence":["他不肯吃亏，只想贪便宜，讨便宜也没讨着，捡便宜倒是很在行。"],"note":"修复前 256/244/418ms。整词改轻声 yi；同句里的讨便宜、捡便宜由各自整词行覆盖。","createdAt":"2026-11-11"}
+{"id":"rr-wf-0005","status":"approved","class":"phone","word":"便宜货","char":"便","offset":0,"phone":"pian2","boundary":"keep","scope":"word","source":"word-family-2026-11-11","confidence":"confirmed","evidence":["那批便宜货看着光鲜，用不了几天就散了架，账房先生直摇头。"],"note":"逐词例外，不跟着同族改轻声。真实 WASM A/B（scripts/scratch/ab-word-family.mjs）：第三音节 huo4 已打断 pian2+yi2 连读，基础读音在短句 244/256/140ms、整块 244/267/197ms 全 normal；强行改轻声 yi 反而让前两音节被吞（93/93/128ms、46/93/174ms）。只整词钉住 pian2 yi2 huo4 防抢词，音素不变。","createdAt":"2026-11-11"}
+{"id":"rr-wf-0006","status":"approved","class":"phone","word":"抢地盘","char":"地","offset":1,"phone":"di4","boundary":"append","scope":"word","source":"word-family-2026-11-11","confidence":"confirmed","evidence":["朱元璋和张士诚都想抢地盘，谁也不肯先退一步，边境上天天有小仗。"],"note":"基础词典无整词行，最长匹配拆成抢+地盘、单字「地」兜底 de；修复前验收脚本无法构造 token 序列，说明从未被任何门禁测量。整词钉 di4 并登记保护/重置词表。词尾静音边界由真实 WASM 四组 A/B 选出：无边界整块 58/104/151ms、词首边界 163/70/163ms（「地」被吞），词尾边界短句 255/255/348、整块 186/151/244ms 全 normal。","createdAt":"2026-11-11"}
+{"id":"rr-wf-0007","status":"approved","class":"phone","word":"占地盘","char":"地","offset":1,"phone":"di4","boundary":"append","scope":"word","source":"word-family-2026-11-11","confidence":"confirmed","evidence":["陈友谅一路往东占地盘，地盘越大，要养的兵就越多，粮草先撑不住了。"],"note":"基础词典只有「占地 zhan4 di4」+「盘 pan2」，无整词行；整词钉 di4 并登记保护/重置词表，避免长词保护跳过 U+2060。词尾静音边界 A/B：无边界整块 291/93/163ms（「地」被吞）、双端 465/302/407ms（吞并），词尾边界短句 163/117/267、整块 267/151/255ms 全 normal。","createdAt":"2026-11-11"}

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>山岚 音素级诊断台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c2024;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --bg: #f7f8fa;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --ok: #0f766e;
+      --bad: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 28px 20px 80px;
+      background: var(--bg);
+      color: var(--ink);
+      font: 15px/1.65 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    main { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: .2px; }
+    h2 { font-size: 16px; margin: 34px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    .lede { color: var(--muted); margin: 0 0 18px; }
+    .bar {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+      padding: 12px 14px; margin: 0 0 8px;
+      background: rgba(247,248,250,.94); backdrop-filter: blur(6px);
+      border: 1px solid var(--line); border-radius: 12px;
+    }
+    .bar .status { color: var(--muted); font-size: 13px; flex: 1 1 240px; min-width: 200px; }
+    button {
+      font: inherit; cursor: pointer; border-radius: 9px;
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
+      padding: 7px 12px; transition: background .15s, border-color .15s, transform .05s;
+    }
+    button:hover:not(:disabled) { border-color: #cbd5e1; background: #f9fafb; }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled { opacity: .45; cursor: default; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover:not(:disabled) { background: #1d4ed8; border-color: #1d4ed8; }
+    .group-note { color: var(--muted); font-size: 13px; margin: -2px 0 12px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 14px 16px; margin: 0 0 12px;
+    }
+    .card.on { border-color: #bfdbfe; box-shadow: 0 0 0 3px #eff6ff; }
+    .card-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+    .id { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .title { font-size: 16px; font-weight: 600; }
+    .text { margin: 8px 0 0; font-size: 15px; }
+    .text .placeholder { color: var(--muted); }
+    .meta { margin: 8px 0 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .meta code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #0f172a; background: #f1f5f9; border-radius: 6px;
+      padding: 1px 6px; word-break: break-all;
+    }
+    .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+    .actions .dur { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .verdict { display: flex; gap: 6px; margin-left: auto; }
+    .verdict button { padding: 5px 10px; font-size: 13px; }
+    .verdict button[aria-pressed="true"] { color: #fff; }
+    .verdict button[data-v="right"][aria-pressed="true"] { background: var(--ok); border-color: var(--ok); }
+    .verdict button[data-v="wrong"][aria-pressed="true"] { background: var(--bad); border-color: var(--bad); }
+    .verdict button[data-v="unclear"][aria-pressed="true"] { background: #6b7280; border-color: #6b7280; }
+    .err { color: var(--bad); font-size: 13px; margin-top: 6px; }
+    textarea {
+      width: 100%; min-height: 132px; margin-top: 10px; padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px; line-height: 1.5; color: var(--ink);
+      border: 1px solid var(--line); border-radius: 10px; background: #fff;
+    }
+    .hint { color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>山岚 · 音素级诊断台</h1>
+    <p class="lede">
+      每条都给出发送文本、模型实际收到的音素串，以及真实 WASM 合成的音频。点「播放」听，
+      然后选「对 / 错 / 含糊」。全部都听过以后点「复制结论」，把结果发回来即可。
+    </p>
+
+    <div class="bar">
+      <button id="prepare" class="primary">准备全部音频（约 1 分钟）</button>
+      <button id="copy">复制结论</button>
+      <span class="status" id="status">正在准备模型文件…</span>
+    </div>
+
+    <div id="groups"></div>
+
+    <h2>结论</h2>
+    <p class="hint">点「复制结论」后，这段文字会复制到剪贴板，直接粘贴回来。</p>
+    <textarea id="report" readonly placeholder="尚未生成"></textarea>
+  </main>
+  <script type="module" src="./tts-diagnose.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+# 2026-11-11 第五次复听：占便宜的漏读不是声学例外，是音素串 pian2+yi2 连读合并，
+# 覆盖表已把「宜」改成标准轻声 yi；地盘的长句压缩也不再靠边界，改由
+# utteranceResets.v1.txt 的语句重置在运行时处理。本表保留历史边界决策，
+# 当前配置以 polyphones.v1.txt 与 utteranceResets.v1.txt 为准。
+#
+# 山岚「声学例外表」（P2）。开发期由 scripts/audit-acoustics.mjs 消费，
+# 应用运行时不加载。每行一条 JSON 记录，# 开头为注释。
+#
+# 记录的是「音素正确、但声学模型会吞音/合并/读断」的词及其边界决策。
+# 与 polyphones.v1.txt 的区别：覆盖表决定「读什么音」，本表决定「要不要给
+# 声学模型一个词尾完成边界」。两者都经 worker 的内存词典补丁生效。
+#
+# 字段：
+#   word / charCount      词与字数
+#   class                 boundary（边界）| omission（字被压成半个音）| frontend（分句/文本前端）
+#   currentBoundary       lead（词首有 "）| append（词尾有 "）| both | none
+#                         词内边界（internal）已废弃：它会让被截断的音节丢掉调尾。
+#   recommendation        **人工流程结论**：keep（维持现状）| needs-review（须复听后定夺）
+#   algorithmicSuggestion 仅在两者冲突时记录代理指标的建议（如 none），
+#                         它只是待复核的证据，不是自动执行项
+#   baselineMs            当前配置下各音节的时长贡献（真实 WASM 消融实测）
+#   tailForbidden         ≥3 字词禁止自动加词尾边界（自动推荐规则，不否定人工已确认配置）
+#   policyException       人工确认的既有配置，不受自动推荐规则约束
+#   source                反馈/规则编号
+#   status                pending-listening（待用户复听）| confirmed | rejected
+#   note                  归因与失效条件
+#
+# 重要：音节贡献度只是代理指标，不能替代听感。所有条目在用户复听确认前
+# 一律 pending-listening；脚本不会据分数自动改写覆盖表。
+
+{"word":"应立即","charCount":3,"class":"boundary","currentBoundary":"append","recommendation":"keep","baselineMs":[197,139,197],"tailForbidden":true,"policyException":"人工确认的既有配置；三字词禁用规则只约束自动推荐，不否定已确认条目","source":"feedback-20261109-36","status":"pending-listening","note":"词尾边界把「立」从 105ms 恢复到 139ms、「即」151→197ms；句首重复音由 min_words_in_sentence 处理，不属本表。"}
+{"word":"占便宜","charCount":3,"class":"omission","currentBoundary":"lead","recommendation":"keep","baselineMs":[151,244,267],"tailForbidden":true,"policyException":"omissionCases om-0001：人工确认 + 2 条反馈原句 + 2 条书中整块真实 WASM 验收；完成边界在词首，词内边界已全局禁用","source":"feedback-20261109-37","status":"confirmed","note":"2026-11-11 第四次复听：用户确认「便」能听见但读音不准。上一轮把边界放在「便」之后（词内），「便」按短语末处理只剩 221ms 且调尾被截断。改成词首边界后 占/便/宜 163/221/186 → 198/337/267ms，词内不再有停顿。词内边界自此由 audit-omission 的策略检查直接判失败。"}
+{"word":"原已","charCount":2,"class":"frontend","currentBoundary":"none","recommendation":"keep","baselineMs":[198,163],"tailForbidden":false,"source":"feedback-20261109-38","status":"pending-listening","note":"音素与音节时长均正常，词典层无解；「原原已」是短分句独立 utterance 的句首重复，归属 B 类，由 worker 的 min_words_in_sentence=12 处理。禁止为此词加边界（实测加后 yuan2 达 395ms）。"}
+{"word":"最先","charCount":2,"class":"boundary","currentBoundary":"append","recommendation":"keep","baselineMs":[301,232],"tailForbidden":false,"source":"feedback-20261109-39","status":"pending-listening","note":"无边界时 zui4 达 383ms 吞并 xian1（186ms），听成一个别的音调；词尾边界恢复为 301/232ms。"}
+{"word":"地盘","charCount":2,"class":"omission","currentBoundary":"lead","recommendation":"keep","baselineMs":[128,198],"tailForbidden":false,"source":"feedback-20261109-40","status":"confirmed","note":"2026-11-11 第二次复听：音素 di4 一直正确，被吞的是时长。App 实际发送的 20 音节整块里「地」只有 105ms（被吞阈值 100ms），另一个语境「徐寿辉的地盘很小」只有 58ms；词尾边界只救「盘」，词首边界让两个字都回到短语开头（105/256→128/198、58/128→279/337）。双端边界在别的语境会把两字一起压没（-46/0ms），不稳定，故不用。"}
+{"word":"应天","charCount":2,"class":"boundary","currentBoundary":"append","recommendation":"needs-review","algorithmicSuggestion":"none","baselineMs":[232,453],"tailForbidden":false,"source":"feedback-20261109-43","status":"pending-listening","note":"P2 发现的真实分歧：词尾边界让「天」完整但拉到 453ms（>350ms 判为吞并邻音），代理指标建议去掉边界，与人工「天读音很不准」的修复方向冲突。必须复听后决定，不得据分数自动改表。"}
+{"word":"上天","charCount":2,"class":"boundary","currentBoundary":"append","recommendation":"keep","baselineMs":[186,256],"tailForbidden":false,"source":"feedback-20261109-44","status":"pending-listening","note":"无边界时「天」仅 151ms 被前字吞并，用户听成「看来上 / 天要…」；词尾边界恢复到 256ms。"}
+{"word":"来到了","charCount":3,"class":"boundary","currentBoundary":"append","recommendation":"keep","baselineMs":[174,290],"tailForbidden":true,"policyException":"真实 WASM 在反馈原句窗口下 A/B 确认：无边界 140/302ms（评分 206.3）→ 词尾边界 174/290ms（评分 243.6）。三字词禁用规则只约束自动推荐，不否定已实测条目。","source":"feedback-20261110-01","status":"confirmed","note":"音节融合 C 类：lai2 + dao4 的 l+ao 拼成 lao，听成「老」。边界必须放在「了」之后；放在「来/到」之间会让 dao4 被吞（实测 -12ms），放在「到」之后会把两音节都压短（93/186ms）。"}
