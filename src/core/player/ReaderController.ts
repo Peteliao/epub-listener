@@ -110,6 +110,10 @@ export interface ReaderDiagnostics {
   sink: MediaSinkDiagnostics
   noiseScale: number | null
   silenceScale: number
+  /** True when the current chapter had to fall back to the system voice. */
+  aiFallback: boolean
+  bookLexiconVersion: number
+  curatedHash: string
 }
 
 interface LoadChapterOptions {
@@ -186,6 +190,10 @@ export class ReaderController {
   private englishAiFallback = false
   private activeEngine: TtsEngine | null = null
   private activeLang: 'zh' | 'en' | null = null
+  // Diagnostics only: the last engine that actually spoke, kept after pause so
+  // the feedback report can say whether playback used matcha or the system voice.
+  private lastActiveEngine: TtsEngine | null = null
+  private lastActiveLang: 'zh' | 'en' | null = null
   private measuredZhMsPerChar: number | null = null
   private measuredEnMsPerChar: number | null = null
   private lastSampledAudioMs: number | null = null
@@ -271,8 +279,8 @@ export class ReaderController {
         this.aiStatus.packs.find((item) => item.id === selected?.packId) ?? null
       voice = {
         engine: 'sherpa',
-        activeEngine: this.activeEngine,
-        activeLang: this.activeLang,
+        activeEngine: this.activeEngine ?? this.lastActiveEngine,
+        activeLang: this.activeLang ?? this.lastActiveLang,
         voiceId: selected?.id ?? this.settings.aiVoiceId,
         voiceLabel: selected?.label ?? '离线 AI 音色',
         packId: selected?.packId ?? null,
@@ -290,8 +298,8 @@ export class ReaderController {
           .find((item) => item.uri === this.settings.voiceURI) ?? null
       voice = {
         engine: 'system',
-        activeEngine: this.activeEngine,
-        activeLang: this.activeLang,
+        activeEngine: this.activeEngine ?? this.lastActiveEngine,
+        activeLang: this.activeLang ?? this.lastActiveLang,
         voiceId: this.settings.voiceURI ?? 'auto',
         voiceLabel: systemVoice?.name ?? '系统语音',
         packId: null,
@@ -463,10 +471,11 @@ export class ReaderController {
   getDiagnostics(): ReaderDiagnostics {
     const voice = this.ai.getVoice(this.settings.aiVoiceId)
     const stats = this.aiSpeech.stats
+    const lexicon = this.bookLexicon.getReportInfo()
     return {
       engine: this.settings.engine,
-      activeEngine: this.activeEngine,
-      activeLang: this.activeLang,
+      activeEngine: this.activeEngine ?? this.lastActiveEngine,
+      activeLang: this.activeLang ?? this.lastActiveLang,
       voiceLabel: voice?.label ?? '山岚',
       packId: this.aiLoadedPackId,
       aiPhase: this.aiStatus.phase,
@@ -477,6 +486,9 @@ export class ReaderController {
       sink: this.aiSpeech.sinkDiagnostics,
       noiseScale: stats?.noiseScale ?? this.settings.labNoiseScale,
       silenceScale: this.settings.labSilenceScale,
+      aiFallback: this.aiFallback,
+      bookLexiconVersion: lexicon.version,
+      curatedHash: lexicon.curatedHash,
     }
   }
 
@@ -550,6 +562,7 @@ export class ReaderController {
         this.aiSpeech.cancel()
         this.releaseAiRuntime()
         this.activeEngine = this.isPlaying ? 'system' : null
+        if (this.activeEngine) this.lastActiveEngine = this.activeEngine
       } else {
         this.aiSpeech.unlock()
         if (!this.isPlaying) this.speech.cancel()
@@ -775,6 +788,8 @@ export class ReaderController {
     this.resetActivePlan()
     this.speech.cancel()
     this.aiSpeech.cancel()
+    this.lastActiveEngine = this.activeEngine ?? this.lastActiveEngine
+    this.lastActiveLang = this.activeLang ?? this.lastActiveLang
     this.activeEngine = null
     this.activeLang = null
     this.isLoading = this.chapterLoading
@@ -1192,9 +1207,11 @@ export class ReaderController {
     )
     const hasAiChunks = plan.some((chunk) => chunk.engine === 'ai')
     this.activeEngine = hasAiChunks ? 'sherpa' : 'system'
+    this.lastActiveEngine = this.activeEngine
     const index = Math.min(startIndex, Math.max(0, plan.length - 1))
     this.restartPlanIndex = index
     this.activeLang = plan[index]?.lang ?? null
+    if (this.activeLang) this.lastActiveLang = this.activeLang
 
     const generation = ++this.playbackGeneration
     this.clearSentenceGap()
@@ -1461,6 +1478,7 @@ export class ReaderController {
       this.activePlanGeneration = generation
       this.activeChunk = chunk
       this.activeLang = chunk.lang
+      this.lastActiveLang = chunk.lang
 
       const advance = () => this.runSpeechPlan(plan, index + 1, generation)
       const onStart = () => {
@@ -1882,6 +1900,8 @@ export class ReaderController {
     if (!this.speech.supported) {
       this.isPlaying = false
       this.isLoading = false
+      this.lastActiveEngine = this.activeEngine ?? this.lastActiveEngine
+      this.lastActiveLang = this.activeLang ?? this.lastActiveLang
       this.activeEngine = null
       this.activeLang = null
       this.disableWakeLock()
@@ -2029,6 +2049,8 @@ export class ReaderController {
     this.isPlaying = false
     this.isLoading = false
     this.chapterLoading = false
+    this.lastActiveEngine = this.activeEngine ?? this.lastActiveEngine
+    this.lastActiveLang = this.activeLang ?? this.lastActiveLang
     this.activeEngine = null
     this.activeLang = null
     this.playbackGeneration += 1

@@ -248,8 +248,15 @@ const diagnosticRows = computed<Array<{ label: string; value: string }>>(() => {
   const rows: Array<{ label: string; value: string }> = []
   if (diag) {
     const activeEngine = diag.activeEngine ?? diag.engine
+    const engineText = engineLabel(activeEngine)
     rows.push(
-      { label: '引擎', value: engineLabel(activeEngine) },
+      {
+        label: '引擎',
+        value:
+          diag.aiFallback && activeEngine === 'system'
+            ? `${engineText}（离线音色回退）`
+            : engineText,
+      },
       {
         label: '音色',
         value:
@@ -258,6 +265,10 @@ const diagnosticRows = computed<Array<{ label: string; value: string }>>(() => {
               ? englishVoiceLabel.value
               : diag.voiceLabel
             : selectedSystemVoice.value?.name ?? '自动选择',
+      },
+      {
+        label: '读音词典',
+        value: `v${diag.bookLexiconVersion} · ${diag.curatedHash}`,
       },
       { label: '句组', value: `${diag.units} 组 / ${diag.sentences} 句` },
     )
