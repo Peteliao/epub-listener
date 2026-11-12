@@ -82,6 +82,11 @@ async function main() {
       required: true,
     },
     {
+      name: '编译产物漂移（白名单/外部词表）',
+      args: ['scripts/verify-compiled-assets.mjs'],
+      required: true,
+    },
+    {
       name: 'P0 风险扫描召回',
       // --verify uses a 9-sentence sample; never let it overwrite the full-book
       // risk inventory that pronunciation-health.mjs reads.

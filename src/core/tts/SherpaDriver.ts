@@ -3,7 +3,10 @@ import {
   MediaAudioSink,
   type MediaSinkDiagnostics,
 } from './MediaAudioSink'
-import { preparePronunciationText } from './pronunciationGuard'
+import {
+  overlayProtectedWords,
+  preparePronunciationText,
+} from './pronunciationGuard'
 
 export interface SherpaSynthesisOptions {
   text: string
@@ -145,6 +148,8 @@ interface RuntimeSlot {
   signature: string
   speakerId: number
   noiseScale: number | null
+  /** Static protected words plus the multi-character rows of the runtime overlay. */
+  protectedWords: readonly string[] | null
   cache: Map<string, AudioBuffer>
   stats: SynthStats
 }
@@ -182,6 +187,7 @@ function createSlot(): RuntimeSlot {
     signature: '',
     speakerId: 0,
     noiseScale: null,
+    protectedWords: null,
     cache: new Map(),
     stats: emptyStats(),
   }
@@ -453,6 +459,9 @@ export class SherpaDriver {
     slot.speakerId = pack.speakerId
     slot.signature = signature
     slot.noiseScale = noiseScaleOf(pack)
+    // Derive the per-book protected words from the SAME overlay that patches
+    // the worker lexicon, so a re-init always keeps the two in sync.
+    slot.protectedWords = overlayProtectedWords(pack.lexiconOverlay)
     const initId = ++this.initSequence
     slot.initId = initId
     const initPromise = new Promise<SherpaReadyInfo>((resolve, reject) => {
@@ -600,6 +609,7 @@ export class SherpaDriver {
       slot.readyInfo = null
       slot.signature = ''
       slot.noiseScale = null
+      slot.protectedWords = null
       slot.engine = null
       slot.cache.clear()
       slot.stats = emptyStats()
@@ -916,7 +926,7 @@ export class SherpaDriver {
       // a word boundary alone cannot fix (地盘's 地 squashed into `de`).
       const synthText =
         lang === 'zh' && engine === 'sherpa'
-          ? preparePronunciationText(text)
+          ? preparePronunciationText(text, this.slots.zh.protectedWords ?? undefined)
           : text
       this.worker.postMessage({
         type: 'synth',

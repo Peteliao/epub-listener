@@ -179,6 +179,23 @@ const packBusy = computed(
     Boolean(props.ai?.packs.some((pack) => pack.phase === 'downloading')) ||
     englishPack.value?.phase === 'downloading',
 )
+const chineseOfflineNote = computed(() => {
+  if (!props.settings.preferChineseOffline) {
+    return '已关闭：中文段落按所选引擎朗读，可随时重新开启。'
+  }
+  if (props.settings.engine === 'sherpa') {
+    return '当前已使用离线 AI 引擎，中文段落全部应用读音词典。'
+  }
+  if (!props.ai?.supported) return '当前浏览器不支持离线音色，暂由系统语音朗读。'
+  if (props.ai.selectedVoice?.modelType !== 'matcha') {
+    return '当前中文音色不是「山岚」，暂由系统语音朗读。'
+  }
+  if (!aiReady.value) {
+    return '山岚音色包尚未就绪，暂由系统语音朗读；下载后自动生效。'
+  }
+  return '已生效：中文段落由山岚合成，英文仍按原设置朗读。'
+})
+
 const bookLexiconNote = computed(() => {
   if (!props.settings.autoBookPolyphones) return '已关闭。重新打开后生效。'
   const status = props.bookLexicon
@@ -621,6 +638,32 @@ function removeEnglishPack(): void {
           <span v-else-if="ai?.phase === 'error'" class="engine__tag">出错</span>
           <span v-else-if="!ai || !ai.packs.length" class="engine__tag">读取中</span>
           <span v-else class="engine__tag">未下载</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="setting">
+      <div class="switch-row">
+        <div class="switch-copy">
+          <h3 class="setting__title">中文优先离线朗读</h3>
+          <p>
+            山岚音色包就绪时，中文段落优先由本机合成，让人工读音表与本书自动补充参与发音；英文段落与未就绪时的回退不变
+          </p>
+          <p class="book-lexicon-state">{{ chineseOfflineNote }}</p>
+        </div>
+        <button
+          type="button"
+          class="switch"
+          role="switch"
+          :aria-checked="settings.preferChineseOffline"
+          :class="{ 'is-on': settings.preferChineseOffline }"
+          @click="
+            emit('patch', {
+              preferChineseOffline: !settings.preferChineseOffline,
+            })
+          "
+        >
+          <span></span>
         </button>
       </div>
     </section>

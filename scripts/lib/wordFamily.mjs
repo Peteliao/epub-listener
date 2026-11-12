@@ -202,10 +202,15 @@ export function protectPronunciations(text, words) {
 export function applyUtteranceResets(text, protectedWords, resetWords) {
   const source = String(text)
   if (!source) return source
+  // Mirror the runtime's longest-first ordering so an explicitly supplied
+  // (dynamic) word list behaves identically.
+  const sortedProtected = [...protectedWords].sort(
+    (a, b) => Array.from(b).length - Array.from(a).length || a.localeCompare(b, 'zh'),
+  )
   const insertions = []
   for (let index = 0; index < source.length; index += 1) {
     if (source[index] !== WORD_BOUNDARY) continue
-    const longest = protectedWords.find((word) => source.startsWith(word, index + 1))
+    const longest = sortedProtected.find((word) => source.startsWith(word, index + 1))
     if (longest && !resetWords.includes(longest)) continue
     if (!resetWords.some((word) => source.startsWith(word, index + 1))) continue
     if (index === 0 || source[index - 1] === UTTERANCE_RESET) continue

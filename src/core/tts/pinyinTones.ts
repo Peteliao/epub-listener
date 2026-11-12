@@ -80,6 +80,36 @@ export function mergeLexiconOverlays(curated: string, book?: string): string {
 }
 
 /**
+ * Merges several "book-side" overlay sources in ascending priority order.
+ * Later sources override earlier ones for the same word, and every word ends
+ * up with exactly ONE row — required because the worker uses last-line-wins
+ * while the audit mirrors use first-line-wins. The curated table is NOT part
+ * of this chain: mergeLexiconOverlays() still appends it last.
+ *
+ * Sources are sorted by word for deterministic output, so the per-book cache
+ * and the audit scripts always read the same text regardless of how the
+ * sources were produced (whole-book scan, ruby annotations, live feedback).
+ */
+export function mergeOverlaySources(
+  ...sources: readonly (string | undefined)[]
+): string {
+  const rows = new Map<string, string>()
+  for (const source of sources) {
+    for (const line of String(source ?? '').split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const word = trimmed.split(/\s+/)[0]
+      if (!word) continue
+      rows.set(word, trimmed)
+    }
+  }
+  return [...rows.keys()]
+    .sort((left, right) => left.localeCompare(right, 'zh'))
+    .map((word) => rows.get(word)!)
+    .join('\n')
+}
+
+/**
  * Converts every word-plus-reading line of an overlay to the numeric-tone
  * format the sherpa lexicons use. Comments, blank lines and English-style
  * `word || phones` lines are passed through untouched.

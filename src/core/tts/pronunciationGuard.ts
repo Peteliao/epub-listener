@@ -98,13 +98,19 @@ export function protectPronunciations(
 export function applyUtteranceResets(
   text: string,
   words: readonly string[] = UTTERANCE_RESET_WORDS,
+  protectedWords: readonly string[] = PROTECTED_WORDS,
 ): string {
   const source = String(text)
   if (!source) return source
+  const sortedProtected = [...protectedWords].sort(
+    (left, right) =>
+      Array.from(right).length - Array.from(left).length ||
+      left.localeCompare(right, 'zh'),
+  )
   const insertions: number[] = []
   for (let index = 0; index < source.length; index += 1) {
     if (source[index] !== WORD_BOUNDARY) continue
-    const longest = PROTECTED_WORDS.find((word) => source.startsWith(word, index + 1))
+    const longest = sortedProtected.find((word) => source.startsWith(word, index + 1))
     if (longest && !words.includes(longest)) continue
     if (!words.some((word) => source.startsWith(word, index + 1))) continue
     if (index === 0 || source[index - 1] === UTTERANCE_RESET) continue
@@ -117,7 +123,57 @@ export function applyUtteranceResets(
   return result
 }
 
-/** The text actually sent to the offline worker for Chinese Matcha packs. */
-export function preparePronunciationText(text: string): string {
-  return applyUtteranceResets(protectPronunciations(text))
+/**
+ * The text actually sent to the offline worker for Chinese Matcha packs.
+ *
+ * `protectedWords` may be extended with per-book words derived from the
+ * runtime lexicon overlay (see SherpaDriver); that only adds U+200B word
+ * boundaries. Utterance resets (U+2060) deliberately keep using the static,
+ * listening-confirmed tables: feeding the dynamic list into the longest-match
+ * check would change which phrases get split into two syntheses.
+ *
+ * With no arguments both parameters default to the static tables, so the
+ * audit mirror and all existing tests see exactly the same text as before.
+ */
+export function preparePronunciationText(
+  text: string,
+  protectedWords?: readonly string[],
+  resetWords?: readonly string[],
+): string {
+  return applyUtteranceResets(
+    protectPronunciations(text, protectedWords),
+    resetWords,
+  )
+}
+
+/**
+ * Extract the multi-character words from a merged lexicon overlay so the
+ * per-book pronunciation fixes also get a hard longest-match boundary.
+ * The static tables stay the default baseline; this only ADDS candidates.
+ * Single-character rows, non-Han words and known dangerous bare words are
+ * excluded (a bare 便宜 would split 占便宜).
+ */
+export function overlayProtectedWords(
+  overlay: string | undefined,
+  staticWords: readonly string[] = PROTECTED_WORDS,
+): readonly string[] {
+  if (!overlay) return staticWords
+  const HAN = /\p{Script=Han}/u
+  const excluded = new Set(['便宜'])
+  const words = new Set(staticWords)
+  for (const line of overlay.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#') || trimmed.includes('||')) continue
+    const word = trimmed.split(/\s+/)[0]
+    const chars = Array.from(word)
+    if (chars.length < 2 || chars.length > 6) continue
+    if (!chars.every((char) => HAN.test(char))) continue
+    if (excluded.has(word)) continue
+    words.add(word)
+  }
+  return [...words].sort(
+    (left, right) =>
+      Array.from(right).length - Array.from(left).length ||
+      left.localeCompare(right, 'zh'),
+  )
 }

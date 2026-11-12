@@ -92,6 +92,93 @@ iPhone 锁屏后，浏览器通常会暂停网页里的系统语音与 Web Audio
 
 Vue 3 · TypeScript · Vite · Pinia · epub.js · foliate-js · sherpa-onnx (WASM，中英双模型) · IndexedDB · Service Worker · Media Session
 
+## 中文多音字正确率：基线与分档提升评估
+
+**结论：还能提高，而且当前最大的杠杆不在算法，在配置。** 人工覆盖表、整书自动词典、零宽整词保护、A/B 声学审计这一整套资产，只在「中文 + 离线 sherpa + Matcha 山岚」链路生效（`AiModel.loadPack()` 只对 `matcha` 注入 `lexiconOverlay`，`SherpaDriver` 只在 `lang === 'zh' && engine === 'sherpa'` 调 `preparePronunciationText()`）。而 `DEFAULT_SETTINGS.engine` 一直是 `'system'`，所以默认路径下用户听到的是系统 TTS 的原始读音，这些积累几乎没被用上。
+
+### 基线（可复测）
+
+    npm run baseline:polyphones              # 结构化结果写到 scripts/out/baseline-polyphones.json
+    npm run baseline:polyphones -- --with-audits   # 额外跑 audit:golden / audit:coverage 交叉校验
+
+脚本复用 `scripts/lib/reading.mjs` 里 `audit:golden` 同一套最长匹配与音素解析，读两个夹具分别统计：
+
+| 口径 | 用例 | 读音点 | 不一致 | 静态一致率 | 单字兜底 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 人工黄金集 | 226 | 255 | 0 | 100.00% | 10（3.92%） |
+| 覆盖表一致性快照 | 1373 | 3889 | 0 | 100.00% | 1（0.03%） |
+| 合计 | 1599 | 4144 | 0 | 100.00% | 11（0.27%） |
+
+词典规模：基础 66914 条 + 人工覆盖 1373 条 = 有效 67977 条，80 个字族。
+
+**口径必须说清楚**：这个 100% 是「有效词典的最长匹配音素 == 标注音素」的静态一致率，**不等于听感正确率**。声学模型吞音、音节融合、抢词都可能在静态一致率满分时继续错读（README 下方「便」漏读被误判修复三次就是实例）。`listeningAccuracy` 在结果里固定为 `null`：真实正确率需要 `npm run lab:ab` 起真实 WASM 后由人盲听打分，`tests/browser/run-ab.mjs` 只采集客观指标、不采集打分。任何选档都应以同一套 A/B 前后对照来量化收益，不要用静态一致率冒充提升。
+
+### 瓶颈归因（按收益/成本排序）
+
+| 优先级 | 瓶颈 | 证据 | 性质 |
+| --- | --- | --- | --- |
+| P0 | 默认路由绕过全部读音资产 | `src/types.ts` 的 `engine: 'system'`；`ReaderController.speakCurrent()` 的 `useAi` | 配置，零算法成本 |
+| P1 | EPUB 自带 `ruby/rt` 注音被丢弃 | `src/core/reader/plainText.ts:3-5`、`src/core/reader/Highlighter.ts:35-45`、`tests/plainText.test.ts:18-22` | 书籍自带高置信真值，无需模型 |
+| P2 | 整书词典保守丢弃候选 | `src/core/tts/bookLexicon.ts:615-621`：上下文读音与孤立读音不一致就一律丢弃，恰好丢掉多音字最需要判定的情形 | 规则式消歧，无词性/语义特征 |
+| P3 | 静态整词 + 最长匹配退化 | `README.md` 抢词案例；现靠 `U+200B` / `U+2060` 补救，保护词表是人工静态表 | 覆盖命中率 |
+| P4 | 无音素级输入 | `TECHNICAL_IMPLEMENTATION_ROADMAP.md:589` 的 `phonemeCodepoints`「首版不做」 | 上限最高、风险最大 |
+
+### 三档方案（供选档）
+
+三档独立、可逐级叠加，也可以只选其中一档。**本次只落地了低档的 ①（路由开关）以及基线脚本与评估文档**；其余全部只做设计，未动代码。
+
+| 档 | 做什么 | 预期收益 | 代价 | 风险 / 回退 | 验证 |
+| --- | --- | --- | --- | --- | --- |
+| **低** | ① **本次已落地**：可逆开关「中文优先离线朗读」，山岚包**已就绪**时把中文段落路由到离线引擎，英文与所有兜底不变。② 放宽 `bookLexicon.ts:615-621` 保守丢弃为白名单准入；③ 保护词表由静态扩到整书动态生成；④ 读音反馈即时生效（IndexedDB → overlay 指纹 → 重建 worker，需去抖） | ① 让已有 1373 条人工覆盖 + 整书自动词典真正进入默认听书路径；②③④ 提高覆盖率与可修复性 | 0 新依赖；音色包需已下载（不强制）；即时纠错会提高 worker 重建频率 | 开关一键关闭即回到原行为；旧 `shusheng.settings.v1` 缺键自动取默认；②③④ 以更强门禁换覆盖率 | `npm test`、`vue-tsc`、`npm run audit:all`、同一套 A/B 前后对照 |
+| **中** | ① 新增并行注音抽取通道（不改 `extractDocumentText()`，复用 `EpubSession.collectPlainText()` 的 section 遍历），把 EPUB `ruby/rt` 转成「词 + 数字声调音素」候选行；② 引入开源多音字/词组读音静态词表，纳入覆盖优先级链 | 注音版书籍接近逐字真值；通用多音字词覆盖显著扩大 | 静态数据几十~几百 KB；注音抽取需处理注音符号/假名/多字 ruby | 无注音书籍覆盖率不变；所有新行须过 `tokens.txt` 与轻声白名单校验，人工表始终最后生效 | `audit:golden` / `audit:coverage` / `audit:polyphones --overlay-only` / `audit:impact` 全书影响面 diff |
+| **高** | ① 前端轻量 ONNX 多音字消歧模型（替换/增强 pinyin-pro 规则）；或 ② 改造 worker 走 `phonemeCodepoints` 音素直输，完全绕过前端 G2P，实现按句预注音 | 上限最高：彻底摆脱最长匹配与抢词 | 模型体积、首启下载、worker/runtime 改动、内存与维护成本 | 需先做 Spike；失败可整档不启用，前两档不受影响 | 真实 WASM A/B + 全量门禁 + 100 句回归集 ≥90% |
+
+**优先级链（三档共用，不另起一套发音控制机制）**：模型基础词典 < 外部静态词表 < 整书自动 < EPUB 注音 < 用户即时纠错 < 人工表。所有来源都收敛到 `mergeLexiconOverlays()` → `normalizeOverlayText()` → `AiModel.loadPack()` 的 `lexiconOverlay` → worker `patchLexicon()`（last line wins），并由 `overlayFingerprint` 变更触发 worker 重建。人工表永远最后，自动结果不会压过人工复核。新增行一律遵守：`tokens.txt` 音素校验、`trainedNeutrals.v1.txt` 轻声白名单、词内边界禁用（见下文）、整书自动词长不超过 6 字、合计受 `MAX_BOOK_OVERLAY_ENTRIES = 2000` 去重裁剪。
+
+### 本次已落地（低档 ①）
+
+- 新增 `ReaderSettings.preferChineseOffline`（默认 `true`），`sanitize()` 逐字段兜底，旧配置无需版本号平滑迁移；`ReaderSettingsSheet` 提供开关与实时状态说明。
+- `ReaderController.chineseOfflineActive()` 只在「开关开 + 选中系统引擎 + 系统语音可用 + 未降级 + 当前中文音色是 Matcha + 音色包 `phase === 'ready'`」时生效。任一条不满足即完全回退，不触发下载、不弹「音色包未就绪」。
+- 生效时仅中文段落走离线引擎；英文段落继续走系统语音，即使 `englishAi` 已开启也不改（`chineseOnlyAi` 同时向下传递到后续句的预取）；`!aiFallback`、`!speech.supported`、`englishAiFallback`、`fallbackFromAi()` 等兜底全部保留。`WebSpeechDriver`、`plainText.ts` 的 `SKIP_TAGS`、`Highlighter.ts`、`tests/plainText.test.ts` 既有断言、worker 与 runtime 均未改动。
+- 没有硬改 `engine` 默认值：多数新用户没下载音色包，硬改会让他们首次点播放就被拦去下载。`play()` 的 `wantsAi` 也保持原语义（不弹下载提示、不改 `aiFallback`），只为新路由补上 `aiSpeech.unlock()` 与 overlay 刷新，保证 iOS 首次手势能解锁媒体播放。
+- 新增 `offlineAudioActive`（`aiModeActive || chineseOfflineActive()`）供句间停顿与章节 autoplay 的媒体会话 keep-alive 使用：中文由离线媒体元素播放时，停顿必须继续走 AI sink，否则锁屏后 `setTimeout` 被节流会断链。`aiModeActive` 本身保持原语义，因此「锁屏跳过英文」的判定完全不变；`WebSpeechDriver` 的实现与系统语音发音逻辑未改。
+- 测试：`tests/ChineseOfflineRoute.test.ts`（四态 + 分段路由 + 预取向下传递）、`tests/SettingsMigration.test.ts`（旧配置迁移/可逆）、`tests/BaselinePolyphones.test.ts`（基线输出格式）。
+
+### 本轮落地：低档 ②③④ + 中档（2026-11-12）
+
+三档全部推进后的实现结论如下。所有来源仍只收敛到 `mergeOverlaySources → mergeLexiconOverlays → normalizeOverlayText → AiModel.loadPack 的 lexiconOverlay → worker.patchLexicon` 单一入口，人工覆盖表永远最后生效。
+
+**固定优先级链**：模型基础词典 < 外部静态词表 < 整书自动 < 书籍拼音注音 < 用户即时纠错 < 人工表。后一级覆盖前一级、每词恰好一行（worker 是 last-line-wins，审计镜像是 first-line-wins，去重后二者才一致）。
+
+| 档 | 实现 | 关键约束 / 回退 |
+| --- | --- | --- |
+| 低 ② | `scripts/compile-approved-overrides.mjs` 把 dev-only 的归因规则编译成 `approvedOverrides.v1.ts`（**83 字 / 89 个已确认音素 / 1 个排除词**）；`bookLexicon.ts:615` 的差异丢弃改为字族级白名单准入 | 只让候选进入既有护栏管线（reserved / isPolyphonic / 轻声白名单 / tokens / 变调 / 2000 条裁剪），不直接写行；`BOOK_LEXICON_VERSION` 6→7、白名单指纹纳入 `assetKey` 与 IndexedDB 校验；不传白名单即完全回到原严格行为 |
+| 低 ③ | `pronunciationGuard.ts` 参数化静态表，新增 `overlayProtectedWords()`；`SherpaDriver` 在 init 时从同一个 `pack.lexiconOverlay` 解析整书多字词，synth 时显式传入 | 动态词表**只**增加 U+200B 整词边界；U+2060 语句重置仍用静态表，避免改变切分决策；排除裸词「便宜」等会切断复合词的短词；默认值与 `scripts/lib/wordFamily.mjs` 镜像逐字一致 |
+| 低 ④ | `src/core/feedback/liveOverlay.ts` 把 IndexedDB 的 `PronunciationReport.marks` 转成整词覆盖行；`ReaderView.onFeedbackSaved()` 去抖 350ms，`BookLexiconService.setLiveOverlay()` 叠加，`ReaderController.applyLivePronunciations()` 释放离线运行时使 worker 重建 | 只收 2–4 字纯汉字词、跳过单字语境/读音冲突/含「一/不」变调词/未训练轻声；人工表已钉住的词不生成；相同指纹 no-op；删除反馈即撤销。反馈只作内存叠加层，不写扫描缓存、不触发全书重扫 |
+| 中 ① | `src/core/reader/rubyAnnotations.ts` 并行只读抽取 `<ruby>/<rt>`，支持多字 ruby 与多 rt、带调/数字调/已训练轻声；`EpubSession` / `FlowSession` 的 `collectBookData()` 用**单次遍历**同时产出纯文本与注音 | 不动 `plainText.ts` / `Highlighter.ts` 的 `SKIP_TAGS`，分句与高亮偏移不变（测试断言）；注音符号与假名按选档明确拒绝；单字 ruby 不生成全局覆盖 |
+| 中 ② | 引入 `mozillazg/phrase-pinyin-data` **v0.20.0 / MIT** 的 `pinyin.txt`，编译成 `src/core/tts/phraseReadings.v1.txt`（**271 条 / 7.2 KB**） | 来源、许可、SHA-256、筛选理由见 `scripts/data/phrase-pinyin-data/SOURCE.md`；只取仓库自有 MIT 文件，**排除** `large_pinyin.txt`（含 CC-CEDICT 的 CC BY-SA 与汉典数据）；只保留声母/韵母真变化，排除一/不变调与纯声调差异；源数据一词多音（如「那些」nà/nèi）整词跳过；`audit:impact --fail-on-unexpected` 零意外变化后才 `--apply --confirm` |
+
+**两个编译产物都有 `--verify` 漂移门禁**（`npm run overrides:verify`、`npm run phrase:verify`），并已接入 `npm run audit:all`。回退：删掉 `phraseReadings.v1.txt` 与 `scripts/data/phrase-pinyin-data/`、移除 `BookLexiconService` 的一处引用即可，其余来源互不影响；关闭 `autoBookPolyphones` 或删除反馈可分别回退低档行为。
+
+### 高档：只评估，未落地
+
+`HIGH_TIER_SPIKE_REPORT.md` 是双路线 Spike 结论（`node scripts/spike/phoneme-direct.mjs` 可复现真实 WASM 证据）：
+
+- **音素直输**：runtime JS 其实**已实现** `tokens` / `phonemeCodepoints`，`matchaSynth.mjs` 已在用真实 WASM 跑空文本 + 纯音素序列。debug 日志证实该路径完全绕过词典最长匹配（token 路径无 `TokenizeFromLexiconStr`，text 路径有）。但消歧问题只是从词典搬到前端，且会绕过全部 overlay / `ruleFsts` / 静音边界 / 语句重置，回归面大于收益。
+- **ONNX 消歧模型**：g2pW（Apache-2.0）fp32 ≈ 606 MiB、int8 ≈ 152 MiB；蒸馏小模型 ≈ 1.7 MB 但需自训与授权核查。对照当前主 bundle gzip 440 KB 与本轮词表 7.2 KB，代价不匹配。
+
+**建议两条都暂缓（No-Go）**，先复测本轮收益；触发重启的条件与完整数据见该报告。本轮未改动 `public/workers/sherpa-tts.worker.js`、`public/sherpa/runtime/*`、`public/models/manifest.json`，未下载模型、未加运行时依赖。
+
+### 验证结果（全部自行完成，无需用户协助）
+
+- `npm test`：**65 文件 / 621 项通过**（含真实 WASM 的 `AcousticAudit` / `Omission` / `SelfIteration`）。
+- `npm run audit:all`：**12/12 通过**（新增「编译产物漂移」门禁；含真实 WASM 门禁；1 项按设计跳过）。
+- `npm run build`（含 `vue-tsc --noEmit`）成功；`npm run baseline:polyphones` 复测：1599 用例 / 4144 读音点 / 0 不一致 / 静态一致率 100.00% / 单字兜底 11（0.27%）。
+
+**口径提醒**：静态一致率在改动前后都是 100%，因为它衡量「有效词典的最长匹配音素 == 标注音素」，而本轮改动主要作用于**运行时实际用上了哪套词典**（默认路由）与**新增来源的覆盖**。`listeningAccuracy` 仍固定为 `null`；真实听感正确率只能由 `npm run lab:ab` 人工 A/B 得出，本轮按约定不安排任何需要用户协助的盲听，因此不给出准确率提升数字。
+
+另需如实说明两点：白名单 ② 探测发现 `pinyin-pro` 在真实句子里「上下文读音 ≠ 孤立读音」的分支触发率很低，因此 ② 主要是防止已确认的多音字读音被误丢弃，而非大幅提升条目数；中档注音只对**词组级 ruby** 生效，逐字注音的书籍（单字 ruby）按既有「单字语境跳过」约定不受益。
+
 ## 本地开发
 
     npm install

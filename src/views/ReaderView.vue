@@ -25,8 +25,11 @@ import {
   countPronunciationReports,
   getBook,
   getProgress,
+  listPronunciationReports,
   touchBook,
 } from '@/core/db/LibraryDB'
+import { reportsToLiveOverlay } from '@/core/feedback/liveOverlay'
+import curatedOverlayText from '@/core/tts/polyphones.v1.txt?raw'
 import {
   ReaderController,
   type ReaderDiagnostics,
@@ -384,6 +387,7 @@ async function boot(): Promise<void> {
     aiStatus.value = nextController.getAiStatus()
     bookLexiconStatus.value = nextController.getBookLexiconStatus()
     ready.value = true
+    refreshLiveOverlay()
     scheduleReaderTour()
   } catch (error) {
     if (unmounted) return
@@ -520,8 +524,51 @@ function openReports(): void {
   reportsOpen.value = true
 }
 
+// Both "save locally" and "submit issue" emit `saved`. Debounce so a double
+// emission cannot tear down and rebuild the offline worker twice mid-sentence.
+let liveOverlayTimer: number | null = null
+function clearLiveOverlayTimer(): void {
+  if (liveOverlayTimer !== null) {
+    window.clearTimeout(liveOverlayTimer)
+    liveOverlayTimer = null
+  }
+}
+
+function refreshLiveOverlay(): void {
+  const bookId = book.value?.id
+  if (!controller.value || !bookId) return
+  void listPronunciationReports()
+    .then((reports) => {
+      if (unmounted) return
+      const live = reportsToLiveOverlay(reports, bookId, pinnedOverlayWords())
+      controller.value?.applyLivePronunciations(live.overlay, live.hash)
+    })
+    .catch(() => undefined)
+}
+
 function onFeedbackSaved(): void {
   refreshReportCount()
+  const bookId = book.value?.id
+  if (!controller.value || !bookId) return
+  clearLiveOverlayTimer()
+  liveOverlayTimer = window.setTimeout(() => {
+    liveOverlayTimer = null
+    refreshLiveOverlay()
+  }, 350)
+}
+
+/** Curated words always win; never emit a live row that would shadow them. */
+let pinnedWordsCache: ReadonlySet<string> | null = null
+function pinnedOverlayWords(): ReadonlySet<string> {
+  if (pinnedWordsCache) return pinnedWordsCache
+  const words = new Set<string>()
+  for (const line of curatedOverlayText.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    words.add(trimmed.split(/\s+/)[0])
+  }
+  pinnedWordsCache = words
+  return words
 }
 
 function openTune(kind: ReaderTuneKind): void {
@@ -732,6 +779,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  clearLiveOverlayTimer()
   setPlaybackActive(false)
   clearTourTimer()
   stopTour()
@@ -1017,7 +1065,10 @@ onBeforeUnmount(() => {
       :open="reportsOpen"
       @close="reportsOpen = false"
       @notice="showToast"
-      @changed="reportCount = $event"
+      @changed="
+        reportCount = $event;
+        refreshLiveOverlay()
+      "
     />
 
     <ReaderTuneSheet

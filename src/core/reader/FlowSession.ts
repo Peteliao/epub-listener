@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, getBookFormat } from '@/types'
 import { Highlighter } from './Highlighter'
 import {
   cleanLabel,
+  type BookTextData,
   type ChapterRender,
   type OpenedBook,
   type ReaderSession,
@@ -10,6 +11,7 @@ import {
 } from './ReaderSession'
 import { applyReaderStyle, injectContentPolicy } from './readerStyle'
 import { extractDocumentText, yieldToMain } from './plainText'
+import { extractRubyAnnotations } from './rubyAnnotations'
 import { bindSwipeNavigation } from './contentSwipe'
 import { bindContentTaps } from './contentTap'
 import { elementAtClientPoint } from './stageTap'
@@ -221,8 +223,10 @@ export class FlowSession implements ReaderSession {
     return true
   }
 
-  async collectPlainText(signal?: AbortSignal): Promise<string[]> {
+  /** One traversal for plain text and ruby annotations (FB2/MOBI/TXT). */
+  async collectBookData(signal?: AbortSignal): Promise<BookTextData> {
     const chunks: string[] = []
+    const rubyOverlays: string[] = []
     for (const section of this.sections) {
       if (signal?.aborted) throw abortError()
       try {
@@ -231,12 +235,18 @@ export class FlowSession implements ReaderSession {
             ? await section.createDocument()
             : null
         chunks.push(doc ? extractDocumentText(doc) : '')
+        rubyOverlays.push(doc ? extractRubyAnnotations(doc).overlay : '')
       } catch {
         chunks.push('')
+        rubyOverlays.push('')
       }
       await yieldToMain()
     }
-    return chunks
+    return { chunks, rubyOverlays }
+  }
+
+  async collectPlainText(signal?: AbortSignal): Promise<string[]> {
+    return (await this.collectBookData(signal)).chunks
   }
 
   destroy(): void {

@@ -1,9 +1,10 @@
 import { OutputFormat, pinyin, segment } from 'pinyin-pro'
 import { normalizeOverlayText } from './pinyinTones'
+import type { ApprovedOverridesData } from './approvedOverrides.v1'
 import trainedNeutralsRaw from './trainedNeutrals.v1.txt?raw'
 
 // Bump when the rules change so cached per-book overlays are regenerated.
-export const BOOK_LEXICON_VERSION = 6
+export const BOOK_LEXICON_VERSION = 7
 export const MAX_BOOK_OVERLAY_ENTRIES = 2000
 
 const HAN = /\p{Script=Han}/u
@@ -81,7 +82,7 @@ const DE_COMMON_STEMS = new Set([
   '变化多端', '五花八门', '各式各样', '各种各样', '形形色色', '林林总总',
 ])
 
-interface Phone {
+export interface Phone {
   base: string
   tone: number | null
 }
@@ -110,6 +111,8 @@ export interface BookLexiconInput {
   lexiconText: string
   tokensText: string
   curatedOverlay: string
+  /** Build-time compiled, hand-verified readings; undefined keeps the old strict behaviour. */
+  approvedOverrides?: ApprovedOverridesData
   maxEntries?: number
 }
 
@@ -136,6 +139,7 @@ export interface BookLexiconRequest {
   lexiconUrl: string
   tokensUrl: string
   curatedOverlay: string
+  approvedOverrides?: ApprovedOverridesData
 }
 
 export interface BookLexiconDone {
@@ -416,6 +420,42 @@ function readingsKey(phones: Phone[]): string {
   return phones.map(phoneText).join(' ')
 }
 
+/**
+ * Whether a context/standalone divergence is explicitly registered as a
+ * hand-verified reading. Only the positions that actually differ are checked,
+ * and the CONTEXT base must be one the curated table or an approved listening
+ * rule has pinned for that character. Tone-only differences stay rejected so
+ * the sandhi rules keep full control. Rejected words are never admitted.
+ *
+ * Admission only lets the candidate reach the existing guard pipeline
+ * (reserved bases, isPolyphonic, trained neutrals, tokens.txt, sandhi); it
+ * never writes an overlay row by itself.
+ */
+export function isApprovedDivergence(
+  word: string,
+  context: Phone[],
+  standalone: Phone[],
+  overrides: ApprovedOverridesData | undefined,
+): boolean {
+  if (!overrides || overrides.rejectedWords.includes(word)) return false
+  const chars = Array.from(word)
+  let sawChange = false
+  for (let index = 0; index < chars.length; index += 1) {
+    const current = context[index]
+    const isolated = standalone[index]
+    if (!current || !isolated) return false
+    if (current.base === isolated.base) {
+      // Tone-only differences belong to the sandhi rules, not this whitelist.
+      if (current.tone !== isolated.tone) return false
+      continue
+    }
+    const allowed = overrides.charBases[chars[index]]
+    if (!allowed || !allowed.includes(current.base)) return false
+    sawChange = true
+  }
+  return sawChange
+}
+
 export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult {
   const maxEntries = input.maxEntries ?? MAX_BOOK_OVERLAY_ENTRIES
   const lexicon = parseLexicon(input.lexiconText)
@@ -425,6 +465,7 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
   for (const [word, reading] of curated) effective.set(word, reading)
   const reserved = deriveReservedChars(curated, lexicon)
   const neutrals = TRAINED_NEUTRAL_PHONES
+  const approved = input.approvedOverrides
 
   let maxLexiconLength = 1
   for (const word of effective.keys()) {
@@ -613,7 +654,10 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
         if (!aligned) continue
 
         const standalone = standaloneReading(word)
-        if (readingsKey(span) !== readingsKey(standalone)) {
+        if (
+          readingsKey(span) !== readingsKey(standalone) &&
+          !isApprovedDivergence(word, span, standalone, approved)
+        ) {
           // Context and dictionary disagree: the word's reading is ambiguous.
           discardedReadings.add(word)
           candidates.delete(word)

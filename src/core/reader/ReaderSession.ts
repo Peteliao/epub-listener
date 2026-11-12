@@ -27,6 +27,13 @@ export interface SessionCallbacks {
  * One open book's rendering surface. `anchor` is opaque to callers: EPUB uses
  * element ids, foliate/TXT use the format's own href tokens.
  */
+export interface BookTextData {
+  /** Plain text per chapter, in reading order. */
+  chunks: string[]
+  /** Ruby annotation overlay lines per chapter ('' when none). */
+  rubyOverlays: string[]
+}
+
 export interface ReaderSession {
   chapters: ChapterInfo[]
   readonly currentHighlighter: Highlighter | null
@@ -41,6 +48,12 @@ export interface ReaderSession {
   tapAt(clientX: number, clientY: number): void
   /** Plain text per chapter, used by the per-book pronunciation pass. */
   collectPlainText(signal?: AbortSignal): Promise<string[]>
+  /**
+   * Single-traversal book data: plain text plus per-chapter `<ruby>` pinyin
+   * annotation overlay lines. The ruby pass is read-only and must never change
+   * the plain text or highlight offsets. Formats without ruby return ''.
+   */
+  collectBookData(signal?: AbortSignal): Promise<BookTextData>
   destroy(): void
 }
 

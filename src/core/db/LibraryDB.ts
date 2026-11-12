@@ -11,6 +11,8 @@ export interface StoredBookLexicon {
   packVersion: string
   lexiconName: string
   curatedHash: string
+  /** Fingerprint of the compiled approved-reading whitelist. */
+  approvedHash?: string
   createdAt: number
 }
 

@@ -4,3 +4,11 @@
 # Model lexicons/tokens are hash-verified byte-for-byte; keep LF everywhere
 public/models/**/*.txt text eol=lf
 public/models/manifest.json text eol=lf
+
+# Pronunciation assets are verified byte-for-byte by compile-*.mjs --verify.
+# Without eol=lf, a Windows checkout (core.autocrlf=true) rewrites CRLF and both
+# the source SHA-256 check and the regenerated-asset comparison would fail in CI.
+scripts/data/phrase-pinyin-data/pinyin.txt text eol=lf
+scripts/data/phrase-pinyin-data/LICENSE text eol=lf
+src/core/tts/phraseReadings.v1.txt text eol=lf
+src/core/tts/approvedOverrides.v1.ts text eol=lf

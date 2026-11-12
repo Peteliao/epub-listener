@@ -8,7 +8,11 @@ import type {
 } from '@/types'
 import { PAUSE_PRESET_SCALES } from '@/types'
 import { createReaderSession } from '@/core/reader/createSession'
-import type { ChapterRender, ReaderSession } from '@/core/reader/ReaderSession'
+import type {
+  BookTextData,
+  ChapterRender,
+  ReaderSession,
+} from '@/core/reader/ReaderSession'
 import type {
   HighlightOptions,
   Highlighter,
@@ -263,6 +267,26 @@ export class ReaderController {
     return this.bookLexicon.getStatus()
   }
 
+  /**
+   * Applies a saved listening correction immediately. Debounced by the caller:
+   * both "save locally" and "submit issue" emit the same `saved` event.
+   *
+   * The overlay changes without a full-book rescan. If the offline runtime is
+   * already initialised we release it so the next sentence re-runs loadPack()
+   * with the new lexiconOverlay; its fingerprint then forces a fresh worker.
+   * Returns false when nothing changed, so no needless rebuild occurs.
+   */
+  applyLivePronunciations(overlay: string, hash: string): boolean {
+    if (this.destroyed) return false
+    const changed = this.bookLexicon.setLiveOverlay(overlay, hash)
+    if (!changed) return false
+    if (this.aiSpeech.initialized) {
+      this.releaseAiRuntime()
+      if (this.isPlaying) this.speakCurrent()
+    }
+    return true
+  }
+
   getFeedbackSnapshot(): FeedbackSnapshot | null {
     const highlighter = this.highlighter
     if (!highlighter || this.sentenceCount === 0) return null
@@ -270,7 +294,9 @@ export class ReaderController {
     const lexicon = this.bookLexicon.getReportInfo()
     const targetEngine: TtsEngine =
       this.activeEngine ??
-      (this.settings.engine === 'sherpa' ? 'sherpa' : 'system')
+      (this.settings.engine === 'sherpa' || this.chineseOfflineActive()
+        ? 'sherpa'
+        : 'system')
 
     let voice: FeedbackVoice
     if (targetEngine === 'sherpa') {
@@ -515,6 +541,8 @@ export class ReaderController {
     const labNoiseChanged = next.labNoiseScale !== previous.labNoiseScale
     const labSilenceChanged = next.labSilenceScale !== previous.labSilenceScale
     const englishAiChanged = next.englishAi !== previous.englishAi
+    const chineseRouteChanged =
+      next.preferChineseOffline !== previous.preferChineseOffline
 
     this.settings = { ...next }
     if (!this.isPlaying && (rateChanged || englishToneChanged)) this.emitState()
@@ -598,7 +626,8 @@ export class ReaderController {
       voiceChanged ||
       englishVoiceChanged ||
       englishToneChanged ||
-      groupingChanged
+      groupingChanged ||
+      chineseRouteChanged
     ) {
       this.speakCurrent()
     }
@@ -709,11 +738,18 @@ export class ReaderController {
 
     const wantsAi =
       this.settings.engine === 'sherpa' || !this.speech.supported
-    if (wantsAi) this.refreshAiOverlayIfNeeded()
+    const chineseOffline = this.chineseOfflineActive()
+    // Keep the overlay-refresh guarantee when Chinese alone uses the offline
+    // engine; the rest of wantsAi (readiness toast, aiFallback) stays on the
+    // original engine setting so no download prompt appears on first launch.
+    if (wantsAi || chineseOffline) this.refreshAiOverlayIfNeeded()
     // iOS only trusts speech synthesis started from this gesture. The first
     // system utterance — pure system mode or an English chunk in AI mode — is
     // spoken after an async delay, so unlock inside the tap regardless of engine.
     this.speech.unlock()
+    // Chinese offline audio also needs the media/AudioContext unlocked inside
+    // this gesture, even though `wantsAi` is false for the system engine.
+    if (chineseOffline && !wantsAi) this.aiSpeech.unlock()
     if (wantsAi) {
       if (!this.aiStatus.supported) {
         if (!this.speech.supported) {
@@ -1007,7 +1043,7 @@ export class ReaderController {
     // the next clip is allowed to start once the text is ready. Checked by
     // mode rather than the previous chunk so a chapter ending on a different
     // engine still holds the session.
-    if (options.autoplay && this.aiModeActive) {
+    if (options.autoplay && this.offlineAudioActive) {
       this.aiSpeech.keepAlive()
     }
     this.displayInFlight = true
@@ -1188,6 +1224,28 @@ export class ReaderController {
     this.highlighter?.setActiveRange(unit.start, unit.end, options)
   }
 
+  /**
+   * The curated overlay, the per-book lexicon and the pronunciation guard only
+   * reach Chinese Matcha chunks (AiModel.loadPack / SherpaDriver). With the
+   * system engine selected those assets are wasted. Once the listener has
+   * already downloaded the 山岚 pack, route Chinese runs through it so they
+   * take effect — without forcing a download on first launch.
+   *
+   * English runs, unready/unsupported packs, AI fallback and the explicit
+   * sherpa engine keep their original behaviour. Failing any check is a no-op,
+   * so the switch is fully reversible.
+   */
+  private chineseOfflineActive(): boolean {
+    if (!this.settings.preferChineseOffline) return false
+    if (this.settings.engine !== 'system') return false
+    if (!this.speech.supported || !this.aiStatus.supported) return false
+    if (this.aiFallback) return false
+    const voice = this.ai.getVoice(this.settings.aiVoiceId)
+    if (voice?.modelType !== 'matcha') return false
+    const pack = this.aiStatus.packs.find((item) => item.id === voice.packId)
+    return Boolean(pack && pack.phase === 'ready' && pack.voices.length > 0)
+  }
+
   private speakCurrent(startIndex = 0): void {
     if (!this.isPlaying || this.destroyed) return
 
@@ -1197,13 +1255,17 @@ export class ReaderController {
       return
     }
 
+    const chineseOffline = this.chineseOfflineActive()
     const useAi =
-      (this.settings.engine === 'sherpa' || !this.speech.supported) &&
+      (this.settings.engine === 'sherpa' ||
+        !this.speech.supported ||
+        chineseOffline) &&
       !this.aiFallback
     const segments = splitLanguageSegments(unit.speechText)
     const plan = this.buildSpeechPlan(
       segments.length ? segments : [{ text: unit.speechText, lang: 'zh' }],
       useAi,
+      chineseOffline,
     )
     const hasAiChunks = plan.some((chunk) => chunk.engine === 'ai')
     this.activeEngine = hasAiChunks ? 'sherpa' : 'system'
@@ -1246,10 +1308,11 @@ export class ReaderController {
   private buildSpeechPlan(
     segments: LanguageSegment[],
     useAi: boolean,
+    chineseOnlyAi = false,
   ): SpeechChunk[] {
-    const plan = this.prepareSpeechChunks(segments, useAi)
+    const plan = this.prepareSpeechChunks(segments, useAi, chineseOnlyAi)
 
-    const tail = this.upcomingAiChunks(useAi, PREFETCH_CHUNKS)
+    const tail = this.upcomingAiChunks(useAi, PREFETCH_CHUNKS, chineseOnlyAi)
     for (let i = 0; i < plan.length; i += 1) {
       const chunk = plan[i]!
       if (chunk.engine !== 'ai') continue
@@ -1265,17 +1328,22 @@ export class ReaderController {
   private prepareSpeechChunks(
     segments: LanguageSegment[],
     useAi: boolean,
+    chineseOnlyAi = false,
   ): SpeechChunk[] {
+    // chineseOnlyAi means the offline engine was chosen solely by the Chinese
+    // pronunciation switch: English runs must stay on the system voice.
     const englishAi =
       this.settings.englishAi &&
       !this.englishAiFallback &&
-      this.englishPackReady()
+      this.englishPackReady() &&
+      !chineseOnlyAi
 
     const plan: SpeechChunk[] = []
 
     for (const segment of segments) {
       const engine: ChunkEngine =
-        useAi && (segment.lang === 'zh' || englishAi || !this.speech.supported)
+        useAi &&
+        (segment.lang === 'zh' || englishAi || !this.speech.supported)
           ? 'ai'
           : 'system'
       let text = segment.text
@@ -1306,6 +1374,7 @@ export class ReaderController {
   private upcomingAiChunks(
     useAi: boolean,
     limit: number,
+    chineseOnlyAi = false,
   ): LanguageSegment[] {
     const chunks: LanguageSegment[] = []
     if (limit <= 0) return chunks
@@ -1325,6 +1394,7 @@ export class ReaderController {
       const plan = this.prepareSpeechChunks(
         segments.length ? segments : [{ text: unit.speechText, lang: 'zh' }],
         useAi,
+        chineseOnlyAi,
       )
       for (const chunk of plan) {
         if (chunk.engine !== 'ai') continue
@@ -1695,10 +1765,10 @@ export class ReaderController {
     this.options.onToast(`离线音色合成速度偏慢，播放可能出现停顿；${hint}`)
   }
 
-  private collectBookText(signal: AbortSignal): Promise<string[]> {
+  private collectBookText(signal: AbortSignal): Promise<BookTextData> {
     const session = this.session
-    if (!session) return Promise.resolve([])
-    return session.collectPlainText(signal)
+    if (!session) return Promise.resolve({ chunks: [], rubyOverlays: [] })
+    return session.collectBookData(signal)
   }
 
   private async ensureAiReady(): Promise<void> {
@@ -1936,7 +2006,7 @@ export class ReaderController {
 
     const generation = this.playbackGeneration
     const useSink =
-      this.aiModeActive &&
+      this.offlineAudioActive &&
       this.aiSpeech.playGap(gap, () => {
         if (!this.isPlaying || generation !== this.playbackGeneration) return
         this.sentenceGapActive = false
@@ -1983,11 +2053,21 @@ export class ReaderController {
     }
   }
 
+  /** The engine the listener explicitly selected; drives the lock-screen skip. */
   private get aiModeActive(): boolean {
     return (
       (this.settings.engine === 'sherpa' || !this.speech.supported) &&
       !this.aiFallback
     )
+  }
+
+  /**
+   * True whenever offline audio is on the playback chain. Sentence gaps and the
+   * media session must use the audio sink (not a throttle-able timer) when
+   * Chinese runs are synthesised offline, even under the system engine.
+   */
+  private get offlineAudioActive(): boolean {
+    return this.aiModeActive || this.chineseOfflineActive()
   }
 
   private resetActivePlan(): void {

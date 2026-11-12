@@ -11,6 +11,8 @@ import {
 } from './ReaderSession'
 import { applyReaderStyle, injectContentPolicy } from './readerStyle'
 import { extractDocumentText, yieldToMain } from './plainText'
+import { extractRubyAnnotations } from './rubyAnnotations'
+import type { BookTextData } from './ReaderSession'
 import { bindSwipeNavigation } from './contentSwipe'
 import { bindContentTaps } from './contentTap'
 import { elementAtClientPoint } from './stageTap'
@@ -249,32 +251,51 @@ export class EpubSession implements ReaderSession {
     return true
   }
 
-  async collectPlainText(signal?: AbortSignal): Promise<string[]> {
+  /**
+   * One spine traversal produces BOTH the plain text and the ruby overlays, so
+   * a large book is loaded once rather than twice. The ruby pass is read-only:
+   * it never adds `<rt>` text to `chunks`, keeping sentence splitting and
+   * highlight character offsets exactly as they were.
+   */
+  async collectBookData(signal?: AbortSignal): Promise<BookTextData> {
     const book = this.book
     const chunks: string[] = []
-    if (!book) return chunks
-
+    const rubyOverlays: string[] = []
+    if (!book) return { chunks, rubyOverlays }
     for (const section of this.spineSections) {
       if (signal?.aborted) throw abortError()
       const hadDocument = Boolean(section.document)
       try {
         if (typeof section.load !== 'function') {
           chunks.push('')
+          rubyOverlays.push('')
         } else {
           await section.load(
             book.load.bind(book) as unknown as (request?: unknown) => Promise<unknown>,
           )
           chunks.push(section.document ? extractDocumentText(section.document) : '')
+          rubyOverlays.push(
+            section.document ? extractRubyAnnotations(section.document).overlay : '',
+          )
         }
       } catch {
         chunks.push('')
+        rubyOverlays.push('')
       } finally {
         // Never unload the section the rendition is currently showing.
         if (!hadDocument) section.unload?.()
       }
       await yieldToMain()
     }
-    return chunks
+    return { chunks, rubyOverlays }
+  }
+
+  async collectPlainText(signal?: AbortSignal): Promise<string[]> {
+    return (await this.collectBookData(signal)).chunks
+  }
+
+  async collectRubyAnnotations(signal?: AbortSignal): Promise<string[]> {
+    return (await this.collectBookData(signal)).rubyOverlays
   }
 
   async nextChapter(): Promise<ChapterRender> {

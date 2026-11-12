@@ -82,6 +82,13 @@ function sanitize(raw: unknown): ReaderSettings {
       ? source.englishAi
       : DEFAULT_SETTINGS.englishAi
 
+  // Old `shusheng.settings.v1` blobs have no such key; defaulting to true
+  // enables the offline Chinese route only when a pack is already downloaded.
+  const preferChineseOffline =
+    typeof source.preferChineseOffline === 'boolean'
+      ? source.preferChineseOffline
+      : DEFAULT_SETTINGS.preferChineseOffline
+
   const autoBookPolyphones =
     typeof source.autoBookPolyphones === 'boolean'
       ? source.autoBookPolyphones
@@ -126,6 +133,7 @@ function sanitize(raw: unknown): ReaderSettings {
     aiEnglishVoiceId,
     aiVariant,
     englishAi,
+    preferChineseOffline,
     autoBookPolyphones,
     groupSentences,
     skipEnglishWhenLocked,

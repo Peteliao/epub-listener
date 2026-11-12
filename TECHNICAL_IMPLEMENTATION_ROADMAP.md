@@ -586,8 +586,39 @@ interface Sentence {
 
 1. **模型词典**（`lexicon.txt`）是唯一直接决定模型发音的输入；长词优先匹配。
 2. **自定义词典补丁**：维护 `glossary.json`（人名、地名、术语、书名）→ 生成 sherpa 可读的 lexicon 条目；启动时把基础词典与补丁合并写入 MEMFS，再初始化 TTS。词典更新后需重建 TTS 实例。
-3. **pinyin-pro**：用于给 OOV 词生成候选拼音、批量生成补丁、人工校验；不能只在前端把文字换成拼音就假设模型会跟着变。若未来要完全绕过模型词典，需要研究 `phonemeCodepoints` 输入链路，首版不做。
+3. **pinyin-pro**：用于给 OOV 词生成候选拼音、批量生成补丁、人工校验；不能只在前端把文字换成拼音就假设模型会跟着变。完全绕过模型词典的 `phonemeCodepoints` / `tokens` 输入链路已在 vendored runtime JS 中具备（见 5.4.4 的 Spike 结论），但仍属待选高档路线，生产 worker/driver 未接通。
 4. 建立 100 句多音字回归集（重/行/长/乐/还/得/地/着/了、姓氏、数字、年份），每次词典/模型变更都跑。
+
+#### 5.4.4 正确率提升的三档设计与基线（2026-11-12 评估）
+
+结论与完整三档对照见 `README.md`「中文多音字正确率：基线与分档提升评估」。这里只记录技术设计与约束。
+
+**基线测量**：`npm run baseline:polyphones` 复用 `scripts/lib/reading.mjs` 的 `loadMatchaAssets()` / `tokenizeSpans()` / `phoneticPhones()`，把黄金集与一致性快照分别统计为结构化 JSON（`scripts/out/baseline-polyphones.json`）。实测：1599 条用例 / 4144 读音点 / 0 不一致 / 静态一致率 100.00% / 单字兜底 11 个（0.27%）/ 80 字族；词典 66914 + 人工覆盖 1373 = 有效 67977 条。该指标是「有效词典最长匹配音素与标注一致」，**不是听感正确率**：`listeningAccuracy` 固定为 `null`，真实正确率只能由 `npm run lab:ab` 起真实 WASM 后人工盲听打分。选档前后必须跑同一套 A/B 才能量化收益。
+
+**低档（已全部落地）**
+
+- ① 路由：`ReaderController.chineseOfflineActive()` 要求「`preferChineseOffline` 开 + `engine === 'system'` + `speech.supported` + `!aiFallback` + `aiStatus.supported` + 当前中文音色 `modelType === 'matcha'` + 对应 pack `phase === 'ready'`」。生效时仅中文 chunk 走 `ai`，英文留在 system；`chineseOnlyAi` 向下传递到预取，保留 `!speech.supported` 硬兜底。`play()` 的 `wantsAi` 保持原语义，只补 `aiSpeech.unlock()` 与 overlay 刷新；`offlineAudioActive` 单独负责句间停顿与 keep-alive，`aiModeActive` 语义不变。不硬改 `engine` 默认值。
+- ② 白名单准入：`scripts/compile-approved-overrides.mjs` 把 `readingRules.v1.jsonl`（approved / scope=word / 非 frontend，排除 rejected 词）与人工覆盖表编译成**字族级**常量 `approvedOverrides.v1.ts`（83 字 / 89 音素 / hash）。最初按整词编译会被 `effective.has(word)` 全部提前跳过而空转，故改为「字符 + 允许音素 base」。`bookLexicon.ts` 的 `isApprovedDivergence()` 只让命中项跳过丢弃、进入 `:649-689` 既有护栏；纯声调差异仍拒绝（变调规则保持控制）。`BOOK_LEXICON_VERSION` 6→7，白名单指纹纳入 `assetKey` 与 `StoredBookLexicon.approvedHash` 校验。
+- ③ 动态整词保护：`pronunciationGuard.ts` 参数化并新增 `overlayProtectedWords()`；`SherpaDriver` 在 `initSlot` 时从**同一个** `pack.lexiconOverlay` 解析词表缓存到 slot，`synth` 显式传入 `preparePronunciationText(text, words)`。动态词只增加 U+200B，U+2060 语句重置仍用静态表；默认值不变，`scripts/lib/wordFamily.mjs` 镜像同步排序以保持逐字一致。
+- ④ 反馈即时生效：`src/core/feedback/liveOverlay.ts`（`reports-to-overlay.mjs` 的运行时版）→ `ReaderView` 去抖 350ms → `BookLexiconService.setLiveOverlay()` 内存叠加 → `ReaderController.applyLivePronunciations()` 释放 runtime，overlay 指纹变化重建 worker。反馈只作内存层、不写扫描缓存、不触发全书重扫；删除反馈即撤销。
+
+**中档（已落地）**
+
+- 注音通道：`rubyAnnotations.ts` 只读抽取 `<ruby>/<rt>`（多字 ruby、多 rt、带调/数字调/已训练轻声），**不改** `plainText.ts` / `Highlighter.ts` 的 `SKIP_TAGS`。`ReaderSession.collectBookData()` 在 `EpubSession` / `FlowSession` 里用**单次遍历**同时产出 `chunks` 与 `rubyOverlays`，分句与高亮偏移不变。按选档只支持拉丁拼音类，注音符号与假名拒绝；单字 ruby 按既有约定不生成全局覆盖。
+- 外部静态词表：`mozillazg/phrase-pinyin-data` v0.20.0 / MIT 的 `pinyin.txt` 固定入库到 `scripts/data/phrase-pinyin-data/`（含 LICENSE、SOURCE.md、SHA-256），`scripts/compile-external-phrase.mjs` 编译成 `phraseReadings.v1.txt`（271 条 / 7.2 KB / 103 字族）。只取仓库自有 MIT 文件，排除含 CC BY-SA 的 `large_pinyin.txt`；只保留声母/韵母真变化，排除一/不变调、纯声调差异与一词多音；`audit:impact --fail-on-unexpected` 零意外变化后才 `--apply --confirm`。
+- 优先级链固定为：模型基础词典 < 外部静态词表 < 整书自动 < EPUB 注音 < 用户即时纠错 < 人工表。新增 `mergeOverlaySources(...sources)`（`pinyinTones.ts`）按序去重、按词排序、每词一行；`mergeLexiconOverlays()` 原语义不变，人工表始终最后。两个编译产物由 `scripts/verify-compiled-assets.mjs` 接入 `audit:all` 漂移门禁。
+
+**高档（仅评估，未落地）**
+
+- 结论：**两条路线均 No-Go / 暂缓**。完整数据与 Go/No-Go 触发条件见 `HIGH_TIER_SPIKE_REPORT.md`，可复现脚本 `npm run spike:phoneme`。
+- 音素直输：runtime JS 已实现 `tokens` / `phonemeCodepoints`，`matchaSynth.mjs:79-90` 已在用真实 WASM 跑空文本 + 纯音素序列；debug 日志证实绕过词典最长匹配。但消歧只是搬到前端，且会绕过 overlay、`ruleFsts`、静音边界与语句重置，回归面大于收益。缺的是 worker/driver 消息透传与整句 G2P，不是 runtime 改造。
+- ONNX 消歧模型：g2pW（Apache-2.0）fp32 ≈ 606 MiB / int8 ≈ 152 MiB，蒸馏小模型 ≈ 1.7 MB 但需自训与授权核查；对照主 bundle gzip 440 KB 与本轮词表 7.2 KB，代价不匹配。不下载模型、不加依赖、不改 worker/runtime。
+
+**所有档共用的硬约束**：单一入口 `mergeOverlaySources → mergeLexiconOverlays → normalizeOverlayText → AiModel.loadPack() 的 lexiconOverlay → worker.patchLexicon()`，不另起 SSML 或第二套发音控制机制；新增行必须过 `tokens.txt` 音素校验、`trainedNeutrals.v1.txt` 轻声白名单、词内边界禁用、词长 ≤6；合计受 `MAX_BOOK_OVERLAY_ENTRIES = 2000` 去重裁剪以控制 MEMFS 规模与每次 init 的线性 patch 成本；`overlayFingerprint` 变更触发 worker 重建；词典变更一律跑 `npm run audit:all`。基线为一次性离线任务，不进运行时热路径。
+
+**落地验证（2026-11-12，全部自动化、无需用户协助）**：`npm test` 65 文件 / 621 项通过；`npm run audit:all` 12/12 通过（含新增「编译产物漂移」与真实 WASM 门禁）；`npm run build`（含 `vue-tsc --noEmit`）成功；`npm run baseline:polyphones` 复测 1599 用例 / 4144 读音点 / 0 不一致 / 静态一致率 100.00%。静态一致率前后都是 100%，因为它衡量词典音素而非「运行时是否用上了这套词典」；真实听感正确率仍需 `npm run lab:ab` 人工 A/B，本轮不安排。
+
+两点如实记录：② 的「上下文读音 ≠ 孤立读音」分支在真实语料里触发率很低，主要是防止已确认读音被误丢弃；中档注音只对词组级 ruby 生效，逐字注音书籍按「单字语境跳过」约定不受益。
 
 ### 5.5 高亮、平滑滚动与点击跳读
 
@@ -1072,6 +1103,8 @@ interface DownloadProgress {
 | :--- | :--- | :--- | :--- | :--- |
 | S1 | 定制 Sherpa WASM 能否在 Worker 中初始化并合成中文，iOS 内存是否可接受 | 2 天 | iPhone（iOS 16.4+/17）与中端 Android 均能初始化；峰值内存 < 350MB；单句 RTF < 0.8 | 官方 `.data` 预打包 + SW 缓存；或首版只上系统语音，AI 延后 |
 | S2 | 四个音色包的清晰度/自然度是否达标；长句延迟是否可接受；每包许可是否明确 | 1-2 天 | 100 句回归集多音字正确率 ≥ 90%；盲听无明显机械感/爆音；设置页逐包展示许可证与商用标识 | 调整 noiseScale / 自定义词典 / 替换不达标音色包；不得把山岚或小雅标注为可商用 |
+
+> S2 的「100 句回归集多音字正确率 ≥ 90%」是**听感**指标，只能由 `npm run lab:ab` 起真实 WASM 后人工盲听判定。`npm run baseline:polyphones` 产出的 100.00% 是静态词典音素一致率，两者不可互相代替；选档验收必须同时给出静态门禁结果（`npm run audit:all`）与同一套 A/B 的前后对照。详见 5.4.4。
 | S3 | epub.js `scrolled-doc` 下坐标、滚动、点击、跨章是否可靠；span 注入是否破坏脚注/目录 | 2 天 | 3 本样本书（小说、非虚构、脚注多）无丢字；点击/滚动/章节切换正常 | 改分页模式；或改用 Range + CSS Highlight，不改 DOM |
 | S4 | Web Speech 在 iOS Safari/Android Chrome/微信的可用性、暂停、声音列表 | 1 天 | 中文声音可用；能暂停/恢复或可接受重读本句；错误有回调 | 系统语音仅作为“无网络应急”；主推 AI |
 | S5 | 音频调度是否无缝、暂停/恢复/跳句是否不重叠/不爆音 | 1 天 | 连续 20 句无欠载/重叠；跳句 < 2s 首音；暂停恢复位置正确 | 简化调度：停止/重启而非 suspend；降低预取 |

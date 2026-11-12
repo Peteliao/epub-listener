@@ -5,6 +5,14 @@ import {
   type BookLexiconResponse,
 } from './bookLexicon'
 import curatedOverlay from './polyphones.v1.txt?raw'
+import { mergeOverlaySources } from './pinyinTones'
+import { mergeRubyOverlays } from '@/core/reader/rubyAnnotations'
+import type { BookTextData } from '@/core/reader/ReaderSession'
+import phraseReadings from './phraseReadings.v1.txt?raw'
+import {
+  APPROVED_OVERRIDES,
+  APPROVED_OVERRIDES_HASH,
+} from './approvedOverrides.v1'
 
 export type BookLexiconPhase =
   | 'idle'
@@ -26,9 +34,11 @@ export interface BookLexiconReportInfo {
   entries: number
 }
 
-type CollectText = (signal: AbortSignal) => Promise<string[]>
+type CollectText = (signal: AbortSignal) => Promise<BookTextData>
 
 const curatedHash = hashText(curatedOverlay)
+/** Fingerprint of the compiled MIT phrase asset; part of the scan cache key. */
+const phraseHash = hashText(phraseReadings)
 
 function hashText(text: string): string {
   let hash = 0x811c9dc5
@@ -45,6 +55,8 @@ function assetKey(assets: AiLexiconAssets): string {
     assets.lexiconName,
     assets.packVersion,
     curatedHash,
+    APPROVED_OVERRIDES_HASH,
+    phraseHash,
     BOOK_LEXICON_VERSION,
   ].join('|')
 }
@@ -58,6 +70,13 @@ export class BookLexiconService {
     entries: 0,
     message: null,
   }
+  /** Overlay produced by the whole-book scan (this is what IndexedDB caches). */
+  private baseOverlay = ''
+  /** Book-specific ruby annotations; never written to the scan cache. */
+  private rubyOverlay = ''
+  /** In-memory live corrections; never written to the scan cache. */
+  private liveOverlay = ''
+  private liveHash = ''
   private overlay = ''
   private enabled = true
   private disposed = false
@@ -78,6 +97,34 @@ export class BookLexiconService {
 
   getOverlay(): string {
     return this.enabled ? this.overlay : ''
+  }
+
+  /**
+   * Applies runtime listening corrections. The whole-book scan is expensive and
+   * its result is independent of feedback, so only the in-memory composed
+   * overlay changes — no full re-scan and no cache rewrite. Returns false when
+   * the fingerprint is unchanged, which makes the caller's debounce idempotent.
+   */
+  setLiveOverlay(overlay: string, hash: string): boolean {
+    if (this.disposed || (this.liveOverlay === overlay && this.liveHash === hash)) {
+      return false
+    }
+    this.liveOverlay = overlay
+    this.liveHash = hash
+    this.recompose()
+    if (this.enabled) {
+      this.setStatus({
+        phase: 'ready',
+        entries: countEntries(this.overlay),
+        message: null,
+      })
+    }
+    return true
+  }
+
+  /** Forces the next start() to recompute; keeps the current overlay usable. */
+  invalidate(): void {
+    this.runKey = ''
   }
 
   getReportInfo(): BookLexiconReportInfo {
@@ -109,13 +156,27 @@ export class BookLexiconService {
   start(voiceId: string, collect: CollectText): void {
     if (!this.enabled || this.disposed || this.pipeline) return
     const pipeline = this.run(voiceId, collect).catch(() => {
-      this.overlay = ''
-      return ''
+      this.baseOverlay = ''
+      this.recompose()
+      return this.overlay
     })
     this.pipeline = pipeline
     void pipeline.finally(() => {
       if (this.pipeline === pipeline) this.pipeline = null
     })
+  }
+
+  /**
+   * Fixed priority chain (later wins, curated is appended by AiModel):
+   * static MIT phrase readings < whole-book scan < ruby annotations < live
+   * feedback < hand-curated table.
+   */
+  private recompose(): void {
+    this.overlay = mergeOverlaySources(
+      this.baseOverlay,
+      this.rubyOverlay,
+      this.liveOverlay,
+    )
   }
 
   async waitForOverlay(timeoutMs: number): Promise<string> {
@@ -138,6 +199,9 @@ export class BookLexiconService {
     this.cancel()
     this.listeners.clear()
     this.pipeline = null
+    this.baseOverlay = ''
+    this.rubyOverlay = ''
+    this.liveOverlay = ''
     this.overlay = ''
   }
 
@@ -150,7 +214,8 @@ export class BookLexiconService {
     }
 
     const key = assetKey(assets)
-    if (this.runKey === key && this.overlay) {
+    if (this.runKey === key) {
+      this.recompose()
       this.setStatus({
         phase: 'ready',
         entries: countEntries(this.overlay),
@@ -159,38 +224,50 @@ export class BookLexiconService {
       return this.overlay
     }
     this.runKey = key
-    this.overlay = ''
-
-    const cached = await this.readCache(assets, key)
-    if (this.disposed || !this.enabled) return ''
-    if (cached) {
-      this.overlay = cached.overlay
-      this.setStatus({ phase: 'ready', entries: cached.entries, message: null })
-      return cached.overlay
-    }
+    this.baseOverlay = ''
+    this.rubyOverlay = ''
+    this.recompose()
 
     this.setStatus({ phase: 'generating', entries: 0, message: null })
+    const controller = new AbortController()
+    this.abort = controller
     try {
-      const overlay = await this.generate(assets, collect)
-      if (this.disposed) return ''
-      this.overlay = overlay
-      const entries = overlay ? countEntries(overlay) : 0
-      this.setStatus({ phase: 'ready', entries, message: null })
-      if (overlay) {
+      // ONE book traversal yields both plain text and ruby annotations, even
+      // when the generated overlay comes from a cache hit. Ruby notes are
+      // book-specific, so they must never be served from the scan cache.
+      const data = await collect(controller.signal)
+      if (this.disposed || !this.enabled) return this.overlay
+      const chunks = Array.isArray(data?.chunks) ? data.chunks : []
+      this.rubyOverlay = mergeRubyOverlays(data?.rubyOverlays ?? [])
+
+      const cached = await this.readCache(assets, key)
+      if (this.disposed || !this.enabled) return this.overlay
+      let scanned = cached?.overlay ?? ''
+      if (!cached && chunks.some((chunk) => chunk.trim())) {
+        scanned = await this.generate(assets, chunks, controller)
+      }
+      if (this.disposed) return this.overlay
+      // Static MIT phrase readings sit below the whole-book scan; the cache
+      // only stores the scan result, so both are composed here.
+      this.baseOverlay = mergeOverlaySources(phraseReadings, scanned)
+      this.recompose()
+      this.setStatus({ phase: 'ready', entries: countEntries(this.overlay), message: null })
+      if (!cached && scanned) {
         const record: StoredBookLexicon = {
           bookId: this.bookId,
-          overlay,
-          entries,
+          overlay: scanned,
+          entries: countEntries(scanned),
           version: BOOK_LEXICON_VERSION,
           packId: assets.packId,
           packVersion: assets.packVersion,
           lexiconName: assets.lexiconName,
           curatedHash,
+          approvedHash: APPROVED_OVERRIDES_HASH,
           createdAt: Date.now(),
         }
         void saveBookLexicon(record).catch(() => undefined)
       }
-      return overlay
+      return this.overlay
     } catch (error) {
       if (!this.disposed && this.enabled) {
         this.setStatus({
@@ -200,7 +277,9 @@ export class BookLexiconService {
             error instanceof Error ? error.message : '本书读音生成失败。',
         })
       }
-      return ''
+      return this.overlay
+    } finally {
+      if (this.abort === controller) this.abort = null
     }
   }
 
@@ -217,6 +296,7 @@ export class BookLexiconService {
         cached.packVersion !== assets.packVersion ||
         cached.lexiconName !== assets.lexiconName ||
         cached.curatedHash !== curatedHash ||
+        cached.approvedHash !== APPROVED_OVERRIDES_HASH ||
         typeof cached.overlay !== 'string' ||
         !Number.isFinite(cached.entries) ||
         assetKey(assets) !== key
@@ -229,7 +309,12 @@ export class BookLexiconService {
     }
   }
 
-  private generate(assets: AiLexiconAssets, collect: CollectText): Promise<string> {
+  /** Runs the per-book scan worker over already-collected chapter text. */
+  private generate(
+    assets: AiLexiconAssets,
+    chunks: string[],
+    controller: AbortController,
+  ): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       let settled = false
       let worker: Worker
@@ -244,8 +329,6 @@ export class BookLexiconService {
 
       this.worker = worker
       const jobId = (this.jobId += 1)
-      const controller = new AbortController()
-      this.abort = controller
 
       const finish = (action: () => void): void => {
         if (settled) return
@@ -273,31 +356,22 @@ export class BookLexiconService {
       worker.addEventListener('messageerror', () => {
         finish(() => reject(new Error('读音生成线程通信失败。')))
       })
-
-      void collect(controller.signal)
-        .then((chunks) => {
-          if (settled) return
-          if (!chunks.some((chunk) => chunk.trim())) {
-            finish(() => resolve(''))
-            return
-          }
-          worker.postMessage({
-            type: 'generate',
-            jobId,
-            chunks,
-            cacheName: assets.cacheName,
-            lexiconUrl: assets.lexiconUrl,
-            tokensUrl: assets.tokensUrl,
-            curatedOverlay,
-          })
+      try {
+        worker.postMessage({
+          type: 'generate',
+          jobId,
+          chunks,
+          cacheName: assets.cacheName,
+          lexiconUrl: assets.lexiconUrl,
+          tokensUrl: assets.tokensUrl,
+          curatedOverlay,
+          approvedOverrides: APPROVED_OVERRIDES,
         })
-        .catch((error) => {
-          finish(() =>
-            reject(
-              error instanceof Error ? error : new Error('未能读取本书正文。'),
-            ),
-          )
-        })
+      } catch (error) {
+        finish(() =>
+          reject(error instanceof Error ? error : new Error('读音生成线程通信失败。')),
+        )
+      }
     })
   }
 

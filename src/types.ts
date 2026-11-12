@@ -69,6 +69,13 @@ export interface ReaderSettings {
   aiVariant: 'auto' | 'full' | 'int8'
   /** Use the offline English voice for English runs instead of system TTS. */
   englishAi: boolean
+  /**
+   * When the system engine is selected, route Chinese runs through the offline
+   * Matcha voice once its pack is ready, so the curated/per-book pronunciation
+   * overlays take effect. English runs, unready packs and AI fallback keep the
+   * original system-voice behaviour; turn off to restore it entirely.
+   */
+  preferChineseOffline: boolean
   autoBookPolyphones: boolean
   /** Merge neighbouring sentences into one synthesis request. */
   groupSentences: boolean
@@ -146,6 +153,7 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   aiEnglishVoiceId: 'kristin',
   aiVariant: 'auto',
   englishAi: true,
+  preferChineseOffline: true,
   autoBookPolyphones: true,
   groupSentences: true,
   skipEnglishWhenLocked: true,

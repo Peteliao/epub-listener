@@ -1,0 +1,277 @@
+# 通用词组读音补充（编译产物，请勿手工编辑）
+# 来源：mozillazg/phrase-pinyin-data v0.20.0，MIT License，Copyright (c) 2017 mozillazg
+# 许可全文与来源/筛选说明：scripts/data/phrase-pinyin-data/{LICENSE,SOURCE.md}
+# 生成命令：npm run phrase:compile -- --apply --confirm
+# 源数据 SHA-256：5d4d86b1337bb2fca95bc5135564a821bfdb40597481ee3e3871bf52d4668622
+# 只含声母/韵母真变化的多音字词组；排除一/不变调、纯声调差异与人工表已有词。
+阿家阿翁 a1 jia1 a1 weng1
+哀的美敦书 ai1 di4 mei3 dun1 shu1
+哀乐 ai1 le4
+聱牙诘屈 ao2 ya2 jie2 qu1
+謷牙诘屈 ao2 ya2 jie2 qu1
+百日咳 bai3 ri4 ke2
+薄面 bo2 mian4
+薄情无义 bo2 qing2 wu2 yi4
+薄葬 bo2 zang4
+趵突泉 bao4 tu1 quan2
+悲咽 bei1 ye4
+碑拓 bei1 ta4
+鼻塞 bi2 se4
+吡啶斯的明 bi3 ding4 si1 di4 ming2
+蔽塞 bi4 se4
+编校 bian1 jiao4
+便血 bian4 xie3
+标识 biao1 shi2
+表徵 biao3 zheng1
+波罗的海 bo1 luo2 di4 hai3
+采血 cai3 xie3
+餐松啖柏 can1 song1 dan4 bo2
+藏香 zang4 xiang1
+抄没 chao1 mo4
+车行 che1 hang2
+车行道 che1 xing2 dao4
+乘壶 cheng2 hu2
+澄汰 cheng2 tai4
+抽丝剥茧 chou1 si1 bo1 jian3
+出乖露丑 chu1 guai1 lou4 chou3
+出头露面 chu1 tou2 lou4 mian4
+出血 chu1 xie3
+啜泣 chuo4 qi4
+穿着打扮 chuan1 zhuo2 da3 ban4
+传神阿堵 chuan2 shen2 e1 du3
+吹竹弹丝 chui1 zhu2 tan2 si1
+垂头搨翼 chui2 tou2 ta4 yi4
+伺弄 si4 nong4
+摧折 cui1 zhe2
+大换血 da4 huan4 xie3
+大黄 da4 huang2
+待贾而沽 dai4 jia3 er2 gu1
+弹腿 tan2 tui3
+当行本色 dang1 hang2 ben3 se4
+颠衣到裳 dian1 yi1 dao4 chang2
+调拨 diao4 bo1
+调人 tiao2 ren2
+调正 tiao2 zheng4
+动如参商 dong4 ru2 shen1 shang1
+都会 du1 hui4
+都俞吁咈 du1 yu2 xu1 fu2
+二长花岗岩 er4 chang2 hua1 gang3 yan2
+二长闪长岩 er4 chang2 shan3 chang2 yan2
+二长岩 er4 chang2 yan2
+反弹 fan3 tan2
+放大率 fang4 da4 lv4
+放还 fang4 huan2
+放血 fang4 xie3
+粉雕玉琢 fen3 diao1 yu4 zhuo2
+佛兰德 fo2 lan2 de2
+佛兰德斯 fo2 lan2 de2 si1
+佛朗哥 fo2 lang3 ge1
+佛罗里达 fo2 luo2 li3 da2
+佛罗里达州 fo2 luo2 li3 da2 zhou1
+佛蒙特 fo2 meng2 te4
+佛蒙特州 fo2 meng2 te4 zhou1
+佛徒 fo2 tu2
+浮栅 fu2 shan1
+富国彊兵 fu4 guo2 qiang2 bing1
+富贾 fu4 gu3
+富商大贾 fu4 shang1 da4 gu3
+富商巨贾 fu4 shang1 ju4 gu3
+橄长岩 gan3 chang2 yan2
+干咳 gan1 ke2
+槁项没齿 gao3 xiang4 mo4 chi3
+歌仔戏 ge1 zi3 xi4
+给付 ji3 fu4
+给与 ji3 yu3
+公了 gong1 liao3
+攻心扼吭 gong1 xin1 e4 hang2
+掴手 guo2 shou3
+国乐 guo2 yue4
+哈佛 ha1 fo2
+哈佛大学 ha1 fo2 da4 xue2
+咳血 ke2 xie3
+还报 huan2 bao4
+还情 huan2 qing2
+海德堡大学 hai3 de2 bao3 da4 xue2
+邯郸重步 han2 dan1 zhong4 bu4
+汉堡包 han4 bao3 bao1
+漢藏 han4 zang4
+豪商巨贾 hao2 shang1 ju4 gu3
+红参 hong2 shen1
+鸿商富贾 hong2 shang1 fu4 gu3
+鸿衣羽裳 hong2 yi1 yu3 chang2
+厚薄 hou4 bo2
+互见 hu4 jian4
+换行 huan4 hang2
+换血 huan4 xie3
+辉长玢岩 hui1 chang2 bin1 yan2
+辉长闪长岩 hui1 chang2 shan3 chang2 yan2
+辉长岩 hui1 chang2 yan2
+活剥生吞 huo2 bo1 sheng1 tun1
+鸡内金 ji1 nei4 jin1
+瘠薄 ji2 bo2
+纪传体 ji4 zhuan4 ti3
+贾贷 jia3 dai4
+贾道 jia3 dao4
+贾官 jia3 guan1
+贾欺 jia3 qi1
+贾田 jia3 tian2
+贾勇 jia3 yong3
+贾资 jia3 zi1
+钾长花岗岩 jia3 chang2 hua1 gang3 yan2
+碱长花岗岩 jian3 chang2 hua1 gang3 yan2
+诘屈謷牙 jie2 qu1 ao2 ya2
+蝍蛆 ji2 qu1
+解铃系铃 jie3 ling2 xi4 ling2
+芥蓝 jie4 lan2
+九重城 jiu3 chong2 cheng2
+九重阁 jiu3 chong2 ge2
+九重宫 jiu3 chong2 gong1
+九重关 jiu3 chong2 guan1
+九重闺 jiu3 chong2 gui1
+九重墙 jiu3 chong2 qiang2
+九重泉 jiu3 chong2 quan2
+九重锁 jiu3 chong2 suo3
+九重天 jiu3 chong2 tian1
+旧事重提 jiu4 shi4 chong2 ti2
+隽语 juan4 yu3
+口角 kou3 jiao3
+捆扎 kun3 za1
+老调重弹 lao3 diao4 chong2 tan2
+老区 lao3 qu1
+乐都 le4 du1
+乐手 yue4 shou3
+乐亭 lao4 ting2
+乐亭县 lao4 ting2 xian4
+了然无闻 liao3 ran2 wu2 wen2
+了身脱命 liao3 shen1 tuo1 ming4
+楞伽 leng2 qie2
+利斯的明 li4 si1 di4 ming2
+敛声屏息 lian3 sheng1 bing3 xi1
+良贾深藏 liang2 gu3 shen1 cang2
+临了 lin2 liao3
+陆仟 lu4 qian1
+露头 lou4 tou2
+绿林大盗 lv4 lin2 da4 dao4
+马尾辫 ma3 wei3 bian4
+马尾松 ma3 wei3 song1
+马尾藻 ma3 wei3 zao3
+没世穷年 mo4 shi4 qiong2 nian2
+没世无称 mo4 shi4 wu2 cheng1
+没世无闻 mo4 shi4 wu2 wen2
+免服 mian3 fu2
+免袒 mian3 tan3
+名刹 ming2 cha4
+抹脸 mo3 lian3
+牧畜 mu4 xu4
+暮爨朝舂 mu4 cuan4 zhao1 chong1
+暮翠朝红 mu4 cui4 zhao1 hong2
+暮去朝来 mu4 qu4 zhao1 lai2
+暮四朝三 mu4 si4 zhao1 san1
+暮想朝思 mu4 xiang3 zhao1 si1
+哪些 na3 xie1
+那么着 na4 me zhe
+南乐 nan2 yue4
+黏皮着骨 nian2 pi2 zhuo2 gu3
+黏着 nian2 zhuo2
+尿血 niao4 xie3
+弄管调弦 nong4 guan3 tiao2 xian2
+女角 nv3 jue2
+攀花折柳 pan1 hua1 zhe2 liu3
+炰鳖脍鲤 fou3 bie1 kuai4 li3
+碰头会 peng4 tou2 hui4
+辟除 pi4 chu2
+娉婷婀娜 ping1 ting2 e1 nuo2
+屏迹 bing3 ji4
+屏气吞声 bing3 qi4 tun1 sheng1
+屏声静气 bing3 sheng1 jing4 qi4
+屏声敛息 bing3 sheng1 lian3 xi1
+破镜重合 po4 jing4 chong2 he2
+溥天率土 pu3 tian1 shuai4 tu3
+器乐 qi4 yue4
+千了百了 qian1 liao3 bai3 liao3
+前爪 qian2 zhao3
+浅浅 qian3 qian3
+茜草 qian4 cao3
+俏成俏败 qiao4 cheng2 qiao4 bai4
+轻口薄舌 qing1 kou3 bo2 she2
+轻傜薄赋 qing1 yao2 bo2 fu4
+曲曲折折 qu1 qu1 zhe2 zhe2
+取给 qu3 ji3
+日没 ri4 mo4
+如登春台 ru2 deng1 chun1 tai2
+塞擦音 se4 ca1 yin1
+赛璐玢 sai4 lu4 fen1
+刹时 cha4 shi2
+山重水复 shan1 chong2 shui3 fu4
+闪长玢岩 shan3 chang2 bin1 yan2
+闪长岩 shan3 chang2 yan2
+上行 shang4 hang2
+身先朝露 shen1 xian1 zhao1 lu4
+省墓 xing3 mu4
+石英二长岩 shi2 ying1 er4 chang2 yan2
+识记 shi2 ji4
+数得上 shu3 de shang4
+衰衣 shuai1 yi1
+水宿风餐 shui3 su4 feng1 can1
+水宿山行 shui3 su4 shan1 xing2
+睡懒觉 shui4 lan3 jiao4
+说项 shuo1 xiang4
+松筠之节 song1 yun2 zhi1 jie2
+搜括 sou1 kuo4
+苏长岩 su1 chang2 yan2
+贪生恶死 tan1 sheng1 wu4 si3
+填塞 tian2 se4
+脱壳 tuo1 ke2
+五藏六府 wu3 zang4 liu4 fu3
+武行 wu3 hang2
+瑕瑜互见 xia2 yu2 hu4 jian4
+下调 xia4 tiao2
+献血 xian4 xie3
+详情度理 xiang2 qing2 du4 li3
+像模像样 xiang4 mu2 xiang4 yang4
+校本 jiao4 ben3
+挟势弄权 xie2 shi4 nong4 quan2
+斜长斑岩 xie2 chang2 ban1 yan2
+斜长角闪岩 xie2 chang2 jiao3 shan3 yan2
+斜长岩 xie2 chang2 yan2
+心惊胆颤 xin1 jing1 dan3 zhan4
+新斯的明 xin1 si1 di4 ming2
+行道树 xing2 dao4 shu4
+行东 hang2 dong1
+行商 xing2 shang1
+行栈 hang2 zhan4
+溴吡斯的明 xiu4 bi3 si1 di4 ming2
+溴新斯的明 xiu4 xin1 si1 di4 ming2
+吁咈都俞 xu1 fu2 du1 yu2
+悬龟系鱼 xuan2 gui1 xi4 yu2
+旋干转坤 xuan2 qian2 zhuan3 kun1
+衒玉贾石 xuan4 yu4 gu3 shi2
+削面 xiao1 mian4
+役畜 yi4 chu4
+饮冰食蘖 yin3 bing1 shi2 nie4
+英雄传 ying1 xiong2 zhuan4
+援藏 yuan2 zang4
+怎么着 zen3 me zhe
+乍暖还寒 zha4 nuan3 huan2 han2
+柞木 zuo4 mu4
+柞树 zuo4 shu4
+长英岩 chang2 ying1 yan2
+折辱 zhe2 ru3
+折损 zhe2 sun3
+折衷 zhe2 zhong1
+这么着 zhe4 me zhe
+正长斑岩 zheng4 chang2 ban1 yan2
+正长岩 zheng4 chang2 yan2
+枝蔓 zhi1 man4
+中都 zhong1 du1
+众啄同音 zhong4 zhuo2 tong2 yin1
+重迭 chong2 die2
+重读 chong2 du2
+重金兼紫 zhong4 jin1 jian1 zi3
+重头戏 zhong4 tou2 xi4
+重选 chong2 xuan3
+重张 chong2 zhang1
+重作冯妇 chong2 zuo4 feng2 fu4
+撰著 zhuan4 zhu4
+卒然 zu2 ran2
+琢磨 zhuo2 mo2

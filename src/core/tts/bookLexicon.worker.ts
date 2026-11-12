@@ -37,6 +37,7 @@ scope.addEventListener('message', (event) => {
         lexiconText,
         tokensText,
         curatedOverlay: data.curatedOverlay,
+        approvedOverrides: data.approvedOverrides,
       })
       scope.postMessage({
         type: 'done',
