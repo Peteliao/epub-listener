@@ -69,9 +69,32 @@ function shushengPwa(): Plugin {
   }
 }
 
+/**
+ * Dev-only: Vite's SPA fallback treats `/di-test/` as an app route and serves
+ * the Vue shell, while GitHub Pages correctly serves public/di-test/index.html.
+ * Redirect so a local directory link behaves exactly like the deployed one.
+ */
+function devDirectoryIndex(): Plugin {
+  return {
+    name: 'shusheng-dev-directory-index',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = (req.url ?? '').split('?')[0]
+        if (path === '/di-test' || path === '/di-test/') {
+          res.writeHead(302, { Location: '/di-test/index.html' })
+          res.end()
+          return
+        }
+        next()
+      })
+    },
+  }
+}
+
 export default defineConfig({
   base: './',
-  plugins: [vue(), shushengPwa()],
+  plugins: [vue(), shushengPwa(), devDirectoryIndex()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

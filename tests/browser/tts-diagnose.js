@@ -94,6 +94,24 @@ const VARIANTS = [
   { id: 'F8', set: 'prod', title: '词族 8/8 地盘', text: '自己只是占了点地盘；',
     expect: '既有修复不回退：地=dì，且「长期地」的助词仍读 de' },
 
+  // 2026-11-11 第九轮：用户反馈的「地（dì）」句子，逐条在生产配置下复听。
+  // 与 scripts/scratch/measure-di.mjs、ab-di.mjs 的真实 WASM 测量一致；
+  // 本地浏览器自检需确认每条都出声，且音素串里是 di4 而不是单字兜底 de。
+  { id: 'D1', set: 'prod', title: '地 1/7 荒地', text: '村里把荒地开垦成了良田。',
+    expect: '荒地=huang1 di4 + 词尾边界；地=dì' },
+  { id: 'D2', set: 'prod', title: '地 2/7 空地', text: '楼前有一片空地可以停车。',
+    expect: '空地=词首边界 + kong4 di4；地=dì' },
+  { id: 'D3', set: 'prod', title: '地 3/7 林地', text: '这片林地受到严格保护。',
+    expect: '林地=lin2 di4 + 词尾边界；地=dì' },
+  { id: 'D4', set: 'prod', title: '地 4/7 本地', text: '这家店只卖本地特产。',
+    expect: '本地=ben3 di4 + 词尾边界；地=dì' },
+  { id: 'D5', set: 'prod', title: '地 5/7 地图', text: '他打开地图寻找路线。',
+    expect: '地图=词首+词尾边界 + di4 tu2；地=dì' },
+  { id: 'D6', set: 'prod', title: '地 6/7 地心', text: '科学家在研究地心的结构。',
+    expect: '地心=di4 xin1，基础词典整词，无边界；地=dì' },
+  { id: 'D7', set: 'prod', title: '地 7/7 地洞', text: '兔子钻进地洞里躲了起来。',
+    expect: '地洞=di4 dong4，基础词典整词，无边界；地=dì' },
+
   { id: 'B1', set: 'probe', title: '单念「便」', text: '便',
     expect: '整句只有一个音素：pian2' },
   { id: 'B2', set: 'probe', title: '单念「宜」', text: '宜',
@@ -129,7 +147,7 @@ const GROUPS = [
   {
     set: 'prod',
     title: '第 1 组 · 生产配置（App 现在发出的声音）',
-    note: '这一组就是 App 里的真实链路（含 F1–F8 八个词组的逐条复听）。如果这里听着就不对，说明问题在覆盖表或声学模型，不在播放器。',
+    note: '这一组就是 App 里的真实链路（含 F1–F8 八个词组与 D1–D7 七个「地」句的逐条复听）。如果这里听着就不对，说明问题在覆盖表或声学模型，不在播放器。',
   },
   {
     set: 'probe',
