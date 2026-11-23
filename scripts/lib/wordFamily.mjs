@@ -446,7 +446,7 @@ export const LONG_EXCLUSIONS = Object.freeze([
 export const ROUND10_CASES = Object.freeze([
   {
     id: 'like', family: 'OOV-立刻', word: '立刻', char: '立', offset: 0,
-    phone: 'li4', boundary: 'lead',
+    phone: 'li4', boundary: 'both',
     contexts: [
       { label: '反馈原句', sentence: '来到此处，你立刻就会明白原因何在。' },
       { label: '短句', sentence: '你立刻就会明白。' },

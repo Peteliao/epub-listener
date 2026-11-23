@@ -44,7 +44,7 @@ describe('2026-11-23 第十轮：四条反馈的最终词典', () => {
       expect(phones[item.offset], item.word).toBe(item.phone)
       expect(currentBoundary(reading).kind, item.word).toBe(item.boundary)
     }
-    expect(assets.overlay.entries.get('立刻')).toBe('" li4 ke4')
+    expect(assets.overlay.entries.get('立刻')).toBe('" li4 ke4 "')
     expect(assets.overlay.entries.get('长期')).toBe('chang2 qi1')
     expect(assets.overlay.entries.get('陪酒那行')).toBe('pei2 jiu3 na4 hang2 "')
   })
