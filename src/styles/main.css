@@ -56,6 +56,19 @@ body {
   overflow: hidden;
 }
 
+/* iOS 26+ derives the status bar tint from the page background. Pocket mode
+   must black out every page layer, not just the overlay, or the system bar
+   keeps sampling the previous reading theme. */
+html.pocket-lock,
+html.pocket-lock body,
+html.pocket-lock #app {
+  background: #000 !important;
+}
+
+html.pocket-lock {
+  color-scheme: dark;
+}
+
 body.has-sheet {
   overscroll-behavior: none;
 }

@@ -10,6 +10,7 @@ const POCKET_RETURN_KEY = 'shusheng.pocket-return-theme.v1'
 
 beforeEach(() => {
   localStorage.clear()
+  document.documentElement.classList.remove('pocket-lock')
   setActivePinia(createPinia())
 })
 
@@ -85,6 +86,17 @@ describe('口袋模式 OLED 主题', () => {
     expect(store.settings.theme).toBe('night')
     expect(localStorage.getItem(POCKET_RETURN_KEY)).toBeNull()
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}').theme).toBe('night')
+  })
+
+  it('口袋模式切换会同步标记页面根节点，退出后移除', () => {
+    const store = useSettingsStore()
+    store.patch({ theme: 'sky' })
+
+    store.setPocketThemeActive(true)
+    expect(document.documentElement.classList.contains('pocket-lock')).toBe(true)
+
+    store.setPocketThemeActive(false)
+    expect(document.documentElement.classList.contains('pocket-lock')).toBe(false)
   })
 
   it('口袋模式切换会同步把 theme-color 改为纯黑并在退出后恢复', () => {

@@ -43,6 +43,13 @@ function writePocketReturnTheme(theme: ReaderTheme | null): void {
   }
 }
 
+function syncPocketPageSurface(active: boolean): void {
+  if (typeof document === 'undefined') return
+  // iOS 26+ samples the page background for the status bar tint, so every
+  // layer must be black for pocket mode rather than only the overlay.
+  document.documentElement.classList.toggle('pocket-lock', active)
+}
+
 function sanitize(raw: unknown): ReaderSettings {
   const source =
     raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
@@ -204,6 +211,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const activePalette = computed(() => READER_PALETTES[activeTheme.value])
 
   function setPocketThemeActive(active: boolean): void {
+    syncPocketPageSurface(active)
     if (active === pocketThemeActive.value) return
     if (active) {
       pocketThemeActive.value = true

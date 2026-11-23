@@ -172,10 +172,17 @@ describe('主题表面同步更新', () => {
       delete (navigator as Navigator & { standalone?: boolean }).standalone
     })
 
-    it('index.html 使用 black-translucent 让页面延伸到状态栏', () => {
+    it('index.html 不锁定状态栏样式，交由 iOS 从页面背景取色', () => {
       const html = readFileSync('index.html', 'utf8')
-      expect(html).toContain(
-        'name="apple-mobile-web-app-status-bar-style" content="black-translucent"',
+      expect(html).not.toMatch(
+        /name=["']apple-mobile-web-app-status-bar-style["']/,
+      )
+    })
+
+    it('口袋模式把 html、body 与 #app 的页面底色一起刷黑', () => {
+      const css = readFileSync('src/styles/main.css', 'utf8')
+      expect(css).toMatch(
+        /html\.pocket-lock,\s*html\.pocket-lock body,\s*html\.pocket-lock #app\s*\{\s*background: #000 !important;\s*\}/,
       )
     })
 
