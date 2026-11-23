@@ -69,11 +69,15 @@ export function protectPronunciations(
       const index = source.indexOf(word, from)
       if (index < 0) break
       from = index + word.length
+      if (covered.some(([start, end]) => index >= start && index < end)) continue
+      // Mark every match as covered, even when it starts at the sentence edge
+      // or already has a boundary. Otherwise a shorter word nested inside a
+      // longer one (会计 inside 学会计) could still insert a second U+200B and
+      // split the longer word at the sentence start.
+      covered.push([index, index + word.length])
       if (index === 0 || !HAN.test(source[index - 1])) continue
       if (source[index - 1] === WORD_BOUNDARY) continue
-      if (covered.some(([start, end]) => index >= start && index < end)) continue
       insertions.push(index)
-      covered.push([index, index + word.length])
     }
   }
 

@@ -15,6 +15,7 @@ import { dirname, join, resolve } from 'node:path'
 import { ROOT, loadMatchaAssets } from './lib/reading.mjs'
 import { createMatchaSynth } from './lib/matchaSynth.mjs'
 import { analyzeEnvelope, evaluateTarget, voicedBounds } from './lib/envelope.mjs'
+import { analyzeF0 } from './lib/f0.mjs'
 import {
   buildRuntimeLexicon, loadWordLists, prepareRuntimeTextWithOverlay, readAsset,
 } from './lib/wordFamily.mjs'
@@ -74,6 +75,7 @@ async function main(options) {
         const fullAudio = synth.generateText(prepareRuntimeTextWithOverlay(sentence, assets, lists))
         const envelope = analyzeEnvelope(fullAudio.samples, fullAudio.sampleRate)
         const target = evaluateTarget(envelope, prefixEndMs)
+        const f0 = analyzeF0(fullAudio.samples, fullAudio.sampleRate)
         results.push({
           caseId: item.id,
           word: item.word,
@@ -84,6 +86,14 @@ async function main(options) {
           gapMs: target.gapMs,
           verdict: target.verdict,
           runs: envelope.runs,
+          f0: {
+            voicedRatio: f0.voicedRatio,
+            jumpRatio: f0.jumpRatio,
+            maxJump: f0.maxJump,
+            octaveJumps: f0.octaveJumps,
+            finalSlopeHzPerSec: f0.finalSlopeHzPerSec,
+            meanF0: f0.meanF0,
+          },
         })
       }
     }
@@ -105,6 +115,13 @@ async function main(options) {
     const first = item.first ? `${pct(item.first.ms)} / peak ${Math.round(item.first.peak * 100)}%` : '—'
     const second = item.second ? `${pct(item.second.ms)} / peak ${Math.round(item.second.peak * 100)}%` : '—'
     lines.push(`| ${item.caseId} | ${item.word} | ${pct(item.prefixEndMs)} | ${first} | ${second} | ${item.gapMs == null ? '—' : pct(item.gapMs)} | ${item.verdict} |`)
+  }
+  lines.push('', '## F0 连续性（advisory）', '',
+    '| 案例 | 词 | voiced | 跳变帧 | 最大跳变 | 八度跳 | 句末斜率 |',
+    '| --- | --- | ---: | ---: | ---: | ---: | ---: |')
+  for (const item of results) {
+    const f0 = item.f0
+    lines.push(`| ${item.caseId} | ${item.word} | ${Math.round(f0.voicedRatio * 100)}% | ${Math.round(f0.jumpRatio * 100)}% | ${Math.round(f0.maxJump * 100)}% | ${f0.octaveJumps} | ${f0.finalSlopeHzPerSec == null ? '—' : `${f0.finalSlopeHzPerSec.toFixed(1)}Hz/s`} |`)
   }
   writeFileSync(SUMMARY, `${lines.join('\n')}\n`, 'utf8')
   console.log(`整句包络报告：${results.length} 条`)

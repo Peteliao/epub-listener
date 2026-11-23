@@ -182,11 +182,13 @@ export function protectPronunciations(text, words) {
       const index = source.indexOf(word, from)
       if (index < 0) break
       from = index + word.length
+      if (covered.some(([start, end]) => index >= start && index < end)) continue
+      // Mark every match, even at the sentence edge or before an existing
+      // boundary, so a nested shorter word cannot split the longer one.
+      covered.push([index, index + word.length])
       if (index === 0 || !HAN.test(source[index - 1])) continue
       if (source[index - 1] === WORD_BOUNDARY) continue
-      if (covered.some(([start, end]) => index >= start && index < end)) continue
       insertions.push(index)
-      covered.push([index, index + word.length])
     }
   }
   if (!insertions.length) return source

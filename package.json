@@ -34,6 +34,8 @@
     "audit:omission": "node scripts/audit-omission.mjs",
     "audit:envelope": "node scripts/audit-envelope.mjs",
     "blind:render": "node scripts/render-blind.mjs",
+    "blind:score": "node scripts/blind-score.mjs",
+    "explain:reading": "node scripts/explain-reading.mjs",
     "audit:word-family": "node scripts/audit-word-family.mjs",
     "audit:word-family:audio": "node scripts/audit-word-family.mjs --measure --audio",
     "feedback:loop": "node scripts/feedback-loop.mjs",
