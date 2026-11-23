@@ -96,7 +96,10 @@ describe('整词保护（零宽边界）', () => {
     expect(protectPronunciations('会计。')).toBe('会计。')
     expect(protectPronunciations('做，会计')).toBe('做，会计')
     const once = protectPronunciations('一些会占便宜的有钱人长期地用盐不给钱；')
-    expect(once).toBe(`一些会${WORD_BOUNDARY}占便宜的有钱人长期地用盐不给钱；`)
+    // 长期 is protected since the 2026-11-23 round: 里长 would otherwise steal it.
+    expect(once).toBe(
+      `一些会${WORD_BOUNDARY}占便宜的有钱人${WORD_BOUNDARY}长期地用盐不给钱；`,
+    )
     expect(protectPronunciations(once)).toBe(once)
   })
 

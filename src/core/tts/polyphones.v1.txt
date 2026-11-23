@@ -1670,3 +1670,103 @@
 林地 lin2 di4 "
 本地 ben3 di4 "
 地图 " di4 tu2 "
+
+# 2026-11-23 第十轮反馈：四条用户原句，按「一个词族」而不是「一个词」修复。
+# 每条真实 WASM 证据与逐词 A/B 见 scripts/out/round10-measure.json；
+# 词族静态检查与真实音节验收由 scripts/audit-word-family.mjs 永久守门。
+#
+# 1. 立刻：基础词典没有整词行，最长匹配把它拆成单字「立」「刻」；音素虽然
+#    是 li4 ke4，但真实 WASM 在反馈原句里「立」只有 93ms（被吞），「刻」186ms，
+#    听感就是「立」后断开、后一个字含混。三条语境 A/B：
+#      无边界 93/186、232/186、-12/11
+#      词尾   244/314、291/326、81/174（第三句「立」仍被吞）
+#      词首   163/163、198/244、151/163（三条全部 normal）
+#      双端   244/255、105/256、174/186
+#    只有词首边界在全部语境稳定，因此 `立刻 " li4 ke4`。lead 边界属于强改动，
+#    已在 omissionCases.v1.jsonl 登记 om-0007（完整反馈原句 + 真实 WASM 验收）。
+立刻 " li4 ke4
+#
+# 2. 染发：词库没有整词，单字「发」兜底是 fa1（发生/发现义）；头发义应读 fà。
+#    这不是「染发」一个词的问题：词库里「秀发」「黑发」「发胶」也错成 fa1，
+#    「美发」「假发」「发膜」「发带」「发质」「发色」「发量」「发际线」
+#    「染发剂」「洗发水」「护发素」则整词缺失。下面按「发=头发义」词族一次补齐；
+#    出发/发现/发生/开发/发言/发财等 fa1 语境一条不动（单元测试守住排除项）。
+#    A/B：反馈原句 174/127ms 已 normal，三条语境都无需静音边界；只改音素。
+染发 ran3 fa4
+美发 mei3 fa4
+秀发 xiu4 fa4 "
+黑发 hei1 fa4
+假发 jia3 fa4
+吹发 chui1 fa4
+盘发 pan2 fa4
+直发 zhi2 fa4
+发胶 fa4 jiao1
+发膜 fa4 mo2
+发带 fa4 dai4
+发际线 fa4 ji4 xian4
+发质 fa4 zhi4
+发色 fa4 se4
+发量 fa4 liang4
+染发剂 ran3 fa4 ji4
+洗发水 xi3 fa4 shui3
+护发素 hu4 fa4 su4
+#
+# 3. 长期：基础词典本来是 chang2 qi1，音素没有错。真实前端日志（debug=1）
+#    显示「有几家公司在店里长期订餐」被切成 `店 / 里长(li2 zhang3) / 期`：
+#    前一个字「里」先与「长」组成更长的词条「里长」，整词「长期」从未被匹配，
+#    于是听到 zhǎng。这是最长匹配抢词（与「学会计」同族），不是读音表缺条。
+#    修复必须让「长期」重新从「长」开始匹配：覆盖行钉住 + 整词保护 U+200B
+#    （pronunciationGuard 的 overlayProtectedWords 会自动把覆盖表多字词加入
+#    保护；protectedWords.v1.txt 再显式登记一次，保证静态审计与运行期一致）。
+#    同族不能只修「长期」：凡是「X + 多音字词首」被更长的 X+首字词条抢走，
+#    都由 self-iterate 新增的 prefix-steal 探测器全书发现（见 README）。
+长期 chang2 qi1
+长期性 chang2 qi1 xing4
+长期以来 chang2 qi1 yi3 lai2
+长期化 chang2 qi1 hua4
+# 「店里长期」是反馈原句里的四字组合，用来让**纯词典门禁**（黄金集、
+# 历史重放）也能看到正确读音；运行期真正的通用修复仍是上面的整词保护
+# U+200B（公司里长期 / 厂里长期 等任意前字都能重新匹配）。同「学会计」的
+# 处理：三/四字整词钉住既让门禁可见，也让最长匹配有确定落点。
+店里长期 dian4 li3 chang2 qi1
+#
+# 4. 那行：「行」单字兜底是 xing2（行走/可以），行业义应读 háng。裸词「那行」
+#    本身有歧义（「那行不行」= 那可以吗，读 xing2），不能整词改成 háng；只钉住
+#    能确定是行业义的搭配：干/做/入 + 那/这 + 行、吃这行饭、干一行爱一行 等。
+#    用户原句「干陪酒那行」由 `陪酒那行` 整词命中。真实 WASM：
+#      无边界 47/35/35/279ms（前三个音节全被吞）
+#      词尾   174/267/255/325、279/290/221/232、302/256/233/198（三条全 normal）
+#      词首   337/290/279/465（行 465ms 吞并邻音）
+#      双端   267/128/163/325
+#    词尾边界是唯一在三条语境全部稳定、且不把「行」拉成吞并音的写法。
+陪酒那行 pei2 jiu3 na4 hang2 "
+陪酒这行 pei2 jiu3 zhe4 hang2
+陪酒那一行 pei2 jiu3 na4 yi4 hang2
+陪酒这一行 pei2 jiu3 zhe4 yi4 hang2
+干那行 gan4 na4 hang2
+干这行 gan4 zhe4 hang2
+干哪行 gan4 na3 hang2
+做那行 zuo4 na4 hang2
+做这行 zuo4 zhe4 hang2
+做哪行 zuo4 na3 hang2
+入那行 ru4 na4 hang2
+入这行 ru4 zhe4 hang2
+入哪行 ru4 na3 hang2
+吃那行饭 chi1 na4 hang2 fan4
+吃这行饭 chi1 zhe4 hang2 fan4
+吃哪行饭 chi1 na3 hang2 fan4
+那行饭 na4 hang2 fan4
+这行饭 zhe4 hang2 fan4
+哪行饭 na3 hang2 fan4
+那行当 na4 hang2 dang1
+这行当 zhe4 hang2 dang1
+哪行当 na3 hang2 dang1
+干一行 gan4 yi4 hang2
+爱一行 ai4 yi4 hang2
+干这一行 gan4 zhe4 yi4 hang2
+干那一行 gan4 na4 yi4 hang2
+干哪一行 gan4 na3 yi4 hang2
+做这一行 zuo4 zhe4 yi4 hang2
+做那一行 zuo4 na4 yi4 hang2
+做哪一行 zuo4 na3 yi4 hang2
+在这一行 zai4 zhe4 yi4 hang2

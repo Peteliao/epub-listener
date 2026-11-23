@@ -7,6 +7,7 @@
 // the whole replay is a fast CI gate and can be unit-tested directly.
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { pinyin } from 'pinyin-pro'
 import {
   maxWordLength, phoneticPhones, readingAt, tokenizeSpans,
 } from './reading.mjs'
@@ -58,6 +59,7 @@ const BOUNDARY_KIND = {
 }
 
 const HAN = /^\p{Script=Han}+$/u
+const PINYIN_OPTIONS = { toneType: 'num', v: true }
 
 function jsonl(text) {
   return String(text).split(/\r?\n/).flatMap((line) => {
@@ -497,6 +499,168 @@ export function discoverBoundaryLeads(text, assets, { limit = 20, maxSentences =
       confidence: item.count > 200 ? 'low' : 'high',
       note: item.count > 200 ? '超高频词，仅列线索不自动应用' : '',
     }))
+}
+
+/**
+ * 2026-11-23 tenth round: prefix-steal discovery.
+ *
+ * Matcha's front end matches the LONGEST dictionary word at each position. If
+ * the character before the intended word forms a longer word with the intended
+ * word's first character, the intended word is never even considered:
+ *   店里长期订餐  -> 店 / 里长(li2 zhang3) / 期      (长期 should be chang2 qi1)
+ *   可能是学会计  -> 可能 / 是 / 学会(xue2 hui4) / 计 (会计 should be kuai4 ji4)
+ * The runtime repair is a U+200B word boundary before the intended word; this
+ * discoverer finds every such shape in a corpus from the dictionary alone, so a
+ * new book cannot silently keep the class. It is review-only: it never edits the
+ * overlay.
+ */
+export function discoverPrefixStealLeads(text, assets, { limit = 20, maxSentences = 0 } = {}) {
+  const effective = assets.effective
+  const byFirst = new Map()
+  for (const word of effective.keys()) {
+    const chars = Array.from(word)
+    if (chars.length < 2 || chars.length > 4 || !HAN.test(word)) continue
+    const list = byFirst.get(chars[0]) ?? []
+    list.push(word)
+    byFirst.set(chars[0], list)
+  }
+  for (const list of byFirst.values()) {
+    list.sort((left, right) => Array.from(right).length - Array.from(left).length)
+  }
+  const phoneAt = (word, offset) => {
+    const phones = phoneticPhones(effective.get(word) ?? '')
+    return phones.length === Array.from(word).length ? phones[offset] : null
+  }
+  const sentences = maxSentences > 0
+    ? splitCorpus(text).slice(0, maxSentences)
+    : splitCorpus(text)
+  const buckets = new Map()
+  for (const sentence of sentences) {
+    const chars = Array.from(sentence)
+    for (let index = 0; index < chars.length - 1; index += 1) {
+      if (!HAN.test(chars[index]) || !HAN.test(chars[index + 1])) continue
+      const prefixWord = `${chars[index]}${chars[index + 1]}`
+      if (!effective.has(prefixWord)) continue
+      const stolenPhone = phoneAt(prefixWord, 1)
+      if (!stolenPhone) continue
+      const target = (byFirst.get(chars[index + 1]) ?? [])
+        .find((word) => sentence.startsWith(word, index + 1))
+      if (!target) continue
+      const intendedPhone = phoneAt(target, 0)
+      if (!intendedPhone || intendedPhone === stolenPhone) continue
+      const key = `${prefixWord}|${target}`
+      let bucket = buckets.get(key)
+      if (!bucket) {
+        bucket = {
+          family: 'segmentation',
+          kind: 'prefix-steal',
+          word: target,
+          reading: effective.get(target),
+          actual: prefixWord,
+          actualReading: effective.get(prefixWord),
+          stolenPhone,
+          intendedPhone,
+          confidence: assets.overlay.entries.has(target) ? 'high' : 'review',
+          count: 0,
+          evidence: [],
+        }
+        buckets.set(key, bucket)
+      }
+      bucket.count += 1
+      if (bucket.evidence.length < 3) {
+        const sample = clip(sentence, index, index + 1 + Array.from(target).length, 12)
+        if (!bucket.evidence.includes(sample)) bucket.evidence.push(sample)
+      }
+    }
+  }
+  return [...buckets.values()]
+    .sort((left, right) =>
+      (left.confidence === 'high' ? 0 : 1) - (right.confidence === 'high' ? 0 : 1)
+      || right.count - left.count
+      || left.word.localeCompare(right.word, 'zh'))
+    .slice(0, limit)
+}
+
+const OOV_STOPWORDS = new Set([
+  '我们', '你们', '他们', '她们', '它们', '咱们', '这个', '那个', '这些', '那些',
+  '这里', '那里', '哪里', '这样', '那样', '怎样', '什么', '怎么', '为什么',
+  '一个', '一下', '一点', '一些', '一种', '不是', '没有', '就是', '还是',
+  '可以', '应该', '已经', '因为', '所以', '但是', '而且', '如果', '虽然',
+])
+
+/**
+ * 2026-11-23 tenth round: OOV two-character words whose *phones look right*.
+ *
+ * bookLexicon only emits an overlay row when the contextual reading differs
+ * from the single-character fallback, so 立刻 (li4 ke4 = 立 + 刻) was invisible
+ * to every phone-level gate. The acoustic model still swallowed 立 to 93ms.
+ * This discoverer lists such words — segmented by pinyin-pro, absent from the
+ * runtime dictionary, not covered by a longer lexicon span, and with phones
+ * identical to the single-character fallback — as measurement candidates.
+ */
+export function discoverOovAcousticLeads(text, assets, { limit = 20, minCount = 2 } = {}) {
+  const effective = assets.effective
+  const maxLength = assets.maxLength ?? maxWordLength(effective)
+  const buckets = new Map()
+  // pinyin-pro's segmenter leaves 立刻 as two single characters (which is why
+  // bookLexicon never even offered it as an OOV candidate). The platform ICU
+  // word segmenter does group it, so this dev-only detector uses that instead.
+  const segmenter = new Intl.Segmenter('zh', { granularity: 'word' })
+  for (const sentence of splitCorpus(text)) {
+    const words = [...segmenter.segment(sentence)].map((item) => item.segment)
+    if (words.join('') !== sentence) continue
+    const spans = tokenizeSpans(sentence, effective, maxLength)
+    const covered = new Set()
+    for (const span of spans) {
+      if (Array.from(span.word).length < 2) continue
+      for (let index = span.start; index < span.end; index += 1) covered.add(index)
+    }
+    let offset = 0
+    for (const word of words) {
+      const start = offset
+      const length = Array.from(word).length
+      offset += length
+      if (length !== 2 || !HAN.test(word) || effective.has(word)) continue
+      if (OOV_STOPWORDS.has(word)) continue
+      if (covered.has(start) || covered.has(start + 1)) continue
+      const singles = Array.from(word).map((char) => {
+        const reading = effective.get(char)
+        return reading ? phoneticPhones(reading)[0] : null
+      })
+      if (singles.some((phone) => !phone)) continue
+      let reference
+      try {
+        reference = pinyin(word, { ...PINYIN_OPTIONS, type: 'array' })
+      } catch {
+        continue
+      }
+      if (reference.length !== 2) continue
+      const normalized = reference.map((phone) => String(phone).toLowerCase())
+      if (normalized.some((phone, index) => phone !== singles[index])) continue
+      let bucket = buckets.get(word)
+      if (!bucket) {
+        bucket = {
+          family: 'boundary',
+          kind: 'oov-acoustic',
+          word,
+          phones: singles,
+          confidence: 'review',
+          count: 0,
+          evidence: [],
+        }
+        buckets.set(word, bucket)
+      }
+      bucket.count += 1
+      if (bucket.evidence.length < 3) {
+        const sample = clip(sentence, start, start + 2, 14)
+        if (!bucket.evidence.includes(sample)) bucket.evidence.push(sample)
+      }
+    }
+  }
+  return [...buckets.values()]
+    .filter((item) => item.count >= minCount)
+    .sort((left, right) => right.count - left.count || left.word.localeCompare(right.word, 'zh'))
+    .slice(0, limit)
 }
 
 /** Curated words that appear in the corpus but lose longest-match to another word. */

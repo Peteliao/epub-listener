@@ -271,6 +271,44 @@ export function coverageOf(sentence, word, effective) {
   return sentenceCoverage(streamFor(sentence, word, effective), sentence)
 }
 
+/**
+ * Resolve the span that actually covers the nth occurrence of `char`. A longer
+ * curated row can legitimately contain the intended word (店里长期 contains
+ * 长期; 学会计 contains 会计), so exact-word lookup is too strict for the
+ * runtime/protection checks. The returned offset is the char's index inside the
+ * covering span, and `phone` is that char's reading.
+ */
+export function streamForChar(sentence, char, occurrence, effective) {
+  const chars = Array.from(sentence)
+  let seen = 0
+  let target = -1
+  for (let index = 0; index < chars.length; index += 1) {
+    if (chars[index] !== char) continue
+    seen += 1
+    if (seen === occurrence) {
+      target = index
+      break
+    }
+  }
+  if (target < 0) return null
+  const { tokens, ranges } = sentenceTokens(sentence, effective, maxWordLength(effective))
+  const range = ranges.find((item) => target >= item.startChar && target < item.endChar)
+  if (!range) return null
+  const reading = effective.get(range.word) ?? ''
+  const phones = phoneticPhones(reading)
+  if (!phones.length || phones.length !== Array.from(range.word).length) return null
+  return {
+    tokens,
+    range,
+    phones,
+    count: phones.length,
+    reading,
+    word: range.word,
+    offset: target - range.startChar,
+    phone: phones[target - range.startChar],
+  }
+}
+
 export function spanOf(sentence, word, effective) {
   return tokenizeSpans(sentence, effective, maxWordLength(effective))
     .some((span) => span.word === word)
@@ -390,3 +428,286 @@ export const LONG_EXCLUSIONS = Object.freeze([
   { phrase: '他指着皇长子', pattern: '^zhang' },
   { phrase: '他成长了，从一个战争的爱好者', pattern: '^zhang' },
 ])
+
+/**
+ * 2026-11-23 tenth round: four listener reports, each fixed as a *word family*.
+ *
+ * 立刻 is an OOV two-character word (the base lexicon has no row), so the front
+ * end reads two lone characters. The phones are correct, which is why every
+ * phone-only gate stayed green; the acoustic model still squeezed 立 to 93ms.
+ * 长期 is the opposite: the base reading is correct, but the preceding 里 plus
+ * its first character form the longer dictionary word 里长, so 长期 is never
+ * matched. 陪酒那行 is a 行=háng word (industry sense) whose bare form cannot be
+ * pinned because 那行 can also mean "that's OK" (xíng).
+ *
+ * Real-WASM A/B numbers are in scripts/out/round10-measure.json; the hard gate
+ * is scripts/audit-word-family.mjs, which re-measures these contexts every run.
+ */
+export const ROUND10_CASES = Object.freeze([
+  {
+    id: 'like', family: 'OOV-立刻', word: '立刻', char: '立', offset: 0,
+    phone: 'li4', boundary: 'lead',
+    contexts: [
+      { label: '反馈原句', sentence: '来到此处，你立刻就会明白原因何在。' },
+      { label: '短句', sentence: '你立刻就会明白。' },
+      { label: '书中整句', sentence: '他立刻站了起来。' },
+    ],
+    aB: { none: [93, 186], tail: [244, 314], lead: [163, 163], both: [244, 255] },
+  },
+  {
+    id: 'chang', family: '抢词-长期', word: '长期', char: '长', offset: 0,
+    phone: 'chang2', boundary: 'none',
+    stolen: {
+      by: '里长', reading: 'li2 zhang3',
+      sentence: '有几家公司在店里长期订餐，必须在十二点之前送到。',
+    },
+    contexts: [
+      { label: '反馈原句', sentence: '有几家公司在店里长期订餐，必须在十二点之前送到。' },
+      { label: '短句', sentence: '他们长期保持合作关系。' },
+    ],
+  },
+  {
+    id: 'hang', family: '行业-那行', word: '陪酒那行', char: '行', offset: 3,
+    phone: 'hang2', boundary: 'tail',
+    contexts: [
+      { label: '反馈原句', sentence: '你也不能永远干陪酒那行啊，美里也大了，她面子上怕也抹不开。' },
+      { label: '短句', sentence: '她说陪酒那行太辛苦。' },
+      { label: '书中整句', sentence: '干陪酒那行并不轻松。' },
+    ],
+    aB: {
+      none: [47, 35, 35, 279], tail: [174, 267, 255, 325],
+      lead: [337, 290, 279, 465], both: [267, 128, 163, 325],
+    },
+  },
+])
+
+/**
+ * 发 = fà（头发义）词族。词库里「秀发」「黑发」「发胶」本身读错，
+ * 「染发」「美发」「假发」「发膜」「发带」「发质」「发色」「发量」
+ * 「发际线」「染发剂」「洗发水」「护发素」等整词缺失；单字「发」兜底是
+ * fa1（发生/发现义），所以这类词只能整词钉住，不能做单字覆盖。
+ */
+export const HAIR_FA_CASES = Object.freeze([
+  { word: '染发', reading: 'ran3 fa4' },
+  { word: '美发', reading: 'mei3 fa4' },
+  // Real WASM in the round-10 gate: 秀发 measured 371/371ms (merged) without
+  // a boundary; tail is 279/291, 209/209, 232/244 across three contexts.
+  { word: '秀发', reading: 'xiu4 fa4 "', boundary: 'tail' },
+  { word: '黑发', reading: 'hei1 fa4' },
+  { word: '假发', reading: 'jia3 fa4' },
+  { word: '吹发', reading: 'chui1 fa4' },
+  { word: '盘发', reading: 'pan2 fa4' },
+  { word: '直发', reading: 'zhi2 fa4' },
+  { word: '发胶', reading: 'fa4 jiao1' },
+  { word: '发膜', reading: 'fa4 mo2' },
+  { word: '发带', reading: 'fa4 dai4' },
+  { word: '发际线', reading: 'fa4 ji4 xian4' },
+  { word: '发质', reading: 'fa4 zhi4' },
+  { word: '发色', reading: 'fa4 se4' },
+  { word: '发量', reading: 'fa4 liang4' },
+  { word: '染发剂', reading: 'ran3 fa4 ji4' },
+  { word: '洗发水', reading: 'xi3 fa4 shui3' },
+  { word: '护发素', reading: 'hu4 fa4 su4' },
+  // Already correct in the base lexicon or an earlier curated row; kept here
+  // so a future base-lexicon update cannot silently regress the family.
+  { word: '头发', reading: 'tou2 fa4' },
+  { word: '短发', reading: 'duan3 fa4' },
+  { word: '长发', reading: 'chang2 fa4' },
+  { word: '发夹', reading: 'fa4 jia1' },
+  { word: '发丝', reading: 'fa4 si1' },
+  { word: '发梢', reading: 'fa4 shao1' },
+  { word: '发小', reading: 'fa4 xiao3' },
+  { word: '发型', reading: 'fa4 xing2' },
+  { word: '发廊', reading: 'fa4 lang2' },
+  { word: '理发', reading: 'li3 fa4' },
+  { word: '烫发', reading: 'tang4 fa4' },
+  { word: '剪发', reading: 'jian3 fa4' },
+  { word: '洗发', reading: 'xi3 fa4' },
+  { word: '护发', reading: 'hu4 fa4' },
+  { word: '卷发', reading: 'juan3 fa4' },
+  { word: '白发', reading: 'bai2 fa4' },
+  { word: '金发', reading: 'jin1 fa4' },
+  { word: '脱发', reading: 'tuo1 fa4' },
+  { word: '白发苍苍', reading: 'bai2 fa4 cang1 cang1' },
+  { word: '千钧一发', reading: 'qian1 jun1 yi1 fa4' },
+  { word: '令人发指', reading: 'ling4 ren2 fa4 zhi3' },
+  { word: '怒发冲冠', reading: 'nu4 fa4 chong1 guan1' },
+  { word: '披头散发', reading: 'pi1 tou2 san4 fa4' },
+  { word: '鹤发童颜', reading: 'he4 fa4 tong2 yan2' },
+])
+
+/** 发 = fā（发生/发出义）in the same leading-character shape: must not be touched. */
+export const HAIR_FA_EXCLUSIONS = Object.freeze([
+  { word: '出发', phone: 'fa1' },
+  { word: '发现', phone: 'fa1' },
+  { word: '发生', phone: 'fa1' },
+  { word: '开发', phone: 'fa1' },
+  { word: '发言', phone: 'fa1' },
+  { word: '发财', phone: 'fa1' },
+  { word: '发放', phone: 'fa1' },
+  { word: '发布', phone: 'fa1' },
+  { word: '发表', phone: 'fa1' },
+  { word: '发射', phone: 'fa1' },
+  { word: '发挥', phone: 'fa1' },
+  { word: '发行', phone: 'fa1' },
+  { word: '发电', phone: 'fa1' },
+  { word: '发烧', phone: 'fa1' },
+  { word: '发货', phone: 'fa1' },
+  { word: '发火', phone: 'fa1' },
+  { word: '发起', phone: 'fa1' },
+  { word: '发明', phone: 'fa1' },
+  { word: '发芽', phone: 'fa1' },
+  { word: '发酵', phone: 'fa1' },
+  { word: '发光', phone: 'fa1' },
+  { word: '发声', phone: 'fa1' },
+  { word: '发愁', phone: 'fa1' },
+  { word: '发呆', phone: 'fa1' },
+  { word: '发愣', phone: 'fa1' },
+  { word: '发炎', phone: 'fa1' },
+  { word: '发抖', phone: 'fa1' },
+  { word: '发问', phone: 'fa1' },
+  { word: '发福', phone: 'fa1' },
+  { word: '发迹', phone: 'fa1' },
+  { word: '发配', phone: 'fa1' },
+  { word: '发落', phone: 'fa1' },
+  { word: '发难', phone: 'fa1' },
+  { word: '发怔', phone: 'fa1' },
+  { word: '散发', phone: 'fa1' },
+])
+
+/**
+ * 行 = háng（行业义）词族。裸词「那行」有歧义（「那行不行」= 那可以吗），
+ * 只钉住能由动词/饭/当等语境确定是行业义的搭配；动词义（进行/行动/行人/
+ * 行李等）全部保持 xíng。
+ */
+export const HANG_INDUSTRY_CASES = Object.freeze([
+  { word: '陪酒那行', char: '行', offset: 3, phone: 'hang2', reading: 'pei2 jiu3 na4 hang2 "', boundary: 'tail' },
+  { word: '陪酒这行', char: '行', offset: 3, phone: 'hang2', reading: 'pei2 jiu3 zhe4 hang2', boundary: 'none' },
+  { word: '陪酒那一行', char: '行', offset: 4, phone: 'hang2', reading: 'pei2 jiu3 na4 yi4 hang2', boundary: 'none' },
+  { word: '陪酒这一行', char: '行', offset: 4, phone: 'hang2', reading: 'pei2 jiu3 zhe4 yi4 hang2', boundary: 'none' },
+  { word: '干那行', char: '行', offset: 2, phone: 'hang2', reading: 'gan4 na4 hang2', boundary: 'none' },
+  { word: '干这行', char: '行', offset: 2, phone: 'hang2', reading: 'gan4 zhe4 hang2', boundary: 'none' },
+  { word: '干哪行', char: '行', offset: 2, phone: 'hang2', reading: 'gan4 na3 hang2', boundary: 'none' },
+  { word: '做那行', char: '行', offset: 2, phone: 'hang2', reading: 'zuo4 na4 hang2', boundary: 'none' },
+  { word: '做这行', char: '行', offset: 2, phone: 'hang2', reading: 'zuo4 zhe4 hang2', boundary: 'none' },
+  { word: '做哪行', char: '行', offset: 2, phone: 'hang2', reading: 'zuo4 na3 hang2', boundary: 'none' },
+  { word: '入那行', char: '行', offset: 2, phone: 'hang2', reading: 'ru4 na4 hang2', boundary: 'none' },
+  { word: '入这行', char: '行', offset: 2, phone: 'hang2', reading: 'ru4 zhe4 hang2', boundary: 'none' },
+  { word: '入哪行', char: '行', offset: 2, phone: 'hang2', reading: 'ru4 na3 hang2', boundary: 'none' },
+  { word: '吃那行饭', char: '行', offset: 2, phone: 'hang2', reading: 'chi1 na4 hang2 fan4', boundary: 'none' },
+  { word: '吃这行饭', char: '行', offset: 2, phone: 'hang2', reading: 'chi1 zhe4 hang2 fan4', boundary: 'none' },
+  { word: '吃哪行饭', char: '行', offset: 2, phone: 'hang2', reading: 'chi1 na3 hang2 fan4', boundary: 'none' },
+  { word: '那行饭', char: '行', offset: 1, phone: 'hang2', reading: 'na4 hang2 fan4', boundary: 'none' },
+  { word: '这行饭', char: '行', offset: 1, phone: 'hang2', reading: 'zhe4 hang2 fan4', boundary: 'none' },
+  { word: '哪行饭', char: '行', offset: 1, phone: 'hang2', reading: 'na3 hang2 fan4', boundary: 'none' },
+  { word: '那行当', char: '行', offset: 1, phone: 'hang2', reading: 'na4 hang2 dang1', boundary: 'none' },
+  { word: '这行当', char: '行', offset: 1, phone: 'hang2', reading: 'zhe4 hang2 dang1', boundary: 'none' },
+  { word: '哪行当', char: '行', offset: 1, phone: 'hang2', reading: 'na3 hang2 dang1', boundary: 'none' },
+  { word: '干一行', char: '行', offset: 2, phone: 'hang2', reading: 'gan4 yi4 hang2', boundary: 'none' },
+  { word: '爱一行', char: '行', offset: 2, phone: 'hang2', reading: 'ai4 yi4 hang2', boundary: 'none' },
+  { word: '干这一行', char: '行', offset: 3, phone: 'hang2', reading: 'gan4 zhe4 yi4 hang2', boundary: 'none' },
+  { word: '干那一行', char: '行', offset: 3, phone: 'hang2', reading: 'gan4 na4 yi4 hang2', boundary: 'none' },
+  { word: '干哪一行', char: '行', offset: 3, phone: 'hang2', reading: 'gan4 na3 yi4 hang2', boundary: 'none' },
+  { word: '做这一行', char: '行', offset: 3, phone: 'hang2', reading: 'zuo4 zhe4 yi4 hang2', boundary: 'none' },
+  { word: '做那一行', char: '行', offset: 3, phone: 'hang2', reading: 'zuo4 na4 yi4 hang2', boundary: 'none' },
+  { word: '做哪一行', char: '行', offset: 3, phone: 'hang2', reading: 'zuo4 na3 yi4 hang2', boundary: 'none' },
+  { word: '在这一行', char: '行', offset: 3, phone: 'hang2', reading: 'zai4 zhe4 yi4 hang2', boundary: 'none' },
+  // Base lexicon already reads háng; pinned here as family guards.
+  { word: '行业', char: '行', offset: 0, phone: 'hang2', reading: 'hang2 ye4', boundary: 'none' },
+  { word: '行家', char: '行', offset: 0, phone: 'hang2', reading: 'hang2 jia1', boundary: 'none' },
+  { word: '行当', char: '行', offset: 0, phone: 'hang2', reading: 'hang2 dang1', boundary: 'none' },
+  { word: '行情', char: '行', offset: 0, phone: 'hang2', reading: 'hang2 qing2', boundary: 'none' },
+  { word: '行规', char: '行', offset: 0, phone: 'hang2', reading: 'hang2 gui1', boundary: 'none' },
+  { word: '行话', char: '行', offset: 0, phone: 'hang2', reading: 'hang2 hua4', boundary: 'none' },
+  { word: '同行', char: '行', offset: 1, phone: 'hang2', reading: 'tong2 hang2', boundary: 'none' },
+  { word: '内行', char: '行', offset: 1, phone: 'hang2', reading: 'nei4 hang2', boundary: 'none' },
+  { word: '外行', char: '行', offset: 1, phone: 'hang2', reading: 'wai4 hang2', boundary: 'none' },
+  { word: '改行', char: '行', offset: 1, phone: 'hang2', reading: 'gai3 hang2', boundary: 'none' },
+  { word: '转行', char: '行', offset: 1, phone: 'hang2', reading: 'zhuan3 hang2', boundary: 'none' },
+  { word: '三百六十行', char: '行', offset: 4, phone: 'hang2', reading: 'san1 bai3 liu4 shi2 hang2', boundary: 'none' },
+  { word: '行行出状元', char: '行', offset: 0, phone: 'hang2', reading: 'hang2 hang2 chu1 zhuang4 yuan2', boundary: 'none' },
+])
+
+/** 行 = xíng（行走/可以义）: the bare 那行 ambiguity is deliberately preserved. */
+export const HANG_INDUSTRY_EXCLUSIONS = Object.freeze([
+  { phrase: '那行不行。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '那行吧。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '行不行？', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '行行好。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '我们继续进行讨论。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '他们马上开始行动。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '这种行为不合适。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '他在雨中慢慢地行走。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '汽车在公路上行驶。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '行人要走人行道。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '他提着行李走进车站。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '依法行使自己的权利。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '这是行政机关的决定。', char: '行', occurrence: 1, phone: 'xing2' },
+  { phrase: '这个办法行之有效。', char: '行', occurrence: 1, phone: 'xing2' },
+])
+
+/**
+ * Prefix-steal cases are the structural counterpart of the curated rows: a
+ * longer dictionary word starting at the *previous* character (里长 / 学会)
+ * captures the first character of the intended word (长期 / 会计), so the
+ * intended word never reaches longest-match. The runtime fix is U+200B before
+ * the intended word; the discovery side is discoverPrefixStealLeads().
+ */
+export const PREFIX_STEAL_CASES = Object.freeze([
+  {
+    word: '长期', char: '长', offset: 0, phone: 'chang2',
+    stolenBy: '里长', stolenReading: 'li2 zhang3',
+    sentence: '有几家公司在店里长期订餐，必须在十二点之前送到。',
+  },
+  {
+    word: '会计', char: '会', offset: 0, phone: 'kuai4',
+    stolenBy: '学会', stolenReading: 'xue2 hui4',
+    sentence: '可能是学会计出身的。',
+    // The runtime already pins the longer 学会计 row, so the raw dictionary
+    // resolves this sentence correctly. The detector unit test uses the base
+    // lexicon (no overlay) to prove the underlying steal is still discoverable.
+    runtimePinned: true,
+  },
+])
+
+/**
+ * Mirror of pronunciationGuard.overlayProtectedWords(): every 2–6 character Han
+ * row of the runtime overlay is protected with U+200B, except the bare 便宜
+ * (it would split 占便宜). Dynamic rows only ADD words; the static table stays.
+ */
+export function overlayProtectedWords(overlayEntries, staticWords = []) {
+  const excluded = new Set(['便宜'])
+  const words = new Set(staticWords)
+  for (const word of overlayEntries.keys()) {
+    const chars = Array.from(word)
+    if (chars.length < 2 || chars.length > 6) continue
+    if (!chars.every((char) => HAN.test(char))) continue
+    if (excluded.has(word)) continue
+    words.add(word)
+  }
+  return [...words].sort(
+    (left, right) =>
+      Array.from(right).length - Array.from(left).length
+      || left.localeCompare(right, 'zh'),
+  )
+}
+
+/** Prepare text exactly like SherpaDriver does for the current overlay. */
+export function prepareRuntimeTextWithOverlay(text, assets, lists = loadWordLists()) {
+  const words = overlayProtectedWords(assets.overlay.entries, lists.protectedWords)
+  return applyUtteranceResets(
+    protectPronunciations(text, words),
+    words,
+    lists.resetWords,
+  )
+}
+
+/** appSegments() with the real overlay-derived protected-word list. */
+export function appSegmentsWithOverlay(sentence, word, assets, lists = loadWordLists()) {
+  const prepared = prepareRuntimeTextWithOverlay(sentence, assets, lists)
+  const parts = utteranceParts(prepared)
+  if (!parts) return [{ label: '整句一次合成', text: prepared, split: false }]
+  return parts
+    .map((part, index) => ({ label: `第 ${index + 1} 段（语句重置）`, text: part, split: true }))
+    .filter((part) => part.text.includes(word))
+}

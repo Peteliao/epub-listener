@@ -239,3 +239,24 @@
 {"id":"wf-di-05","text":"他打开地图寻找路线。","readings":[["地",1,"di4"]]}
 {"id":"wf-di-06","text":"科学家在研究地心的结构。","readings":[["地",1,"di4"]]}
 {"id":"wf-di-07","text":"兔子钻进地洞里躲了起来。","readings":[["地",1,"di4"]]}
+
+# 2026-11-23 第十轮：OOV「立刻」、头发义「发」、被「里长」抢走的「长期」、
+# 行业义「那行」。每个词族另带排除项，防止扩散误伤（出发/发现/那行不行/生长期）。
+{"id":"wf-round10-01","text":"来到此处，你立刻就会明白原因何在。","readings":[["立",1,"li4"],["刻",1,"ke4"]]}
+{"id":"wf-round10-02","text":"他立刻站了起来。","readings":[["立",1,"li4"],["刻",1,"ke4"]]}
+{"id":"wf-round10-03","text":"整个冬天，她始终没上美容院，也未染发。","readings":[["发",1,"fa4"]]}
+{"id":"wf-round10-04","text":"她的秀发又黑又亮。","readings":[["发",1,"fa4"]]}
+{"id":"wf-round10-05","text":"他把黑发染成了棕色。","readings":[["发",1,"fa4"]]}
+{"id":"wf-round10-06","text":"理发店新推出了一项美发服务。","readings":[["发",1,"fa4"],["发",2,"fa4"]]}
+{"id":"wf-round10-07","text":"她买了一顶假发。","readings":[["发",1,"fa4"]]}
+{"id":"wf-round10-08","text":"妈妈买了一瓶发胶。","readings":[["发",1,"fa4"]]}
+{"id":"wf-round10-09","text":"他们长期保持合作关系。","readings":[["长",1,"chang2"]]}
+{"id":"wf-round10-10","text":"她说陪酒那行太辛苦。","readings":[["行",1,"hang2"]]}
+{"id":"wf-round10-11","text":"他干这行已经十年了。","readings":[["行",1,"hang2"]]}
+{"id":"wf-round10-12","text":"干一行，爱一行。","readings":[["行",1,"hang2"],["行",2,"hang2"]]}
+{"id":"wf-round10-13","text":"有几家公司在店里长期订餐，必须在十二点之前送到。","readings":[["长",1,"chang2"]]}
+{"id":"wf-round10-ex1","text":"那行不行？","readings":[["行",1,"xing2"]]}
+{"id":"wf-round10-ex2","text":"他们明天一早出发。","readings":[["发",1,"fa1"]]}
+{"id":"wf-round10-ex3","text":"她发现了一个秘密。","readings":[["发",1,"fa1"]]}
+{"id":"wf-round10-ex4","text":"这种作物的生长期大约三个月。","readings":[["长",1,"zhang3"]]}
+{"id":"wf-round10-ex5","text":"花香从窗口散发出来。","readings":[["发",1,"fa1"]]}

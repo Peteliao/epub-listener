@@ -21,7 +21,8 @@ import { ROOT, loadMatchaAssets, maxWordLength } from './lib/reading.mjs'
 import { loadCorpus } from './lib/corpus.mjs'
 import {
   FAMILIES, PATHS, discoverBoundaryLeads, discoverOmissionLeads,
-  discoverPhoneLeads, discoverSegmentationLeads, frontendConfigCheck,
+  discoverOovAcousticLeads, discoverPhoneLeads, discoverPrefixStealLeads,
+  discoverSegmentationLeads, frontendConfigCheck,
   loadHistory, pinCases, replayAll,
 } from './lib/iterationFamilies.mjs'
 import { scanFusionRisks } from './lib/fusionRisk.mjs'
@@ -50,6 +51,13 @@ const VERIFY_SENTENCES = [
   '看来上天要抛弃朱元璋了。',
   '天平被攻破了，应天就像一个赤裸的孩子。',
   '也就是在此前不久，一个人来到了洪都，他是受朱元璋委派来此地镇守的。',
+  // 2026-11-23 tenth round: one sentence per new family, so a fresh checkout
+  // still proves the prefix-steal and OOV-acoustic discoverers have recall.
+  '来到此处，你立刻就会明白原因何在。',
+  '他立刻站了起来。',
+  '整个冬天，她始终没上美容院，也未染发。',
+  '有几家公司在店里长期订餐，必须在十二点之前送到。',
+  '你也不能永远干陪酒那行啊，美里也大了，她面子上怕也抹不开。',
 ]
 
 function parseArgs(argv) {
@@ -193,10 +201,16 @@ async function verify(assets) {
     overlay: { ...assets.overlay, entries: new Map() },
   }
   const phone = discoverPhoneLeads(selfCheck.text, baseline, replays, { limit: 20 })
-  const boundary = discoverBoundaryLeads(selfCheck.text, baseline, { limit: 20 })
-  const segmentation = discoverSegmentationLeads(selfCheck.text, baseline, {
-    limit: 5, ignoreCuratedLonger: false,
-  })
+  const boundary = [
+    ...discoverBoundaryLeads(selfCheck.text, baseline, { limit: 20 }),
+    ...discoverOovAcousticLeads(selfCheck.text, baseline, { limit: 20 }),
+  ]
+  const segmentation = [
+    ...discoverSegmentationLeads(selfCheck.text, baseline, {
+      limit: 5, ignoreCuratedLonger: false,
+    }),
+    ...discoverPrefixStealLeads(selfCheck.text, baseline, { limit: 20 }),
+  ]
   const fusion = scanFusionRisks(selfCheck.text, baseline)
   const omissionCases = cases.filter((item) => item.family === 'omission')
   // 20 keeps the same depth as the other families; at 10 the 地X compounds that
@@ -219,6 +233,20 @@ async function verify(assets) {
       ok: !selfCheck.rich || item.count > 0,
       detail: `修复前基线召回 ${item.count} 条${selfCheck.rich ? '' : '（内置验证语料）'}`,
     })),
+    {
+      name: 'prefix-steal 族可在修复前基线发现「里长 / 长期」',
+      ok: segmentation.some((item) =>
+        item.kind === 'prefix-steal' && item.word === '长期' && item.actual === '里长'),
+      detail: segmentation.find((item) => item.kind === 'prefix-steal' && item.word === '长期')
+        ?.actual ?? `未发现（segmentation ${segmentation.length} 条）`,
+    },
+    {
+      name: 'OOV 声学盲区可发现「立刻」',
+      ok: boundary.some((item) => item.kind === 'oov-acoustic' && item.word === '立刻'),
+      detail: boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻')
+        ? `音素 ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').phones.join(' ')}`
+        : `未发现（boundary ${boundary.length} 条）`,
+    },
     { name: 'fusion 族可召回已修复词', ok: fusion.some((item) => item.word === '来到了' && item.blend === 'lao'), detail: `修复前基线召回 ${fusion.length} 条融合风险词` },
     {
       name: 'omission 族可在修复前基线召回同类词',
@@ -325,10 +353,16 @@ async function main() {
     ? discoverPhoneLeads(corpus.text, assets, replays, { limit: options.limit })
     : []
   const boundary = familyEnabled(options, 'boundary')
-    ? discoverBoundaryLeads(corpus.text, assets, { limit: options.limit })
+    ? [
+      ...discoverBoundaryLeads(corpus.text, assets, { limit: options.limit }),
+      ...discoverOovAcousticLeads(corpus.text, assets, { limit: options.limit }),
+    ]
     : []
   const segmentation = familyEnabled(options, 'segmentation')
-    ? discoverSegmentationLeads(corpus.text, assets, { limit: options.limit })
+    ? [
+      ...discoverSegmentationLeads(corpus.text, assets, { limit: options.limit }),
+      ...discoverPrefixStealLeads(corpus.text, assets, { limit: options.limit }),
+    ]
     : []
   const fusionRisks = familyEnabled(options, 'fusion')
     ? scanFusionRisks(corpus.text, assets).filter((item) => item.confidence === 'high'

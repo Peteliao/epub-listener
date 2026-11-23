@@ -10,7 +10,7 @@ export interface ApprovedOverridesData {
   rejectedWords: readonly string[]
 }
 
-/** 83 characters / 89 verified bases / 1 rejected words. */
+/** 84 characters / 90 verified bases / 1 rejected words. */
 export const APPROVED_OVERRIDES: ApprovedOverridesData = Object.freeze({
   charBases: Object.freeze({
   '薄': ['bo'],
@@ -36,6 +36,7 @@ export const APPROVED_OVERRIDES: ApprovedOverridesData = Object.freeze({
   '调': ['tiao'],
   '都': ['du'],
   '度': ['duo'],
+  '发': ['fa'],
   '佛': ['fo'],
   '镐': ['hao'],
   '给': ['ji'],
@@ -101,4 +102,4 @@ export const APPROVED_OVERRIDES: ApprovedOverridesData = Object.freeze({
 })
 
 /** Fingerprint of the exact entries above; part of the per-book cache key. */
-export const APPROVED_OVERRIDES_HASH = '4901c5e3'
+export const APPROVED_OVERRIDES_HASH = '9591b8ec'

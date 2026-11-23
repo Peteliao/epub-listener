@@ -199,7 +199,9 @@ describe('omission CI gate', () => {
     // 宜→轻声 must stay visible every run, but must not be hidden by being
     // silently dropped from the case asset.
     expect(result.stdout).toContain('待复听  om-0001')
-  }, 120_000)
+    // Eight confirmed cases now each measure full sentences with real WASM;
+    // the 立刻 case (om-0007) pushed the verify run past the old 120s budget.
+  }, 300_000)
 
   it('is wired into audit:all as a required gate', async () => {
     const { mkdtemp, readFile, rm } = await import('node:fs/promises')
@@ -221,5 +223,5 @@ describe('omission CI gate', () => {
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
-  }, 120_000)
+  }, 300_000)
 })

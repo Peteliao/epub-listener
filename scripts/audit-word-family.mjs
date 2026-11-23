@@ -34,7 +34,7 @@ import {
   TRAINED_NEUTRAL_PHONES,
 } from './lib/reading.mjs'
 import { phoneIndices } from './lib/fusionRisk.mjs'
-import { currentBoundary } from './lib/omission.mjs'
+import { currentBoundary, sentenceCoverage } from './lib/omission.mjs'
 import { summarizeContributions } from './lib/acousticScoring.mjs'
 import { createMatchaSynth } from './lib/matchaSynth.mjs'
 import {
@@ -45,6 +45,12 @@ import {
   LONG_CASES,
   LONG_EXCLUSIONS,
   DI_CASES,
+  ROUND10_CASES,
+  HAIR_FA_CASES,
+  HAIR_FA_EXCLUSIONS,
+  HANG_INDUSTRY_CASES,
+  HANG_INDUSTRY_EXCLUSIONS,
+  PREFIX_STEAL_CASES,
   FEEDBACK_SENTENCE,
   BOOK_BLOCK,
   DIPAN_SENTENCE,
@@ -53,13 +59,16 @@ import {
   buildRuntimeLexicon,
   loadWordLists,
   prepareRuntimeText,
+  prepareRuntimeTextWithOverlay,
+  appSegments,
+  appSegmentsWithOverlay,
   utteranceParts,
   streamFor,
+  streamForChar,
   coverageOf,
   spanOf,
   overlayRows,
   readAsset,
-  appSegments,
 } from './lib/wordFamily.mjs'
 
 const OUT_DIR = join(ROOT, 'scripts', 'out')
@@ -421,6 +430,123 @@ async function main() {
       boundary.kind === item.boundary, `实际 ${boundary.kind}`)
   }
 
+  // ---- 4e. 2026-11-23 tenth round: OOV / 发 / 长期 / 行业-行 ------------
+  attribution.round10 = []
+  for (const item of ROUND10_CASES) {
+    const reading = runtime.runtimeMap.get(item.word)
+    const phones = phoneticPhones(reading ?? '')
+    const boundary = currentBoundary(reading ?? '')
+    attribution.round10.push({
+      ...item,
+      actualReading: reading ?? null,
+      actualBoundary: boundary.kind,
+    })
+    check(checks, '第十轮', `${item.word} 最终词典读音（${item.char}=${item.phone}）`,
+      Boolean(reading)
+        && phones.length === Array.from(item.word).length
+        && phones[item.offset] === item.phone,
+      `生效=${reading ?? '缺'} · 音素数=${phones.length}/${Array.from(item.word).length}`)
+    check(checks, '第十轮', `${item.word} 边界为 ${item.boundary}`,
+      boundary.kind === item.boundary, `实际 ${boundary.kind}`)
+    for (const context of item.contexts) {
+      const prepared = prepareRuntimeTextWithOverlay(context.sentence, assets, lists)
+      const stream = streamForChar(prepared, item.char, 1, runtime.runtimeMap)
+      const coverage = stream ? sentenceCoverage(stream, prepared) : { ok: false }
+      const boundaryBefore = stream
+        && (prepared.includes(WORD_BOUNDARY + item.word)
+          || prepared.includes(WORD_BOUNDARY + stream.word))
+      check(checks, '第十轮', `${item.word} ${context.label} 整词命中且原句未截断`,
+        Boolean(stream) && stream.phone === item.phone && coverage.ok,
+        stream
+          ? `${stream.word} -> ${stream.phones.join(' ')} · ${boundaryBefore ? '有 U+200B' : '无 U+200B'}`
+          : '未命中')
+    }
+    if (item.stolen) {
+      // A true pre-fix baseline removes every overlay row that contains the
+      // intended word (长期/长期性/店里长期; 会计/学会计), leaving the base
+      // lexicon where the prefix word wins.
+      const before = new Map(runtime.runtimeMap)
+      for (const word of assets.overlay.entries.keys()) {
+        if (word.includes(item.word)) before.delete(word)
+      }
+      let raw = null
+      try {
+        raw = readingAt(item.stolen.sentence, item.char, 1, before)
+      } catch {
+        raw = null
+      }
+      const prepared = prepareRuntimeTextWithOverlay(item.stolen.sentence, assets, lists)
+      const fixed = streamForChar(prepared, item.char, 1, runtime.runtimeMap)
+      const stolenPhone = phoneticPhones(item.stolen.reading).slice(-1)[0]
+      check(checks, '第十轮', `${item.word} 修复前可复现「${item.stolen.by}」抢词`,
+        raw?.word === item.stolen.by && raw?.phone === stolenPhone,
+        raw ? `${raw.word} -> ${raw.phone}（期望 ${item.stolen.by} -> ${stolenPhone}）` : '无法定位')
+      check(checks, '第十轮', `${item.word} 加 U+200B 后整词重新命中`,
+        Boolean(fixed) && fixed.phone === item.phone,
+        fixed ? `${fixed.word} -> ${fixed.phones.join(' ')}` : '未命中')
+    }
+  }
+
+  attribution.hairFa = []
+  for (const item of HAIR_FA_CASES) {
+    const reading = runtime.runtimeMap.get(item.word)
+    attribution.hairFa.push({ ...item, actual: reading ?? null })
+    check(checks, '发词族', `${item.word} = ${item.reading}`,
+      reading === item.reading, `实际=${reading ?? '缺'}`)
+  }
+  attribution.hairFaExclusions = []
+  for (const item of HAIR_FA_EXCLUSIONS) {
+    const result = readingAt(`${item.word}。`, '发', 1, runtime.runtimeMap)
+    attribution.hairFaExclusions.push({ ...item, actualWord: result.word, actualPhone: result.phone })
+    check(checks, '发词族', `${item.word} 仍是 fā（排除项未被头发义词族误伤）`,
+      result.phone === item.phone, `${result.word} -> ${result.phone}`)
+  }
+
+  attribution.hangIndustry = []
+  for (const item of HANG_INDUSTRY_CASES) {
+    const reading = runtime.runtimeMap.get(item.word)
+    const phones = phoneticPhones(reading ?? '')
+    const boundary = currentBoundary(reading ?? '')
+    attribution.hangIndustry.push({ ...item, actual: reading ?? null, actualBoundary: boundary.kind })
+    check(checks, '行词族', `${item.word} = ${item.reading}`,
+      reading === item.reading, `实际=${reading ?? '缺'}`)
+    check(checks, '行词族', `${item.word} 的「行」= ${item.phone}`,
+      phones[item.offset] === item.phone, `音素=${phones.join(' ')}`)
+    check(checks, '行词族', `${item.word} 边界为 ${item.boundary}`,
+      boundary.kind === item.boundary, `实际 ${boundary.kind}`)
+  }
+  attribution.hangIndustryExclusions = []
+  for (const item of HANG_INDUSTRY_EXCLUSIONS) {
+    const result = readingAt(item.phrase, item.char, item.occurrence, runtime.runtimeMap)
+    attribution.hangIndustryExclusions.push({ ...item, actualWord: result.word, actualPhone: result.phone })
+    check(checks, '行词族', `${item.phrase.slice(0, 12)}…「行」仍读 xíng（那行歧义保持）`,
+      result.phone === item.phone, `${result.word} -> ${result.phone}`)
+  }
+
+  attribution.prefixSteal = []
+  for (const item of PREFIX_STEAL_CASES) {
+    const before = new Map(runtime.runtimeMap)
+    for (const word of assets.overlay.entries.keys()) {
+      if (word.includes(item.word)) before.delete(word)
+    }
+    const raw = readingAt(item.sentence, item.char, 1, before)
+    const current = readingAt(item.sentence, item.char, 1, runtime.runtimeMap)
+    const prepared = prepareRuntimeTextWithOverlay(item.sentence, assets, lists)
+    const fixed = streamForChar(prepared, item.char, 1, runtime.runtimeMap)
+    const stolenPhone = phoneticPhones(item.stolenReading).slice(-1)[0]
+    attribution.prefixSteal.push({
+      ...item, rawWord: raw.word, rawPhone: raw.phone,
+      currentWord: current.word, currentPhone: current.phone,
+      fixedWord: fixed?.word ?? null, fixedPhone: fixed?.phone ?? null,
+    })
+    check(checks, '前缀抢词', `${item.word} 不保护时确实被「${item.stolenBy}」抢走`,
+      raw.word === item.stolenBy && raw.phone === stolenPhone,
+      `${raw.word} -> ${raw.phone}（期望 ${item.stolenBy} -> ${stolenPhone}）`)
+    check(checks, '前缀抢词', `${item.word} 加 U+200B 后从词首重新匹配`,
+      fixed?.phone === item.phone,
+      fixed ? `${fixed.word} -> ${fixed.phone}` : '未命中')
+  }
+
   attribution.whyPreviousFixesFailed = [
     `人工表历史上只有 ${HISTORICAL_CURATED.join(' / ')} 四行；${attribution.dictionary.wordsNeverCuratedBefore.join(' / ')} 从未进表，基础词典「便宜」族全是 pian2 yi2 两个阳平连读，`,
     'AiModel.ts 把人工表拼在整书自动生成 overlay 之前，worker.patchLexicon 后写覆盖：整书表一旦含同名词即生效，而审计侧 parseOverlay 是首行生效，门禁永远看不到 App 实际用的那一行；',
@@ -523,6 +649,58 @@ async function main() {
             check(checks, '声学', `${item.word} 单字地可听（${sentence.slice(0, 10)}…）`,
               summary.states[0] === 'normal',
               `${summary.values[0]}ms ${summary.states[0]}`)
+          }
+        }
+      }
+      // 2026-11-23 tenth round: measure the four reported words with the real
+      // overlay-derived protected-word list (the app's SherpaDriver path), plus
+      // a representative slice of the 发=fà word family. Verify mode uses the
+      // first two contexts per word; --measure uses every context.
+      const roundTargets = ROUND10_CASES.flatMap((item) =>
+        (options.mode === 'measure' ? item.contexts : item.contexts.slice(0, 2))
+          .map((context) => ({ ...context, item })))
+      for (const { label, sentence, item } of roundTargets) {
+        const segments = appSegmentsWithOverlay(sentence, item.word, assets, lists)
+        if (!segments.length) {
+          check(checks, '第十轮声学', `${item.word} ${label} 真实 WASM 音节可听`, false, 'App 送入段中找不到目标词')
+          continue
+        }
+        for (const segment of segments) {
+          const stream = streamForChar(segment.text, item.char, 1, runtime.runtimeMap)
+          if (!stream) {
+            check(checks, '第十轮声学', `${item.word} ${label} 真实 WASM 音节可听`, false, '无法构造 token 序列')
+            continue
+          }
+          const indices = phoneIndices(stream.tokens, stream.range.start, stream.count)
+          const summary = summarizeContributions(synth.contributions(stream.tokens, indices))
+          const name = `${item.word} ${label}`
+          acoustic.push({ word: item.word, span: stream.word, label: name, sentence: segment.text,
+            phones: stream.phones, split: segment.split, ...summary })
+          check(checks, '第十轮声学', `${name} 真实 WASM 每个音节可听（100–350ms）`,
+            summary.states.every((state) => state === 'normal'),
+            `${stream.word} ${summary.values.join('/')}ms · ${summary.states.join('/')} · 评分 ${summary.score}`)
+        }
+      }
+      const HAIR_WASM = [
+        { word: '染发', contexts: ['整个冬天，她始终没上美容院，也未染发。', '她决定去染发。'] },
+        { word: '秀发', contexts: ['她的秀发又黑又亮。', '秀发在风中轻轻飘动。'] },
+        { word: '发胶', contexts: ['妈妈买了一瓶发胶。', '他用发胶把头发固定住。'] },
+      ]
+      for (const item of HAIR_WASM) {
+        for (const sentence of item.contexts) {
+          for (const segment of appSegmentsWithOverlay(sentence, item.word, assets, lists)) {
+            const stream = streamFor(segment.text, item.word, runtime.runtimeMap)
+            if (!stream) {
+              check(checks, '第十轮声学', `${item.word} 真实 WASM 音节可听`, false, '无法构造 token 序列')
+              continue
+            }
+            const indices = phoneIndices(stream.tokens, stream.range.start, stream.count)
+            const summary = summarizeContributions(synth.contributions(stream.tokens, indices))
+            acoustic.push({ word: item.word, label: item.word, sentence: segment.text,
+              phones: stream.phones, ...summary })
+            check(checks, '第十轮声学', `${item.word} 真实 WASM 每个音节可听（100–350ms）`,
+              summary.states.every((state) => state === 'normal'),
+              `${summary.values.join('/')}ms · ${summary.states.join('/')} · 评分 ${summary.score}`)
           }
         }
       }
