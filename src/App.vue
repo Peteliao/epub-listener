@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import LibraryView from '@/views/LibraryView.vue'
 import ReaderView from '@/views/ReaderView.vue'
 import AppIcon from '@/components/AppIcon.vue'
@@ -12,7 +12,7 @@ import {
   setupPwa,
   updateReady,
 } from '@/ui/pwa'
-import { patternTileUrl } from '@/types'
+import { bindThemeSurface } from '@/ui/themeSurface'
 
 const settingsStore = useSettingsStore()
 const route = ref<Route>(parseRoute(window.location.hash))
@@ -21,28 +21,10 @@ function syncRoute(): void {
   route.value = parseRoute(window.location.hash)
 }
 
-watchEffect(() => {
-  const palette = settingsStore.activePalette
-  const root = document.documentElement
-  root.style.setProperty('--app-bg', palette.bg)
-  root.style.setProperty('--app-bg-image', palette.bgImage ?? 'none')
-  // Panels use --app-ui as their base color, so they need a tile-only layer:
-  // the full gradient would repaint the panel and erase its elevation.
-  root.style.setProperty(
-    '--app-pattern',
-    patternTileUrl(palette) ? (palette.bgImage ?? 'none') : 'none',
-  )
-  root.style.setProperty('--app-fg', palette.fg)
-  root.style.setProperty('--app-muted', palette.muted)
-  root.style.setProperty('--app-accent', palette.accent)
-  root.style.setProperty('--app-ui', palette.uiBg)
-  root.style.setProperty('--app-highlight', palette.highlight)
-  root.style.colorScheme = palette.dark ? 'dark' : 'light'
-  root.dataset.theme = settingsStore.activeTheme
-  document
-    .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', palette.bg)
-})
+const stopThemeSurface = bindThemeSurface(
+  () => settingsStore.activePalette,
+  () => settingsStore.activeTheme,
+)
 
 onMounted(() => {
   window.addEventListener('hashchange', syncRoute)
@@ -54,6 +36,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', syncRoute)
+  stopThemeSurface()
 })
 </script>
 
