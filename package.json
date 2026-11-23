@@ -33,6 +33,7 @@
     "acoustics:verify": "node scripts/audit-acoustics.mjs --verify",
     "audit:omission": "node scripts/audit-omission.mjs",
     "audit:envelope": "node scripts/audit-envelope.mjs",
+    "audit:external-data": "node scripts/audit-external-data.mjs",
     "oov:recall": "node scripts/oov-recall.mjs",
     "quality:report": "node scripts/quality-report.mjs",
     "blind:render": "node scripts/render-blind.mjs",

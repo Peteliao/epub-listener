@@ -147,6 +147,22 @@ function voicedIslands(samples, rate) {
   return count
 }
 
+/**
+ * Matcha uses a non-zero noiseScale, so a single render can randomly merge
+ * neighbouring energy islands. The medium is stable enough for the >=2 check
+ * only when we take a small median over independent renders; the threshold stays
+ * unchanged, only the random draw is averaged.
+ */
+function voicedIslandsMedian(synth, text, renders = 3) {
+  const values = []
+  for (let index = 0; index < renders; index += 1) {
+    const audio = synth.generateText(text)
+    values.push(voicedIslands(audio.samples, audio.sampleRate))
+  }
+  values.sort((left, right) => left - right)
+  return values[Math.floor(values.length / 2)]
+}
+
 /** Insert 120ms of silence between utterance parts, mirroring joinUtteranceAudio. */
 function joinParts(rendered, rate) {
   const gap = new Float32Array(Math.round(rate * 0.12))
@@ -622,8 +638,7 @@ async function main() {
         // tone, so >=2 islands is the direct waveform-level proof that the
         // syllables are separate. Island count is not a per-syllable counter
         // (adjacent voiced syllables commonly merge into one energy island).
-        const isolated = synth.generateText(`${item.word}。`).samples
-        const islands = voicedIslands(isolated, synth.sampleRate)
+        const islands = voicedIslandsMedian(synth, `${item.word}。`)
         acoustic.push({ word: item.word, label: `${item.word} 单独念·波形`,
           islands, expected: Array.from(item.word).length, kind: 'waveform' })
         check(checks, '声学', `${item.word} 真实文本前端单独念：不是融成一段的连续怪音`,

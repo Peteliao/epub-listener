@@ -11,7 +11,7 @@
  * same. The goal is a listener-friendly breath at the semantic seam, not a new
  * sentence or a model-level prosody claim.
  */
-const BREAK_WORDS = [
+export const SEMANTIC_CONNECTIVES = [
   // Contrast: the highest-value pause and the least ambiguous.
   '但是', '可是', '然而', '而是',
   // Consequence / sequence.
@@ -54,7 +54,7 @@ function isPause(char: string): boolean {
 }
 
 function findWordAt(text: string, index: number): string | null {
-  for (const word of BREAK_WORDS) {
+  for (const word of SEMANTIC_CONNECTIVES) {
     if (text.startsWith(word, index)) return word
   }
   return null
