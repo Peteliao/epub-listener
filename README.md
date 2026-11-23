@@ -625,6 +625,50 @@ Matcha 没有可直接控制的基频/情绪标签，贸然调语速或给句子
 
 仍待下一阶段：图形化盲听实验室、每类 100 条完整盲听集、预取队列取消/长时间内存监控、Matcha 原生韵律/情绪。
 
+### 2026-11-23 第十七轮：评测体系收敛（对齐 / 双盲 / 目标 F0 / 统一状态）
+
+按这轮审查优先修复评测体系，不改 Matcha、不扩词典、不改已验证的覆盖率：
+
+**P0 整句包络时间对齐**
+
+- `audit-envelope` 不再把单独合成的前缀时长当成绝对位置：
+  - 有 `U+2060` 语句重置时，按 Worker 的 120ms PCM 拼接边界精确定位目标段；
+  - 没有重置时，用前缀包络与整句波形做归一化互相关，输出 `offsetMs / correlation / margin / confidence`；
+  - 低置信度列为 `NEEDS_LISTENING`，不会触发自动修复，也不再让 `--strict` 因定位错误而失败。
+- 塞音首音节（如 `刻 ke4`）有天然闭塞段，短爆破阈值按声母类型区分（`<20ms` 才算弱），避免把正常 `k` 爆破误判为吞字。
+
+**P0 真正双盲 A/B**
+
+- 新增 `npm run blind:ab -- --before=before --after=after`：
+  - 固定随机种子生成不可推断的 4 位代号；
+  - 每条的播放顺序随机；
+  - 评分清单只有代号，版本映射写在独立 `.key.json`，评分结束前不打开；
+  - 评测副本做峰值响度归一化，原始 WAV 不改。
+- `npm run blind:score -- --bundle=... --rater=...` 生成单评分者表；`--validate` 只显示代号分数；`--reveal=... --sheets=...` 在评分完成后解盲，并输出多名评分者的一致性和维度差异。
+
+**P1 目标音节局部 F0**
+
+- `analyzeF0()` 保留整句连续性，同时新增 `analyzeTargetF0(report, startMs, endMs)`：只统计目标词窗口的均值、范围、斜率和跳变，不再把句末斜率误当成目标声调。
+- 搜索范围可用 `--min-hz / --max-hz` 按音色配置；加入邻近中值修正的八度错误。F0 仍是辅助指标，不进硬性门禁。
+
+**P1 OOV 召回 2–6 字**
+
+- `oov:recall` 从双字扩到 2–6 字，按词长分层抽样与计数；三字以上只进人工复听队列，不自动改词典。
+- 报告明确区分词典命中、探测器命中与未命中；`说白` 遮住 `白果` 这类盲区仍会被抽样。
+
+**P2 整词保护与 Unicode**
+
+- `protectPronunciations()` / `applyUtteranceResets()` 改为按 Unicode code point 扫描，不再用 `source[index - 1]` 判断扩展区汉字；重复、嵌套、重叠词与幂等性均有测试，运行时与审计镜像保持一致。
+
+**统一质量状态**
+
+- 新增 `npm run quality:report`：汇总门禁、包络、OOV 抽样、解盲评分、历史回归和声学冒烟，输出
+  `PASS / WARNING / NEEDS_LISTENING / FAIL` 四种状态；自动指标不替听感做最终决定。
+
+**验证**：`npm test` **81 文件 / 694 项通过**；`npm run audit:all` **14/14 通过**；`npm run iterate -- --verify`、`npm run audit:word-family -- --verify`、`npm run audit:omission -- --verify`、`npm run build` 全部通过。
+
+未做：不同语速矩阵、长时间内存监控、图形化盲听实验室、Matcha 原生韵律/情绪。
+
 ### 2026-11-12 本地浏览器自检（无需用户协助）
 
 用 `vite` + `agent-browser` 真实打开本地页面，再用项目自带的 CDP 自检（`npm run lab:diagnose:check`）复核，确认第九轮的「地」反馈在浏览器链路里到底是什么：

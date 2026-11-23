@@ -49,6 +49,14 @@ describe('2026-11-23 第十一轮：整句包络分析', () => {
     expect(target.verdict).toBe('weak-second')
   })
 
+  it('塞音短爆破按音节类型使用更短的 burst 阈值', async () => {
+    const { analyzeEnvelope, evaluateTarget } = await loadEnvelope()
+    const input = concat(quiet(100), tone(200), quiet(100), tone(30, 0.08))
+    expect(evaluateTarget(analyzeEnvelope(input, RATE), 0).verdict).toBe('weak-second')
+    expect(evaluateTarget(analyzeEnvelope(input, RATE), 0, { minSecondMs: 20 }).verdict)
+      .toBe('ok')
+  })
+
   it('两音节粘连、没有第二个 burst 时标为 merged', async () => {
     const { analyzeEnvelope, evaluateTarget } = await loadEnvelope()
     const input = concat(quiet(100), tone(380), quiet(100))

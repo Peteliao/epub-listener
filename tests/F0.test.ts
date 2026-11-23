@@ -63,6 +63,16 @@ describe('2026-11-23 第十四轮：基频连续性', () => {
     expect(falling.finalSlopeHzPerSec).toBeLessThan(0)
   })
 
+  it('目标词局部斜率与句末斜率分开统计', async () => {
+    const { analyzeF0, analyzeTargetF0 } = await loadF0()
+    const full = concat(sweep(900, 180, 280), sweep(300, 280, 180))
+    const report = analyzeF0(full, RATE)
+    const target = analyzeTargetF0(report, 500, 900)
+    expect(report.finalSlopeHzPerSec).toBeLessThan(0)
+    expect(target.slopeHzPerSec).toBeGreaterThan(0)
+    expect(target.confidence).toBe('high')
+  })
+
   it('静音没有 voiced 帧', async () => {
     const { analyzeF0 } = await loadF0()
     const result = analyzeF0(new Float32Array(RATE), RATE)

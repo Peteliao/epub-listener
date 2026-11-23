@@ -28,6 +28,22 @@ export const UTTERANCE_RESET_WORDS: readonly string[] = Object.freeze(
 
 const HAN = /\p{Script=Han}/u
 
+/** UTF-16 offsets of every Unicode code point, for astral-safe scanning. */
+function codePointOffsets(text: string): number[] {
+  const offsets: number[] = []
+  let offset = 0
+  for (const char of text) {
+    offsets.push(offset)
+    offset += char.length
+  }
+  return offsets
+}
+
+function previousCodePoint(text: string, offsets: number[], index: number): string {
+  const position = offsets.indexOf(index)
+  return position > 0 ? text.slice(offsets[position - 1]!, index) : ''
+}
+
 export const PROTECTED_WORDS: readonly string[] = Object.freeze(
   protectedWordsRaw
     .split(/\r?\n/)
@@ -61,22 +77,20 @@ export function protectPronunciations(
   )
   const insertions: number[] = []
   const covered: Array<[number, number]> = []
+  const offsets = codePointOffsets(source)
 
   for (const word of sorted) {
     if (!word) continue
-    let from = 0
-    for (;;) {
-      const index = source.indexOf(word, from)
-      if (index < 0) break
-      from = index + word.length
+    // Advance by one CODE POINT, not by word.length: overlapping occurrences
+    // and astral-plane characters must not be skipped by a UTF-16 shortcut.
+    for (const index of offsets) {
+      if (!source.startsWith(word, index)) continue
       if (covered.some(([start, end]) => index >= start && index < end)) continue
-      // Mark every match as covered, even when it starts at the sentence edge
-      // or already has a boundary. Otherwise a shorter word nested inside a
-      // longer one (会计 inside 学会计) could still insert a second U+200B and
-      // split the longer word at the sentence start.
+      // Mark every match, even at the sentence edge, so a shorter word nested
+      // inside a longer one (会计 inside 学会计) cannot split the longer word.
       covered.push([index, index + word.length])
-      if (index === 0 || !HAN.test(source[index - 1])) continue
-      if (source[index - 1] === WORD_BOUNDARY) continue
+      const before = previousCodePoint(source, offsets, index)
+      if (!before || !HAN.test(before) || before === WORD_BOUNDARY) continue
       insertions.push(index)
     }
   }
@@ -112,12 +126,14 @@ export function applyUtteranceResets(
       left.localeCompare(right, 'zh'),
   )
   const insertions: number[] = []
-  for (let index = 0; index < source.length; index += 1) {
+  const offsets = codePointOffsets(source)
+  for (const index of offsets) {
     if (source[index] !== WORD_BOUNDARY) continue
     const longest = sortedProtected.find((word) => source.startsWith(word, index + 1))
     if (longest && !words.includes(longest)) continue
     if (!words.some((word) => source.startsWith(word, index + 1))) continue
-    if (index === 0 || source[index - 1] === UTTERANCE_RESET) continue
+    const before = previousCodePoint(source, offsets, index)
+    if (!before || before === UTTERANCE_RESET) continue
     insertions.push(index)
   }
   let result = source

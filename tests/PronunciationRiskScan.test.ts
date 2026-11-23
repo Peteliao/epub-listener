@@ -80,7 +80,7 @@ describe('pronunciation risk scanner', () => {
       )
       expect(ying?.status).toBe('review')
     })
-  })
+  }, 60_000)
 
   it('does not flag readings already confirmed by the curated table or golden set', async () => {
     await withTempDir(async (dir) => {

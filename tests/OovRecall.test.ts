@@ -15,21 +15,27 @@ describe('2026-11-23 第十六轮：OOV 未召回词抽样', () => {
     const { collectRecallSample } = await loadRecall()
     const { loadMatchaAssets, maxWordLength } = await loadReading()
     const assets = await loadMatchaAssets()
+    const effective = new Map(assets.lexicon)
+    // Simulate a book-specific OOV idiom for the 4-character bucket.
+    effective.delete('稀奇古怪')
     const baseline = {
       ...assets,
-      effective: new Map(assets.lexicon),
+      effective,
       maxLength: maxWordLength(assets.lexicon),
     }
     // 说白 is a real dictionary span covering 白, so 白果 is an OOV word that
     // discoverOovAcousticLeads deliberately skips. It must show up as a missed
     // recall item instead of silently disappearing.
     const result = collectRecallSample(
-      '他说白果很重要。\n老人坐在门口。\n他说立刻就会明白。',
+      '他说白果很重要。\n老人坐在门口。\n他说立刻就会明白。\n他说稀奇古怪的事情。',
       baseline,
       { sample: 10 },
     )
     const words = result.sample.map((item: any) => item.word)
     expect(words).toContain('白果')
+    expect(words).toContain('稀奇古怪')
+    expect(result.byLength['4'].missed).toBeGreaterThanOrEqual(1)
+    expect(Object.keys(result.byLength)).toEqual(['2', '3', '4', '5', '6'])
     expect(words).not.toContain('老人')
     expect(words).not.toContain('坐在')
     expect(result.dictionary).toBeGreaterThan(0)

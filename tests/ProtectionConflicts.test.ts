@@ -6,6 +6,7 @@ import {
   WORD_BOUNDARY,
   overlayProtectedWords,
   preparePronunciationText,
+  protectPronunciations,
 } from '../src/core/tts/pronunciationGuard'
 
 function dynamicWords(): readonly string[] {
@@ -64,6 +65,19 @@ describe('2026-11-23 第十四轮：保护词重叠冲突矩阵', () => {
     expect(prepared.startsWith('立刻')).toBe(true)
     expect(prepared).not.toContain(`立${WORD_BOUNDARY}刻`)
     expect(prepared).toContain(`${WORD_BOUNDARY}明白`)
+  })
+
+  it('重复、嵌套与重叠词都只加必要边界，且按 Unicode 码点扫描', () => {
+    expect(protectPronunciations('哈哈哈哈哈哈', ['哈哈']))
+      .toBe(`哈哈${WORD_BOUNDARY}哈哈${WORD_BOUNDARY}哈哈`)
+    expect(protectPronunciations('他学会计的人', ['会计', '学会计']))
+      .toBe(`他${WORD_BOUNDARY}学会计的人`)
+    // 𠀀 is an astral Han character; UTF-16 unit indexing would miss it.
+    expect(protectPronunciations('𠀀立刻', ['立刻'])).toBe(`𠀀${WORD_BOUNDARY}立刻`)
+    for (const text of ['哈哈哈哈哈', '他学会计的人', `𠀀${WORD_BOUNDARY}立刻`]) {
+      const once = protectPronunciations(text, ['会计', '学会计', '立刻', '哈哈'])
+      expect(protectPronunciations(once, ['会计', '学会计', '立刻', '哈哈']), text).toBe(once)
+    }
   })
 
   it('重复调用是幂等的，不会累积零宽字符', () => {

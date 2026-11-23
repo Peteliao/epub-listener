@@ -54,6 +54,61 @@ function frameF0(samples, start, size, sampleRate, minLag, maxLag, minCorrelatio
     : { f0: null, correlation: best }
 }
 
+function median(values) {
+  if (!values.length) return null
+  const sorted = [...values].sort((left, right) => left - right)
+  const middle = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
+}
+
+export function linearSlope(frames) {
+  if (frames.length < 3) return null
+  let sumX = 0
+  let sumY = 0
+  let sumXY = 0
+  let sumXX = 0
+  for (const item of frames) {
+    const x = item.timeMs / 1000
+    const y = item.f0
+    sumX += x
+    sumY += y
+    sumXY += x * y
+    sumXX += x * x
+  }
+  const denominator = frames.length * sumXX - sumX * sumX
+  return Math.abs(denominator) > 1e-9
+    ? (frames.length * sumXY - sumX * sumY) / denominator
+    : null
+}
+
+/** Local F0 of the target word, not the sentence-final tail. */
+export function analyzeTargetF0(report, startMs, endMs) {
+  const frames = (report.frames ?? []).filter((item) =>
+    item.f0 !== null && item.timeMs >= startMs && item.timeMs <= endMs)
+  if (!frames.length) {
+    return {
+      frames: 0, meanF0: null, minF0: null, maxF0: null,
+      slopeHzPerSec: null, jumpRatio: 0, confidence: 'low',
+    }
+  }
+  let jumps = 0
+  for (let index = 1; index < frames.length; index += 1) {
+    const previous = frames[index - 1].f0
+    const current = frames[index].f0
+    if (Math.abs(current - previous) / Math.min(current, previous) > 0.2) jumps += 1
+  }
+  const slope = linearSlope(frames)
+  return {
+    frames: frames.length,
+    meanF0: frames.reduce((sum, item) => sum + item.f0, 0) / frames.length,
+    minF0: Math.min(...frames.map((item) => item.f0)),
+    maxF0: Math.max(...frames.map((item) => item.f0)),
+    slopeHzPerSec: slope,
+    jumpRatio: frames.length > 1 ? jumps / (frames.length - 1) : 0,
+    confidence: frames.length >= 4 ? 'high' : frames.length >= 2 ? 'medium' : 'low',
+  }
+}
+
 export function analyzeF0(samples, sampleRate, options = {}) {
   const config = { ...F0_DEFAULTS, ...options }
   const frame = Math.max(2, Math.round((sampleRate * config.frameMs) / 1000))
@@ -87,6 +142,22 @@ export function analyzeF0(samples, sampleRate, options = {}) {
     })
   }
 
+  // Octave errors are common with short, high-pitched Chinese syllables. Pull
+  // an isolated 2x/0.5x frame back toward the median of its voiced neighbours.
+  for (let index = 0; index < frames.length; index += 1) {
+    const frame = frames[index]
+    if (frame.f0 === null) continue
+    const neighbours = frames
+      .slice(Math.max(0, index - 3), Math.min(frames.length, index + 4))
+      .filter((item) => item.f0 !== null)
+      .map((item) => item.f0)
+    const local = median(neighbours)
+    if (!local) continue
+    const ratio = frame.f0 / local
+    if (ratio > 1.7 && ratio < 2.3) frame.f0 /= 2
+    else if (ratio > 0.43 && ratio < 0.59) frame.f0 *= 2
+  }
+
   const voiced = frames.filter((item) => item.f0 !== null)
   let jumpFrames = 0
   let maxJump = 0
@@ -108,24 +179,7 @@ export function analyzeF0(samples, sampleRate, options = {}) {
   let finalSlopeHzPerSec = null
   const lastVoicedTime = voiced[voiced.length - 1]?.timeMs ?? 0
   const tail = voiced.filter((item) => item.timeMs >= lastVoicedTime - config.finalWindowMs)
-  if (tail.length >= 3) {
-    let sumX = 0
-    let sumY = 0
-    let sumXY = 0
-    let sumXX = 0
-    for (const item of tail) {
-      const x = item.timeMs / 1000
-      const y = item.f0
-      sumX += x
-      sumY += y
-      sumXY += x * y
-      sumXX += x * x
-    }
-    const denominator = tail.length * sumXX - sumX * sumX
-    if (Math.abs(denominator) > 1e-9) {
-      finalSlopeHzPerSec = (tail.length * sumXY - sumX * sumY) / denominator
-    }
-  }
+  if (tail.length >= 3) finalSlopeHzPerSec = linearSlope(tail)
 
   return {
     frames,

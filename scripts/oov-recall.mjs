@@ -53,13 +53,20 @@ async function main(options) {
     `- 探测器命中：${result.found} 个 OOV 声学候选`,
     `- 未命中 OOV：${result.missed} 个（本次抽样 ${result.sample.length} 个）`,
     '',
-    '> 未命中不等于错误；这里只列出探测器看不见的词，供定期人工复听。',
+    '> 未命中不等于错误；这里只列出探测器看不见的词，供定期人工复听。3–6 字词不进入自动声学修复。',
     '',
-    '| 词 | 出现 | 证据 |',
-    '| --- | ---: | --- |',
+    '| 词长 | 词典命中 | 探测器命中 | 未命中 |',
+    '| ---: | ---: | ---: | ---: |',
   ]
+  for (const [length, counts] of Object.entries(result.byLength)) {
+    lines.push(`| ${length} | ${counts.dictionary} | ${counts.found} | ${counts.missed} |`)
+  }
+  lines.push('', '## 本次抽样', '',
+    '| 词 | 词长 | 出现 | 证据 |',
+    '| --- | ---: | ---: | --- |',
+  )
   for (const item of result.sample) {
-    lines.push(`| ${item.word} | ${item.count} | ${String(item.evidence[0] ?? '').replace(/\|/g, '\\|').slice(0, 50)} |`)
+    lines.push(`| ${item.word} | ${item.length} | ${item.count} | ${String(item.evidence[0] ?? '').replace(/\|/g, '\\|').slice(0, 50)} |`)
   }
   writeFileSync(options.summary, `${lines.join('\n')}\n`, 'utf8')
   console.log(`OOV 召回抽样：found ${result.found} / missed ${result.missed} / sample ${result.sample.length}`)

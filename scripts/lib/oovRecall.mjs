@@ -1,15 +1,13 @@
 import { splitCorpus, discoverOovAcousticLeads } from './iterationFamilies.mjs'
 
-const HAN_WORD = /^\p{Script=Han}{2}$/u
+const LENGTHS = [2, 3, 4, 5, 6]
+const HAN_WORD = new RegExp(`^\\p{Script=Han}{2,6}$`, 'u')
 
 /**
- * Samples OOV two-character words that discoverOovAcousticLeads did NOT flag.
- *
- * The detector deliberately skips a word whose first character is covered by a
- * longer dictionary span (e.g. 说白 + 白果 -> the OOV 白果 is invisible). Those
- * words are not necessarily broken, but they are exactly the blind spots that
- * a periodic human recall audit should listen to. This sampler is advisory:
- * it never edits the lexicon and never claims a word is an error.
+ * Samples OOV words of 2–6 characters that discoverOovAcousticLeads did NOT
+ * flag. The acoustic detector only handles two-character words, so longer
+ * entries are always a manual-recall queue: their segmentation and semantics
+ * are too fragile for automatic repair. This never edits a lexicon.
  */
 export function collectRecallSample(text, assets, options = {}) {
   const sampleSize = options.sample ?? 20
@@ -20,7 +18,9 @@ export function collectRecallSample(text, assets, options = {}) {
     minCount,
   })
   const found = new Map(detector.map((item) => [item.word, item]))
-  const dictionary = new Set()
+  const byLength = Object.fromEntries(LENGTHS.map((length) => [
+    length, { dictionary: new Set(), found: new Set(), missed: new Set() },
+  ]))
   const missed = new Map()
   const segmenter = new Intl.Segmenter('zh', { granularity: 'word' })
 
@@ -28,15 +28,20 @@ export function collectRecallSample(text, assets, options = {}) {
     const words = [...segmenter.segment(sentence)].map((item) => item.segment)
     if (words.join('') !== sentence) continue
     for (const word of words) {
-      if (!HAN_WORD.test(word)) continue
+      const length = Array.from(word).length
+      if (!HAN_WORD.test(word) || !byLength[length]) continue
       if (effective.has(word)) {
-        dictionary.add(word)
+        byLength[length].dictionary.add(word)
         continue
       }
-      if (found.has(word)) continue
+      if (found.has(word)) {
+        byLength[length].found.add(word)
+        continue
+      }
+      byLength[length].missed.add(word)
       let bucket = missed.get(word)
       if (!bucket) {
-        bucket = { word, count: 0, evidence: [] }
+        bucket = { word, length, count: 0, evidence: [] }
         missed.set(word, bucket)
       }
       bucket.count += 1
@@ -47,14 +52,42 @@ export function collectRecallSample(text, assets, options = {}) {
     }
   }
 
-  const sample = [...missed.values()]
-    .sort((left, right) =>
-      right.count - left.count || left.word.localeCompare(right.word, 'zh'))
-    .slice(0, sampleSize)
+  // Stratified sample: every word length gets a slot before 2-char pairs (the
+  // noisiest bucket) can consume the whole quota.
+  const quota = Math.max(1, Math.ceil(sampleSize / LENGTHS.length))
+  const sample = []
+  const claimed = new Set()
+  for (const length of LENGTHS) {
+    const candidates = [...missed.values()]
+      .filter((item) => item.length === length && !claimed.has(item.word))
+      .sort((left, right) =>
+        right.count - left.count || left.word.localeCompare(right.word, 'zh'))
+    for (const item of candidates.slice(0, quota)) {
+      sample.push(item)
+      claimed.add(item.word)
+    }
+  }
+  if (sample.length < sampleSize) {
+    const rest = [...missed.values()]
+      .filter((item) => !claimed.has(item.word))
+      .sort((left, right) =>
+        right.count - left.count || left.word.localeCompare(right.word, 'zh'))
+    for (const item of rest) {
+      if (sample.length >= sampleSize) break
+      sample.push(item)
+      claimed.add(item.word)
+    }
+  }
+
   return {
-    dictionary: dictionary.size,
+    dictionary: LENGTHS.reduce((sum, length) => sum + byLength[length].dictionary.size, 0),
     found: found.size,
     missed: missed.size,
     sample,
+    byLength: Object.fromEntries(LENGTHS.map((length) => [length, {
+      dictionary: byLength[length].dictionary.size,
+      found: byLength[length].found.size,
+      missed: byLength[length].missed.size,
+    }])),
   }
 }

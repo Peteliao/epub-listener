@@ -26,6 +26,21 @@ export const WORD_BOUNDARY = '\u200b'
 export const UTTERANCE_RESET = '\u2060'
 export const HAN = /\p{Script=Han}/u
 
+function codePointOffsets(text) {
+  const offsets = []
+  let offset = 0
+  for (const char of text) {
+    offsets.push(offset)
+    offset += char.length
+  }
+  return offsets
+}
+
+function previousCodePoint(text, offsets, index) {
+  const position = offsets.indexOf(index)
+  return position > 0 ? text.slice(offsets[position - 1], index) : ''
+}
+
 /** The eight words the listener reported, plus the two already-pinned words. */
 export const WORD_FAMILY = Object.freeze([
   {
@@ -175,19 +190,15 @@ export function protectPronunciations(text, words) {
   )
   const insertions = []
   const covered = []
+  const offsets = codePointOffsets(source)
   for (const word of sorted) {
     if (!word) continue
-    let from = 0
-    for (;;) {
-      const index = source.indexOf(word, from)
-      if (index < 0) break
-      from = index + word.length
+    for (const index of offsets) {
+      if (!source.startsWith(word, index)) continue
       if (covered.some(([start, end]) => index >= start && index < end)) continue
-      // Mark every match, even at the sentence edge or before an existing
-      // boundary, so a nested shorter word cannot split the longer one.
       covered.push([index, index + word.length])
-      if (index === 0 || !HAN.test(source[index - 1])) continue
-      if (source[index - 1] === WORD_BOUNDARY) continue
+      const before = previousCodePoint(source, offsets, index)
+      if (!before || !HAN.test(before) || before === WORD_BOUNDARY) continue
       insertions.push(index)
     }
   }
@@ -210,12 +221,14 @@ export function applyUtteranceResets(text, protectedWords, resetWords) {
     (a, b) => Array.from(b).length - Array.from(a).length || a.localeCompare(b, 'zh'),
   )
   const insertions = []
-  for (let index = 0; index < source.length; index += 1) {
+  const offsets = codePointOffsets(source)
+  for (const index of offsets) {
     if (source[index] !== WORD_BOUNDARY) continue
     const longest = sortedProtected.find((word) => source.startsWith(word, index + 1))
     if (longest && !resetWords.includes(longest)) continue
     if (!resetWords.some((word) => source.startsWith(word, index + 1))) continue
-    if (index === 0 || source[index - 1] === UTTERANCE_RESET) continue
+    const before = previousCodePoint(source, offsets, index)
+    if (!before || before === UTTERANCE_RESET) continue
     insertions.push(index)
   }
   let result = source
