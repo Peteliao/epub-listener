@@ -600,6 +600,31 @@ Matcha 没有可直接控制的基频/情绪标签，贸然调语速或给句子
 
 **验证**：`npm test` **75 文件 / 673 项通过**；`npm run audit:all` **13/13 通过**；`node scripts/self-iterate.mjs --verify` 通过；`npm run audit:envelope -- --case=om-0007 --strict` 通过；`npm run build` 通过。
 
+### 2026-11-23 第十六轮：召回抽样与整书词典生命周期
+
+继续处理审查中的 P1/P2 剩余项，不改模型、不扩词典：
+
+**OOV 未召回词抽样**
+
+- 新增 `npm run oov:recall -- --corpus=public/sample.epub --sample=20` 与 `scripts/lib/oovRecall.mjs`：列出 ICU 分词后「词典没有、但 `discoverOovAcousticLeads` 也没命中」的二字词，写 `scripts/out/oov-recall.jsonl` / `.md`，供定期人工复听。
+- 这补上了一个真实盲区：若 OOV 词首字被前文词典词覆盖（如「说白」覆盖「白果」的「白」），声学探测器会跳过；这类词现在进入抽样队列，而不是静默消失。抽样结果**不是错误清单**。
+- `tests/OovRecall.test.ts` 用该案例锁定抽样行为；`audit:all` 新增可选 advisory 门禁「OOV 召回抽样」。
+
+**统一整书词典缓存指纹**
+
+- 新增 `bookLexiconFingerprint()`：把 `voiceId`、缓存名、词典/token URL、音色包 ID/版本、人工表哈希、白名单哈希、外部短语表、扫描规则版本、`bookId`、章节内容、ruby 注音统一成一个指纹。
+- `StoredBookLexicon` 写入 `fingerprint`；旧记录没有该字段会自动失效，不需要 DB 迁移。
+- 书内容更新或音色包升级都会重新扫描；完全相同的输入只命中缓存。`BookLexiconLifecycle.test.ts` 覆盖 A/B 书隔离、`dispose()` 清理、即时纠错删除后恢复扫描结果、内容/音色包变化失效。
+- `removeBookProgressAndLexicon()` 现在同时删除该书的 pronunciation reports，避免删书后即时纠错残留；`reportIdsForBook()` 可单独测试。
+
+**Worker 重建压力**
+
+- `SherpaDriver.test.ts` 新增：同一音色/词典指纹连续 10 次 `init()` 不创建新 Worker、不追加 init 消息；`ReaderView` 的 350ms 去抖之外再有一道指纹护栏。
+
+**验证**：`npm test` **78 文件 / 680 项通过**；`npm run audit:all` **14/14 通过**（含 OOV 召回抽样 advisory 门禁）；`npm run build` 通过。
+
+仍待下一阶段：图形化盲听实验室、每类 100 条完整盲听集、预取队列取消/长时间内存监控、Matcha 原生韵律/情绪。
+
 ### 2026-11-12 本地浏览器自检（无需用户协助）
 
 用 `vite` + `agent-browser` 真实打开本地页面，再用项目自带的 CDP 自检（`npm run lab:diagnose:check`）复核，确认第九轮的「地」反馈在浏览器链路里到底是什么：

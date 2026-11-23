@@ -141,6 +141,8 @@ export interface AiRuntimeConfig {
 }
 
 export interface AiLexiconAssets {
+  /** Selected voice id; part of the per-book lexicon cache fingerprint. */
+  voiceId: string
   cacheName: string
   lexiconUrl: string
   tokensUrl: string
@@ -977,6 +979,7 @@ export class AiModelManager {
     const tokensFile = files.find((file) => file.name === 'tokens.txt')
     if (!lexiconFile || !tokensFile) return null
     return {
+      voiceId,
       cacheName: this.modelCacheName(pack),
       lexiconUrl: resolveUrl(lexiconFile.url),
       tokensUrl: resolveUrl(tokensFile.url),

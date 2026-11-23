@@ -49,16 +49,40 @@ function hashText(text: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0')
 }
 
-function assetKey(assets: AiLexiconAssets): string {
-  return [
+/**
+ * Unified, auditable cache fingerprint.
+ *
+ * It includes every input that can change the generated overlay: book identity
+ * and content, ruby annotations, voice/model pack, lexicon/token asset URLs,
+ * curated table, compiled whitelist, external phrase table and scan rules.
+ * A content edit or a voice-pack update therefore invalidates the old cache
+ * without a DB migration; old records simply lack `fingerprint` and are ignored.
+ */
+export function bookLexiconFingerprint(
+  assets: AiLexiconAssets,
+  bookId: string,
+  chunks: readonly string[] = [],
+  rubyOverlays: readonly unknown[] = [],
+): string {
+  const contentHash = hashText([
+    bookId,
+    ...chunks,
+    JSON.stringify(rubyOverlays),
+  ].join('\u0000'))
+  return hashText([
+    assets.voiceId,
     assets.cacheName,
     assets.lexiconName,
+    assets.lexiconUrl,
+    assets.tokensUrl,
+    assets.packId,
     assets.packVersion,
     curatedHash,
     APPROVED_OVERRIDES_HASH,
     phraseHash,
     BOOK_LEXICON_VERSION,
-  ].join('|')
+    contentHash,
+  ].join('\u0001'))
 }
 
 export class BookLexiconService {
@@ -213,21 +237,6 @@ export class BookLexiconService {
       return ''
     }
 
-    const key = assetKey(assets)
-    if (this.runKey === key) {
-      this.recompose()
-      this.setStatus({
-        phase: 'ready',
-        entries: countEntries(this.overlay),
-        message: null,
-      })
-      return this.overlay
-    }
-    this.runKey = key
-    this.baseOverlay = ''
-    this.rubyOverlay = ''
-    this.recompose()
-
     this.setStatus({ phase: 'generating', entries: 0, message: null })
     const controller = new AbortController()
     this.abort = controller
@@ -238,9 +247,27 @@ export class BookLexiconService {
       const data = await collect(controller.signal)
       if (this.disposed || !this.enabled) return this.overlay
       const chunks = Array.isArray(data?.chunks) ? data.chunks : []
-      this.rubyOverlay = mergeRubyOverlays(data?.rubyOverlays ?? [])
+      const rubyOverlays = data?.rubyOverlays ?? []
+      this.rubyOverlay = mergeRubyOverlays(rubyOverlays)
 
-      const cached = await this.readCache(assets, key)
+      // The fingerprint is computed AFTER the traversal because it includes the
+      // book content itself. Reopening an edited EPUB can no longer keep a scan
+      // generated from the old chapters.
+      const key = bookLexiconFingerprint(assets, this.bookId, chunks, rubyOverlays)
+      if (this.runKey === key) {
+        this.recompose()
+        this.setStatus({
+          phase: 'ready',
+          entries: countEntries(this.overlay),
+          message: null,
+        })
+        return this.overlay
+      }
+      this.runKey = key
+      this.baseOverlay = ''
+      this.recompose()
+
+      const cached = await this.readCache(key)
       if (this.disposed || !this.enabled) return this.overlay
       let scanned = cached?.overlay ?? ''
       if (!cached && chunks.some((chunk) => chunk.trim())) {
@@ -258,6 +285,7 @@ export class BookLexiconService {
           overlay: scanned,
           entries: countEntries(scanned),
           version: BOOK_LEXICON_VERSION,
+          fingerprint: key,
           packId: assets.packId,
           packVersion: assets.packVersion,
           lexiconName: assets.lexiconName,
@@ -283,23 +311,14 @@ export class BookLexiconService {
     }
   }
 
-  private async readCache(
-    assets: AiLexiconAssets,
-    key: string,
-  ): Promise<StoredBookLexicon | null> {
+  private async readCache(key: string): Promise<StoredBookLexicon | null> {
     try {
       const cached = await getBookLexicon(this.bookId)
       if (
         !cached ||
-        cached.version !== BOOK_LEXICON_VERSION ||
-        cached.packId !== assets.packId ||
-        cached.packVersion !== assets.packVersion ||
-        cached.lexiconName !== assets.lexiconName ||
-        cached.curatedHash !== curatedHash ||
-        cached.approvedHash !== APPROVED_OVERRIDES_HASH ||
+        cached.fingerprint !== key ||
         typeof cached.overlay !== 'string' ||
-        !Number.isFinite(cached.entries) ||
-        assetKey(assets) !== key
+        !Number.isFinite(cached.entries)
       ) {
         return null
       }

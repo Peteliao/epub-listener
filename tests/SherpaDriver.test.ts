@@ -514,4 +514,21 @@ describe('SherpaDriver', () => {
     expect(rebuilt).not.toBe(worker)
     expect(rebuilt.ofType('init').at(-1)!.lexiconOverlay).toBe('会计 kuai4 ji4')
   })
+
+  it('same voice/overlay fingerprint is a no-op under repeated init calls', async () => {
+    const config = pack('zh', 'sherpa')
+    await initialize('sherpa')
+    const worker = FakeWorker.instances[0]!
+    const beforeWorkers = FakeWorker.instances.length
+    const beforeInits = worker.ofType('init').length
+
+    // Ten live-correction saves that resolve to the same overlay must not queue
+    // ten worker rebuilds; the signature guard is the last line of defence
+    // after ReaderView's 350ms debounce.
+    for (let index = 0; index < 10; index += 1) {
+      expect(await driver.init(config)).toBeTruthy()
+    }
+    expect(FakeWorker.instances.length).toBe(beforeWorkers)
+    expect(worker.ofType('init').length).toBe(beforeInits)
+  })
 })

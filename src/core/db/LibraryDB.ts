@@ -7,6 +7,8 @@ export interface StoredBookLexicon {
   overlay: string
   entries: number
   version: number
+  /** Unified cache fingerprint; old records without it are invalidated. */
+  fingerprint?: string
   packId: string
   packVersion: string
   lexiconName: string
@@ -142,12 +144,33 @@ export async function getProgress(bookId: string): Promise<StoredProgress | unde
   return db.get('progress', bookId)
 }
 
+/** Report ids that belong to a book; separated for lifecycle unit tests. */
+export function reportIdsForBook(
+  reports: readonly PronunciationReport[],
+  bookId: string,
+): string[] {
+  return reports
+    .filter((report) => report?.book?.id === bookId)
+    .map((report) => report.id)
+}
+
 export async function removeBookProgressAndLexicon(bookId: string): Promise<void> {
   const db = await getDatabase()
-  const transaction = db.transaction(['progress', 'bookLexicons'], 'readwrite')
+  const transaction = db.transaction(
+    ['progress', 'bookLexicons', 'pronunciationReports'],
+    'readwrite',
+  )
+  const reportsStore = transaction.objectStore('pronunciationReports')
+  const reports = await reportsStore.getAll()
+  // Live corrections are persisted separately from the scan cache. Deleting a
+  // book must remove them too, or reopening a book with the same id would
+  // inherit another book's feedback overlay.
+  const deletes = reportIdsForBook(reports, bookId)
+    .map((id) => reportsStore.delete(id))
   await Promise.all([
     transaction.objectStore('progress').delete(bookId),
     transaction.objectStore('bookLexicons').delete(bookId),
+    ...deletes,
     transaction.done,
   ])
 }
