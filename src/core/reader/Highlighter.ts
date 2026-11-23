@@ -1,4 +1,5 @@
 import { endsWithSentenceMark, splitSentences } from '../text/SentenceSplitter'
+import { planSpeechPhrasing } from '../text/SpeechPhrasing'
 import { normalizeSpeechText } from '../text/TextNormalizer'
 
 interface CharRef {
@@ -424,7 +425,9 @@ export class Highlighter {
     const fixtures: FragmentSlice[][] = []
 
     for (const range of ranges) {
-      const speechText = normalizeSpeechText(range.text)
+      // Display text stays untouched; only the TTS string receives the single
+      // semantic comma planned for a long contrast/consequence clause.
+      const speechText = planSpeechPhrasing(normalizeSpeechText(range.text))
       if (!speechText) continue
 
       const slices: FragmentSlice[] = []

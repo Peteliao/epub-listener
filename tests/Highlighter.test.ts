@@ -79,6 +79,17 @@ describe('Highlighter', () => {
     )
   })
 
+  it('adds a semantic comma before a long-clause contrast in speech only', () => {
+    const highlighter = build(
+      '<p>他本来想今天早上去图书馆把上周借的那本关于中国古代建筑史的书还掉可是走到半路发现借书卡忘在家里了。</p>',
+    )
+    expect(highlighter.sentences).toHaveLength(1)
+    const sentence = highlighter.sentences[0]!
+    expect(sentence.text).not.toContain('，可是')
+    expect(sentence.speechText).toContain('，可是')
+    expect(sentence.speechText.replaceAll('，', '')).toBe(sentence.text.replaceAll('，', ''))
+  })
+
   it('keeps headings and list items as separate sentences', () => {
     const highlighter = build(
       '<h1>第一章</h1><ul><li>第一件事</li><li>第二件事</li></ul><p>他走进屋子，看到桌上有一封没有署名的信。</p>',
