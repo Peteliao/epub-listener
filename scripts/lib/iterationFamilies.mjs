@@ -494,6 +494,9 @@ export function discoverBoundaryLeads(text, assets, { limit = 20, maxSentences =
     .slice(0, limit)
     .map((item) => ({
       ...item,
+      // C = dictionary match is normal; the lead is only a boundary/rhythm
+      // candidate. It must never be mixed into the OOV A/B emergency queue.
+      grade: 'C',
       // A boundary on a word spoken thousands of times would change the rhythm
       // of the whole book; keep it as a listening lead, never an auto-edit.
       confidence: item.count > 200 ? 'low' : 'high',
@@ -560,6 +563,8 @@ export function discoverPrefixStealLeads(text, assets, { limit = 20, maxSentence
           actualReading: effective.get(prefixWord),
           stolenPhone,
           intendedPhone,
+          // A = the dictionary itself steals the intended word's first phone.
+          grade: 'A',
           confidence: assets.overlay.entries.has(target) ? 'high' : 'review',
           count: 0,
           evidence: [],
@@ -655,6 +660,10 @@ export function discoverOovAcousticLeads(text, assets, { limit = 20, minCount = 
           word,
           phones: singles,
           risk: oovRisk(singles),
+          // A = 立刻-shaped stop-second OOV; B = OOV but no stop-second risk.
+          // Neither is a confirmed error; S is assigned only after the
+          // full-sentence envelope says the syllable is actually swallowed.
+          grade: oovRisk(singles) === 'stop-second' ? 'A' : 'B',
           confidence: 'review',
           count: 0,
           evidence: [],
@@ -700,6 +709,7 @@ export function discoverSegmentationLeads(text, assets, { limit = 40, ignoreCura
         leads.push({
           family: 'segmentation', word, reading,
           actual: covering.word,
+          grade: 'B',
           evidence: [clip(window, local, local + Array.from(word).length)],
           confidence: 'review',
         })

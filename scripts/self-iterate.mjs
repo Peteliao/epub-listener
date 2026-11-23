@@ -241,11 +241,11 @@ async function verify(assets) {
         ?.actual ?? `未发现（segmentation ${segmentation.length} 条）`,
     },
     {
-      name: 'OOV 声学盲区可发现「立刻」并标为 stop-second',
+      name: 'OOV 声学盲区可发现「立刻」并标为 A 级 stop-second',
       ok: boundary.some((item) => item.kind === 'oov-acoustic'
-        && item.word === '立刻' && item.risk === 'stop-second'),
+        && item.word === '立刻' && item.grade === 'A' && item.risk === 'stop-second'),
       detail: boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻')
-        ? `音素 ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').phones.join(' ')} · ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').risk}`
+        ? `音素 ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').phones.join(' ')} · grade ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').grade} · ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').risk}`
         : `未发现（boundary ${boundary.length} 条）`,
     },
     { name: 'fusion 族可召回已修复词', ok: fusion.some((item) => item.word === '来到了' && item.blend === 'lao'), detail: `修复前基线召回 ${fusion.length} 条融合风险词` },
@@ -319,7 +319,10 @@ function renderSummary({ corpus, replays, byFamily, phone, boundary, segmentatio
     return rank(left) - rank(right) || right.count - left.count
   })
   for (const item of orderedBoundary.slice(0, options.limit)) {
-    lines.push(`| ${item.word} | ${item.phones.join(' ')} | ${item.count} | ${item.risk ?? '—'} | ${String(item.evidence[0] ?? '').replace(/\|/g, '\\|').slice(0, 50)} |`)
+    const risk = item.grade
+      ? `${item.grade}${item.risk ? ` / ${item.risk}` : ''}`
+      : '—'
+    lines.push(`| ${item.word} | ${item.phones.join(' ')} | ${item.count} | ${risk} | ${String(item.evidence[0] ?? '').replace(/\|/g, '\\|').slice(0, 50)} |`)
   }
   if (!boundary.length) lines.push('| — | — | 0 | — | — |')
   lines.push('', '## segmentation 族（覆盖词被最长匹配截走）', '',

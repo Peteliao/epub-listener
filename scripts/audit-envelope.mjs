@@ -14,7 +14,9 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { ROOT, loadMatchaAssets } from './lib/reading.mjs'
 import { createMatchaSynth } from './lib/matchaSynth.mjs'
-import { analyzeEnvelope, evaluateTarget, voicedBounds } from './lib/envelope.mjs'
+import {
+  analyzeEnvelope, evaluateTarget, severityFor, voicedBounds,
+} from './lib/envelope.mjs'
 import { analyzeF0 } from './lib/f0.mjs'
 import {
   buildRuntimeLexicon, loadWordLists, prepareRuntimeTextWithOverlay, readAsset,
@@ -85,6 +87,7 @@ async function main(options) {
           second: target.second,
           gapMs: target.gapMs,
           verdict: target.verdict,
+          severity: severityFor(target),
           runs: envelope.runs,
           f0: {
             voicedRatio: f0.voicedRatio,
@@ -108,13 +111,13 @@ async function main(options) {
     '- 口径：目标词前缀结束时间之后的第一个强 burst 为第一音节，下一个 burst 为第二音节；第二音节 <60ms 或峰值 <第一音节 25% 记为 weak-second；没有第二个 burst 记为 merged。',
     '- 包络不能替代听感：粘连/弱爆破是排序线索，不是硬性判错。',
     '',
-    '| 案例 | 词 | 前缀结束 | 第一音节 | 第二音节 | 间隔 | 判定 |',
-    '| --- | --- | ---: | --- | --- | ---: | --- |',
+    '| 案例 | 词 | 前缀结束 | 第一音节 | 第二音节 | 间隔 | 等级 | 判定 |',
+    '| --- | --- | ---: | --- | --- | ---: | --- | --- |',
   ]
   for (const item of results) {
     const first = item.first ? `${pct(item.first.ms)} / peak ${Math.round(item.first.peak * 100)}%` : '—'
     const second = item.second ? `${pct(item.second.ms)} / peak ${Math.round(item.second.peak * 100)}%` : '—'
-    lines.push(`| ${item.caseId} | ${item.word} | ${pct(item.prefixEndMs)} | ${first} | ${second} | ${item.gapMs == null ? '—' : pct(item.gapMs)} | ${item.verdict} |`)
+    lines.push(`| ${item.caseId} | ${item.word} | ${pct(item.prefixEndMs)} | ${first} | ${second} | ${item.gapMs == null ? '—' : pct(item.gapMs)} | ${item.severity} | ${item.verdict} |`)
   }
   lines.push('', '## F0 连续性（advisory）', '',
     '| 案例 | 词 | voiced | 跳变帧 | 最大跳变 | 八度跳 | 句末斜率 |',

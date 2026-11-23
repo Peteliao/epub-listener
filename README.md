@@ -581,6 +581,27 @@ Matcha 没有可直接控制的基频/情绪标签，贸然调语速或给句子
 
 **仍待**：Matcha 原生韵律/情绪、每类 100 条的完整盲听集、图形化盲听实验室、Worker 重建压力测试与书籍缓存隔离测试——这些属于下一阶段，不在本轮用规则硬猜。
 
+### 2026-11-23 第十五轮：OOV 风险分级与召回评估
+
+审查指出「探测器发现多少」不等于「问题有多少」，这一轮把候选分成可行动的等级，并给召回率一个可重复的基线：
+
+| 等级 | 判定 | 来源 / 动作 |
+| --- | --- | --- |
+| S | 整句包络已经出现吞并/弱爆破 | `audit-envelope` 的 `weak-second` / `merged` / `missing`；优先 A/B |
+| A | 立刻形状的 stop-second OOV，或词典前缀抢词 | `discoverOovAcousticLeads` 的 `risk=stop-second`；`discoverPrefixStealLeads`；多语境测量 |
+| B | 普通 OOV / overlay 被更长词遮住 | OOV 声学候选、segmentation 候选；保留观察 |
+| C | 词典匹配正常，只是边界/节奏候选 | `discoverBoundaryLeads`；不进入紧急队列 |
+
+- `discoverOovAcousticLeads` 增加 `grade: 'A' | 'B'`；`discoverPrefixStealLeads` 为 A；`discoverBoundaryLeads` 为 C；`discoverSegmentationLeads` 为 B。
+- `audit-envelope` 增加 `severityFor()`：包络不 ok → S；第二音节 <100ms → A；正常 → B。
+- `self-iterate` 报告把等级和风险一起显示，`--verify` 断言「立刻」必须是 `grade A / stop-second`。
+- `tests/OovRisk.test.ts` 用 12 个 A 形状词 + 9 个 B 形状词做 shape-level 召回/精度基线（21/21），并验证 S/A/B 包络分级。注意这是探测器形状召回，不是真人听感 ground truth；S 级仍以完整包络和复听为准。
+- **已知边界**：如果 OOV 词的首字被前面的词典词覆盖（如「说白」覆盖「白果」的「白」），当前 OOV 探测器会跳过；这类需要 `discoverPrefixStealLeads`、整句包络或人工抽样补位，不能把 21/21 当成全量召回。
+
+**验证**：`npm test` **75 文件 / 673 项通过**；`npm run audit:all` **13/13 通过**；`node scripts/self-iterate.mjs --verify` 通过；`npm run audit:envelope -- --case=om-0007 --strict` 通过；`npm run build` 通过。
+
+### 2026-11-12 本地浏览器自检（无需用户协助）
+
 用 `vite` + `agent-browser` 真实打开本地页面，再用项目自带的 CDP 自检（`npm run lab:diagnose:check`）复核，确认第九轮的「地」反馈在浏览器链路里到底是什么：
 
 - 诊断页渲染 **37 张卡片**（新增 D1–D7 对应七个「地」句），`__diagReady=true`、`__diagError=null`；

@@ -115,6 +115,19 @@ export function voicedBounds(samples, sampleRate, options = {}) {
  * own tail and skipped. The next two runs are the two syllables. If the second
  * run is missing or has too little energy/duration, the target is flagged.
  */
+/**
+ * Triage grade used by the listening queue:
+ *   S = full-sentence envelope already shows a swallow/merge;
+ *   A = second burst survives but is still short (<100ms);
+ *   B = OOV/acoustic candidate that measured normal.
+ * C is reserved for dictionary-normal boundary candidates (never an emergency).
+ */
+export function severityFor(result, options = {}) {
+  const aMs = options.aMs ?? 100
+  if (!result || result.verdict !== 'ok') return 'S'
+  return (result.second?.ms ?? 0) < aMs ? 'A' : 'B'
+}
+
 export function evaluateTarget(envelope, prefixEndMs, options = {}) {
   const searchBeforeMs = options.searchBeforeMs ?? 400
   const searchAfterMs = options.searchAfterMs ?? 800
