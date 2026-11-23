@@ -172,14 +172,14 @@ describe('主题表面同步更新', () => {
       delete (navigator as Navigator & { standalone?: boolean }).standalone
     })
 
-    it('index.html 声明固定白色系统图标', () => {
+    it('index.html 使用 black-translucent 让页面延伸到状态栏', () => {
       const html = readFileSync('index.html', 'utf8')
       expect(html).toContain(
         'name="apple-mobile-web-app-status-bar-style" content="black-translucent"',
       )
     })
 
-    it('浅色主题用墨色表面承托白色图标，页面背景保持不变', () => {
+    it('浅色主题的状态栏表面与页面背景一致', () => {
       const theme = ref<ReaderTheme>('paper')
       const palette = computed(() => READER_PALETTES[theme.value])
 
@@ -190,14 +190,14 @@ describe('主题表面同步更新', () => {
 
       expect(
         document.documentElement.style.getPropertyValue('--status-bar-bg'),
-      ).toBe(READER_PALETTES.paper.fg)
-      expect(themeColorMeta?.content).toBe(READER_PALETTES.paper.fg)
+      ).toBe(READER_PALETTES.paper.bg)
+      expect(themeColorMeta?.content).toBe(READER_PALETTES.paper.bg)
       expect(document.documentElement.style.getPropertyValue('--app-bg')).toBe(
         READER_PALETTES.paper.bg,
       )
     })
 
-    it('所有主题的状态栏表面都保持深色可读', () => {
+    it('所有主题的状态栏表面都等于主题背景', () => {
       const theme = ref<ReaderTheme>('paper')
       const palette = computed(() => READER_PALETTES[theme.value])
 
@@ -209,18 +209,17 @@ describe('主题表面同步更新', () => {
       for (const next of READER_THEME_ORDER) {
         theme.value = next
         const nextPalette = READER_PALETTES[next]
-        const expected = nextPalette.dark ? nextPalette.bg : nextPalette.fg
         expect(
           document.documentElement.style.getPropertyValue('--status-bar-bg'),
-        ).toBe(expected)
-        expect(themeColorMeta?.content).toBe(expected)
+        ).toBe(nextPalette.bg)
+        expect(themeColorMeta?.content).toBe(nextPalette.bg)
         expect(document.documentElement.style.getPropertyValue('--app-bg')).toBe(
           nextPalette.bg,
         )
       }
     })
 
-    it('口袋模式为纯黑，退出后恢复原主题的深色状态栏表面', () => {
+    it('口袋模式为纯黑，退出后恢复原主题背景', () => {
       const theme = ref<ReaderTheme>('sky')
       const palette = computed(() => READER_PALETTES[theme.value])
 
@@ -231,7 +230,7 @@ describe('主题表面同步更新', () => {
 
       expect(
         document.documentElement.style.getPropertyValue('--status-bar-bg'),
-      ).toBe(READER_PALETTES.sky.fg)
+      ).toBe(READER_PALETTES.sky.bg)
 
       theme.value = 'oled'
       expect(
@@ -242,8 +241,8 @@ describe('主题表面同步更新', () => {
       theme.value = 'sky'
       expect(
         document.documentElement.style.getPropertyValue('--status-bar-bg'),
-      ).toBe(READER_PALETTES.sky.fg)
-      expect(themeColorMeta?.content).toBe(READER_PALETTES.sky.fg)
+      ).toBe(READER_PALETTES.sky.bg)
+      expect(themeColorMeta?.content).toBe(READER_PALETTES.sky.bg)
     })
   })
 })

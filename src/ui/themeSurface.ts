@@ -19,29 +19,16 @@ function resolveThemeSurface(): ThemeSurface {
   }
 }
 
-function isIosStandaloneWebApp(): boolean {
-  return (
-    typeof navigator !== 'undefined' &&
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  )
-}
-
-function statusBarSurfaceColor(palette: ReaderPalette): string {
-  if (!isIosStandaloneWebApp()) return palette.bg
-  // black-translucent fixes installed iOS apps to white system glyphs, so the
-  // strip behind them must stay dark; light themes use their ink color.
-  return palette.dark ? palette.bg : palette.fg
-}
-
 export function applyThemeSurface(
   palette: ReaderPalette,
   theme: ReaderTheme,
   surface: ThemeSurface = resolveThemeSurface(),
 ): void {
   const { root, themeColorMeta } = surface
-  // The status bar cannot paint a gradient, so its strip and theme-color stay
-  // one solid color instead of reusing the page background image.
-  const statusBarBg = statusBarSurfaceColor(palette)
+  // The strip behind the iOS status bar must match the reading surface. Pocket
+  // mode swaps in the OLED palette, so the same variable becomes pure black.
+  // The status bar cannot paint a gradient, so this stays one solid color.
+  const statusBarBg = palette.bg
   root.style.setProperty('--app-bg', palette.bg)
   root.style.setProperty('--status-bar-bg', statusBarBg)
   root.style.setProperty('--app-bg-image', palette.bgImage ?? 'none')
