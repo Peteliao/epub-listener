@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { computed, ref } from 'vue'
 import { bindThemeSurface } from '../src/ui/themeSurface'
-import { READER_PALETTES, type ReaderTheme } from '../src/types'
+import { READER_PALETTES, READER_THEME_ORDER, type ReaderTheme } from '../src/types'
 
 describe('主题表面同步更新', () => {
   let themeColorMeta: HTMLMetaElement | null = null
@@ -33,6 +33,9 @@ describe('主题表面同步更新', () => {
 
     const root = document.documentElement
     expect(root.style.getPropertyValue('--app-bg')).toBe(READER_PALETTES.night.bg)
+    expect(root.style.getPropertyValue('--status-bar-bg')).toBe(
+      READER_PALETTES.night.bg,
+    )
     expect(root.style.getPropertyValue('--app-fg')).toBe(READER_PALETTES.night.fg)
     expect(root.style.colorScheme).toBe('dark')
     expect(root.dataset.theme).toBe('night')
@@ -53,6 +56,9 @@ describe('主题表面同步更新', () => {
     const root = document.documentElement
     expect(themeColorMeta?.content).toBe(READER_PALETTES.night.bg)
     expect(root.style.getPropertyValue('--app-bg')).toBe(READER_PALETTES.night.bg)
+    expect(root.style.getPropertyValue('--status-bar-bg')).toBe(
+      READER_PALETTES.night.bg,
+    )
     expect(root.dataset.theme).toBe('night')
   })
 
@@ -74,10 +80,19 @@ describe('主题表面同步更新', () => {
     expect(document.documentElement.style.getPropertyValue('--app-bg')).toBe(
       '#000000',
     )
+    expect(
+      document.documentElement.style.getPropertyValue('--status-bar-bg'),
+    ).toBe('#000000')
+    expect(
+      document.documentElement.style.getPropertyValue('--app-bg-image'),
+    ).toBe('none')
     expect(document.documentElement.dataset.theme).toBe('oled')
 
     pocketMode.value = false
     expect(themeColorMeta?.content).toBe(READER_PALETTES.sepia.bg)
+    expect(
+      document.documentElement.style.getPropertyValue('--status-bar-bg'),
+    ).toBe(READER_PALETTES.sepia.bg)
     expect(document.documentElement.dataset.theme).toBe('sepia')
     expect(chosenTheme.value).toBe('sepia')
   })
@@ -98,6 +113,30 @@ describe('主题表面同步更新', () => {
     expect(root.style.getPropertyValue('--app-pattern')).toBe(
       READER_PALETTES.bamboo.bgImage,
     )
+    expect(root.style.getPropertyValue('--status-bar-bg')).toBe(
+      READER_PALETTES.bamboo.bg,
+    )
+  })
+
+  it('所有主题的状态栏变量都是与 theme-color 一致的纯色', () => {
+    const theme = ref<ReaderTheme>('paper')
+    const palette = computed(() => READER_PALETTES[theme.value])
+
+    stop = bindThemeSurface(
+      () => palette.value,
+      () => theme.value,
+    )
+
+    for (const next of READER_THEME_ORDER) {
+      theme.value = next
+      const statusBarBg = document.documentElement.style.getPropertyValue(
+        '--status-bar-bg',
+      )
+      expect(statusBarBg).toBe(READER_PALETTES[next].bg)
+      expect(themeColorMeta?.content).toBe(statusBarBg)
+      expect(statusBarBg).not.toContain('gradient')
+      expect(statusBarBg).not.toContain('url(')
+    }
   })
 
   it('缺失 theme-color 时仍可更新页面变量且不抛错', () => {
@@ -115,5 +154,8 @@ describe('主题表面同步更新', () => {
     expect(document.documentElement.style.getPropertyValue('--app-bg')).toBe(
       READER_PALETTES.paper.bg,
     )
+    expect(
+      document.documentElement.style.getPropertyValue('--status-bar-bg'),
+    ).toBe(READER_PALETTES.paper.bg)
   })
 })

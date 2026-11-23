@@ -81,9 +81,8 @@ onBeforeUnmount(() => {
   left: 0;
   z-index: 4;
   height: calc(env(safe-area-inset-top, 0px) + 1px);
-  background-color: var(--app-bg);
-  background-image: var(--app-bg-image);
-  background-attachment: fixed;
+  /* Solid only: the system bar cannot render gradients or patterns. */
+  background-color: var(--status-bar-bg, var(--app-bg));
   pointer-events: none;
 }
 

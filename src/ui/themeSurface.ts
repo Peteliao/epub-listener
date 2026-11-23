@@ -25,7 +25,11 @@ export function applyThemeSurface(
   surface: ThemeSurface = resolveThemeSurface(),
 ): void {
   const { root, themeColorMeta } = surface
+  // The status bar cannot paint a gradient, so its strip and theme-color must
+  // share one solid color instead of reusing the page background image.
+  const statusBarBg = palette.bg
   root.style.setProperty('--app-bg', palette.bg)
+  root.style.setProperty('--status-bar-bg', statusBarBg)
   root.style.setProperty('--app-bg-image', palette.bgImage ?? 'none')
   // Panels use --app-ui as their base color, so they need a tile-only layer:
   // the full gradient would repaint the panel and erase its elevation.
@@ -40,7 +44,7 @@ export function applyThemeSurface(
   root.style.setProperty('--app-highlight', palette.highlight)
   root.style.colorScheme = palette.dark ? 'dark' : 'light'
   root.dataset.theme = theme
-  themeColorMeta?.setAttribute('content', palette.bg)
+  themeColorMeta?.setAttribute('content', statusBarBg)
 }
 
 export function bindThemeSurface(
