@@ -3,6 +3,7 @@ import {
   buildSpeechUnits,
   groupCharsForRtf,
   joinSentenceText,
+  sentenceTerminal,
 } from '../src/core/text/speechGroups'
 
 function sentence(text: string, paragraphEnd = false, dialogue = false) {
@@ -139,6 +140,57 @@ describe('buildSpeechUnits', () => {
       [0, 0],
       [1, 1],
     ])
+  })
+
+  it('ends a group at a question/exclamation so the final contour survives', () => {
+    const units = buildSpeechUnits(
+      [
+        sentence('他为什么要走？'),
+        sentence('没有人知道。'),
+        sentence('真的吗！'),
+        sentence('是的。'),
+      ],
+      { maxChars: 120 },
+    )
+    expect(units.map((unit) => [unit.start, unit.end])).toEqual([
+      [0, 0],
+      [1, 2],
+      [3, 3],
+    ])
+    expect(units[0]!.terminal).toBe('question')
+    expect(units[1]!.terminal).toBe('exclamation')
+    expect(units[2]!.terminal).toBe('statement')
+  })
+
+  it('keeps question/exclamation dialogue separate even when both are dialogue', () => {
+    const units = buildSpeechUnits(
+      [
+        sentence('“别动！”', false, true),
+        sentence('“为什么？”', false, true),
+      ],
+      { maxChars: 120 },
+    )
+    expect(units.map((unit) => [unit.start, unit.end])).toEqual([
+      [0, 0],
+      [1, 1],
+    ])
+    expect(units.every((unit) => unit.dialogue)).toBe(true)
+  })
+
+  it('can disable terminal breaks for diagnostics', () => {
+    const units = buildSpeechUnits(
+      [sentence('第一句？'), sentence('第二句。')],
+      { maxChars: 120, breakOnTerminal: false },
+    )
+    expect(units).toHaveLength(1)
+  })
+
+  it('classifies question/exclamation/ellipsis through closing quotes', () => {
+    expect(sentenceTerminal('“你确定吗？”')).toBe('question')
+    expect(sentenceTerminal('“别动！”')).toBe('exclamation')
+    expect(sentenceTerminal('她犹豫了一下……')).toBe('ellipsis')
+    expect(sentenceTerminal('他走了。')).toBe('statement')
+    expect(sentenceTerminal('没有标点')).toBe(null)
   })
 
   it('returns no units for an empty chapter', () => {

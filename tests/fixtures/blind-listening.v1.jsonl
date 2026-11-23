@@ -1,0 +1,53 @@
+{"id":"blind-poly-01","category":"polyphone","text":"银行行长正在柜台后面核对账目。","focus":"银行 / 行长","note":"行：银行 háng，行走 xíng"}
+{"id":"blind-poly-02","category":"polyphone","text":"这种重要材料需要重复核对，不能有半点马虎。","focus":"重要 / 重复","note":"重：重要 zhòng，重复 chóng"}
+{"id":"blind-poly-03","category":"polyphone","text":"这家店的东西很便宜，结账也很方便。","focus":"便宜 / 方便","note":"便：便宜 pián，方便 biàn"}
+{"id":"blind-poly-04","category":"polyphone","text":"他慢慢地走下山坡，脚下是湿润的土地。","focus":"慢慢地 / 土地","note":"地：慢慢地 de，土地 dì"}
+{"id":"blind-poly-05","category":"polyphone","text":"看着窗外的火光，他心里有些着急。","focus":"看着 / 着急","note":"着：看着 zhe，着急 zháo"}
+{"id":"blind-poly-06","category":"polyphone","text":"借出去的书终于归还了，他还有几本没看完。","focus":"归还 / 还有","note":"还：归还 huán，还有 hái"}
+{"id":"blind-poly-07","category":"polyphone","text":"小树苗在阳光里成长，校长站在旁边微笑。","focus":"成长 / 校长","note":"长：成长 zhǎng，校长 zhǎng"}
+{"id":"blind-poly-08","category":"polyphone","text":"他喜欢听音乐，但更享受简单的快乐。","focus":"音乐 / 快乐","note":"乐：音乐 yuè，快乐 lè"}
+
+{"id":"blind-long-01","category":"long-sentence","text":"他本来想今天早上去图书馆把上周借的那本关于中国古代建筑史的书还掉可是走到半路发现借书卡忘在家里了。","focus":"可是","note":"无标点长句，测试语义呼吸"}
+{"id":"blind-long-02","category":"long-sentence","text":"如果一个人总是习惯于在遇到问题的时候逃避那么他最终失去的可能不仅仅是解决问题的机会还有改变自己的能力。","focus":"那么 / 还有","note":"条件复句，测试两个语义边界"}
+{"id":"blind-long-03","category":"long-sentence","text":"他之所以没有立即回答是因为他需要时间整理自己的思绪并且确认这句话不会伤害到对方。","focus":"并且","note":"因果 + 递进，避免拆开 之所以"}
+{"id":"blind-long-04","category":"long-sentence","text":"清晨的山谷里，雾气还没有散去，远处的钟声穿过树林，惊起一群灰色的鸟。","focus":"逗号停顿","note":"多分句写景，测试停顿层次"}
+{"id":"blind-long-05","category":"long-sentence","text":"那间位于老街尽头的旧书店，木门上挂着一串生锈的铜铃，风一吹便发出细碎的声响。","focus":"长定语","note":"避免在 的 字结构中间断开"}
+{"id":"blind-long-06","category":"long-sentence","text":"我记得那天傍晚，天边压着很低的云，母亲站在门口，手里还攥着没有来得及放下的围裙。","focus":"回忆节奏","note":"长句叙述，测试回忆语气"}
+{"id":"blind-long-07","category":"long-sentence","text":"如果雨再下大一些，山路就会变得泥泞难走，我们必须在天黑之前赶到山那边的村子。","focus":"条件 + 结论","note":"测试 如果 分句的重心"}
+{"id":"blind-long-08","category":"long-sentence","text":"他把信纸折好放进信封，又仔细地封上口，才慢慢地走到街角的邮筒前。","focus":"动作序列","note":"动作描写，测试连贯性"}
+
+{"id":"blind-dialog-01","category":"dialogue","text":"他愤怒地问道：“你到底想干什么？”","focus":"愤怒 / 疑问","note":"对白疑问，句末应自然上扬"}
+{"id":"blind-dialog-02","category":"dialogue","text":"“别动！”她压低声音，几乎是从牙缝里挤出这两个字。","focus":"压低声音 / 感叹","note":"低声警告，不要夸张表演"}
+{"id":"blind-dialog-03","category":"dialogue","text":"“你真的要走了吗？”母亲站在门口，眼圈红了。","focus":"疑问 / 悲伤","note":"疑问句与叙述分离"}
+{"id":"blind-dialog-04","category":"dialogue","text":"“好家伙，这么大的雨！”老赵把伞收起来，抖了抖水。","focus":"感叹 / 惊讶","note":"感叹句保留句末重音"}
+{"id":"blind-dialog-05","category":"dialogue","text":"“我没事。”她笑了笑，可声音里带着明显的疲惫。","focus":"平静 / 疲惫","note":"表面平静，避免过度煽情"}
+{"id":"blind-dialog-06","category":"dialogue","text":"“求求你，再给我一点时间。”他低着头，手指紧紧攥着衣角。","focus":"恳求 / 紧张","note":"恳求语气，停顿不要碎"}
+{"id":"blind-dialog-07","category":"dialogue","text":"“怎么会这样？”她喃喃自语，像是没有听见身后的脚步声。","focus":"喃喃 / 疑问","note":"低声自问，句末轻上扬"}
+{"id":"blind-dialog-08","category":"dialogue","text":"“你给我出去！”他猛地拍了一下桌子，茶杯跳了起来。","focus":"愤怒 / 命令","note":"强感叹，不要破音"}
+
+{"id":"blind-particle-01","category":"particle","text":"啊，原来你在这里呀。","focus":"啊 / 呀","note":"惊讶 + 确认"}
+{"id":"blind-particle-02","category":"particle","text":"这件事到底该怎么办呢？","focus":"呢","note":"疑问语气词，句末上扬"}
+{"id":"blind-particle-03","category":"particle","text":"好吧，那就按你说的办吧。","focus":"吧","note":"让步 / 同意"}
+{"id":"blind-particle-04","category":"particle","text":"唉，早知如此，何必当初呢。","focus":"唉 / 呢","note":"懊悔，语速稍缓"}
+{"id":"blind-particle-05","category":"particle","text":"哎哟，这可真是稀奇啊。","focus":"哎哟 / 啊","note":"惊讶，避免拖腔"}
+{"id":"blind-particle-06","category":"particle","text":"嘛，人生总有些不如意的时候。","focus":"嘛","note":"无奈，轻微停顿"}
+{"id":"blind-particle-07","category":"particle","text":"哦，我想起来了，钥匙在抽屉里。","focus":"哦","note":"忽然想起"}
+{"id":"blind-particle-08","category":"particle","text":"真的假的？你可别骗我呀。","focus":"真的假的 / 呀","note":"反问 + 提醒"}
+
+{"id":"blind-number-01","category":"number","text":"会议定在2026年11月23日下午3:30开始。","focus":"日期 / 时间","note":"二零二六年十一月二十三日 / 三点半"}
+{"id":"blind-number-02","category":"number","text":"这次活动的参与率达到了12.5%，比去年高了3个百分点。","focus":"百分比","note":"十二点五 / 三个百分点"}
+{"id":"blind-number-03","category":"number","text":"博物馆今年接待了8,500名游客，其中约1/3是学生。","focus":"千分位 / 分数","note":"八千五百 / 三分之一"}
+{"id":"blind-number-04","category":"number","text":"今天气温零下5℃，明天会回升到8℃左右。","focus":"温度","note":"零下五摄氏度 / 八摄氏度"}
+{"id":"blind-number-05","category":"number","text":"这批货物总重1,250千克，需要用两辆车运送。","focus":"重量","note":"一千二百五十千克"}
+{"id":"blind-number-06","category":"number","text":"他的电话号码是13800138000，请在工作时间联系。","focus":"电话号码","note":"逐位读，不能读成大数"}
+{"id":"blind-number-07","category":"number","text":"从2000年到2026年，这个小城的变化很大。","focus":"年份","note":"二零零零 / 二零二六"}
+{"id":"blind-number-08","category":"number","text":"车票上写着：省城至县城，硬座，票价28.5元。","focus":"票价","note":"二十八点五元"}
+
+{"id":"blind-acoustic-01","category":"acoustic","text":"来到此处，你立刻就会明白原因何在。","focus":"立刻","note":"立/刻不能断开，刻要有强爆破"}
+{"id":"blind-acoustic-02","category":"acoustic","text":"他立刻站了起来，推门走了出去。","focus":"立刻","note":"短语境，立 105ms 以上"}
+{"id":"blind-acoustic-03","category":"acoustic","text":"整个冬天，她始终没上美容院，也未染发。","focus":"染发","note":"发读 fà，不是 fā"}
+{"id":"blind-acoustic-04","category":"acoustic","text":"有几家公司在店里长期订餐，必须在十二点之前送到。","focus":"长期","note":"不能切成 里长 / 期"}
+{"id":"blind-acoustic-05","category":"acoustic","text":"你也不能永远干陪酒那行啊，美里也大了。","focus":"那行","note":"行读 háng，不是 xíng"}
+{"id":"blind-acoustic-06","category":"acoustic","text":"他的目的很简单，只是想确认大家是否安全。","focus":"目的","note":"的读 dì，不是 de"}
+{"id":"blind-acoustic-07","category":"acoustic","text":"雨不断地下着，屋檐下的水声一直没有停。","focus":"不断","note":"断不能吞成单字"}
+{"id":"blind-acoustic-08","category":"acoustic","text":"外婆坐在门口，声音很轻，像是在自言自语。","focus":"外婆 / 声音","note":"OOV 双字词，第二音节要有 burst"}

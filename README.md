@@ -505,6 +505,34 @@ normal。长句代理指标分歧的 6 条按项目惯例每轮照测并列出�
 
 **验证**：`npm test` **68 文件 / 642 项通过**；`npm run audit:all` **13/13 通过**（整句包络为可选 advisory 门禁）；`npm run audit:envelope -- --case=om-0007 --strict` 通过；`npm run build`（vue-tsc + vite）通过。
 
+### 2026-11-23 第十二轮：疑问句/对白终止与固定盲听语料
+
+Matcha 没有可直接控制的基频/情绪标签，贸然调语速或给句子贴「愤怒/悲伤」会变成夸张的 AI 表演。这一轮只做模型已经支持、而且可泛化的两件事：
+
+**疑问句与对白终止**
+
+- `speechGroups` 增加 `sentenceTerminal()`：识别 `？/！/……`，并穿透中文/英文收引号。
+- `buildSpeechUnits()` 在 `？/！/……` 后结束当前语句单元（`breakOnTerminal` 默认 true）。之前 `？` 可能落在 2–3 句组的中间，模型看到的是句中标点，句末语调被后面的叙述压平；现在它成为合成请求的最后一个标点，模型已有的疑问/感叹终调才能保留。
+- 对白与叙述本来就不混组；对白里的 `？/！/……` 也各自终止，所以 `“别动！”` 和 `“为什么？”` 不会挤在同一口气里。
+- `SpeechUnit` 新增 `dialogue` 与 `terminal` 元数据，供反馈/诊断和后续阶段使用。这一轮**没有**改语速、基频或音素，也没有做「愤怒/悲伤」的语义猜测。
+
+**固定盲听语料**
+
+- 新增 `tests/fixtures/blind-listening.v1.jsonl`：**48 条 starter**，六个类别各 8 条：
+  - `polyphone` 多音字
+  - `long-sentence` 长句
+  - `dialogue` 人物对白
+  - `particle` 语气词
+  - `number` 数字/日期/单位
+  - `acoustic` 声学疑难词（立刻/染发/长期/那行/目的/不断/外婆等）
+- `tests/BlindCorpus.test.ts` 校验条数、类别覆盖、ID/文本唯一、字段完整；后续扩充时同一份语料继续用。
+- `npm run blind:render -- --tag=before` / `--tag=after` 会把整份语料渲染到 `scripts/out/blind/<tag>/`，并写 `manifest.json`，用于修改前后盲听对照。
+- 建议评分权重按方案保留：发音准确度 30%、清晰度 25%、自然流畅度 20%、韵律节奏 15%、情绪表现 10%。包络/音节指标只是辅助，最终以盲听为准。
+
+这一轮仍不改 Matcha 模型和现有音素/覆盖表；下一阶段可继续做长句切分的更多句法边界、对话节奏标签和真正的盲听 A/B 页面。
+
+**验证**：`npm test` **69 文件 / 649 项通过**；`npm run audit:all` **13/13 通过**；`npm run blind:render -- --tag=smoke --limit=1` 通过；`npm run build`（vue-tsc + vite）通过。
+
 ### 2026-11-12 本地浏览器自检（无需用户协助）
 
 用 `vite` + `agent-browser` 真实打开本地页面，再用项目自带的 CDP 自检（`npm run lab:diagnose:check`）复核，确认第九轮的「地」反馈在浏览器链路里到底是什么：

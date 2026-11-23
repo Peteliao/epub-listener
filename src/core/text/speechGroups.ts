@@ -6,6 +6,13 @@ export interface GroupableSentence {
   dialogue?: boolean
 }
 
+export type SentenceTerminal =
+  | 'question'
+  | 'exclamation'
+  | 'ellipsis'
+  | 'statement'
+  | null
+
 export interface SpeechUnit {
   /** First sentence index, also the unit's stable position in the book. */
   start: number
@@ -14,12 +21,18 @@ export interface SpeechUnit {
   text: string
   speechText: string
   paragraphEnd: boolean
+  /** Last sentence is dialogue/narration; useful for diagnostics and future pacing. */
+  dialogue?: boolean
+  /** Terminal mode of the last sentence. */
+  terminal?: SentenceTerminal
 }
 
 export interface SpeechGroupOptions {
   enabled?: boolean
   maxSentences?: number
   maxChars?: number
+  /** End a group after ？/！/…… so the model gets a real utterance-final contour. */
+  breakOnTerminal?: boolean
 }
 
 // A/B measured on the real WASM runtime (tests/fixtures/ab-baseline.json):
@@ -77,16 +90,36 @@ export function joinSentenceText(parts: readonly string[]): string {
   return result
 }
 
+const CLOSERS = /[”’」』）】》〉"']+$/u
+
+/** Classify the last meaningful punctuation of a sentence for grouping. */
+export function sentenceTerminal(text: string): SentenceTerminal {
+  const trimmed = text.trimEnd().replace(CLOSERS, '').trimEnd()
+  if (!trimmed) return null
+  const last = trimmed[trimmed.length - 1]!
+  if (last === '？' || last === '?') return 'question'
+  if (last === '！' || last === '!') return 'exclamation'
+  if (last === '…' || trimmed.endsWith('...')) return 'ellipsis'
+  if (last === '。' || last === '.') return 'statement'
+  return null
+}
+
 /**
  * Turns sentences into playback units. A unit may hold 2–3 neighbouring
  * sentences from the same paragraph, which lets the acoustic model carry
  * prosody across sentence marks instead of restarting on every full stop.
+ *
+ * A question/exclamation/ellipsis ends the unit. If it were followed by more
+ * text in the same synthesis request, the model would see the punctuation in
+ * the middle and flatten the final contour; ending the request there is the
+ * only per-sentence intonation control Matcha exposes without model changes.
  */
 export function buildSpeechUnits(
   sentences: readonly GroupableSentence[],
   options: SpeechGroupOptions = {},
 ): SpeechUnit[] {
   const enabled = options.enabled ?? true
+  const breakOnTerminal = options.breakOnTerminal ?? true
   const maxSentences = Math.max(2, options.maxSentences ?? DEFAULTS.maxSentences)
   const maxChars = Math.max(1, options.maxChars ?? DEFAULTS.maxChars)
   const units: SpeechUnit[] = []
@@ -103,6 +136,9 @@ export function buildSpeechUnits(
         end - start + 1 < maxSentences &&
         !sentences[end]!.paragraphEnd &&
         Boolean(sentences[end]!.dialogue) === Boolean(sentences[end + 1]!.dialogue) &&
+        (!breakOnTerminal
+          || sentenceTerminal(sentences[end]!.speechText) === null
+          || sentenceTerminal(sentences[end]!.speechText) === 'statement') &&
         chars + countChars(sentences[end + 1]!.speechText) <= maxChars
       ) {
         end += 1
@@ -119,6 +155,8 @@ export function buildSpeechUnits(
         group.map((sentence) => sentence.speechText),
       ),
       paragraphEnd: sentences[end]!.paragraphEnd,
+      dialogue: Boolean(sentences[start]!.dialogue),
+      terminal: sentenceTerminal(sentences[end]!.speechText),
     })
     index = end + 1
   }
