@@ -12,7 +12,7 @@ import {
   setupPwa,
   updateReady,
 } from '@/ui/pwa'
-import { patternTileUrl, READER_PALETTES } from '@/types'
+import { patternTileUrl } from '@/types'
 
 const settingsStore = useSettingsStore()
 const route = ref<Route>(parseRoute(window.location.hash))
@@ -22,7 +22,7 @@ function syncRoute(): void {
 }
 
 watchEffect(() => {
-  const palette = READER_PALETTES[settingsStore.settings.theme]
+  const palette = settingsStore.activePalette
   const root = document.documentElement
   root.style.setProperty('--app-bg', palette.bg)
   root.style.setProperty('--app-bg-image', palette.bgImage ?? 'none')
@@ -38,7 +38,7 @@ watchEffect(() => {
   root.style.setProperty('--app-ui', palette.uiBg)
   root.style.setProperty('--app-highlight', palette.highlight)
   root.style.colorScheme = palette.dark ? 'dark' : 'light'
-  root.dataset.theme = settingsStore.settings.theme
+  root.dataset.theme = settingsStore.activeTheme
   document
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', palette.bg)

@@ -291,6 +291,7 @@ async function boot(): Promise<void> {
   aiStatus.value = null
   bookLexiconStatus.value = null
   pocketActive.value = false
+  settingsStore.setPocketThemeActive(false)
   pageTurnRevealed.value = false
   tocOpen.value = false
   settingsOpen.value = false
@@ -756,12 +757,14 @@ function enterPocket(): void {
   if (!ready.value) return
   tocOpen.value = false
   closeSettings()
+  settingsStore.setPocketThemeActive(true)
   pocketActive.value = true
   controller.value?.setPocketActive(true)
 }
 
 function leavePocket(): void {
   pocketActive.value = false
+  settingsStore.setPocketThemeActive(false)
   controller.value?.setPocketActive(false)
 }
 
@@ -779,6 +782,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   unmounted = true
+  settingsStore.setPocketThemeActive(false)
   clearLiveOverlayTimer()
   setPlaybackActive(false)
   clearTourTimer()

@@ -152,9 +152,22 @@ function loadSettings(): ReaderSettings {
   }
 }
 
+const POCKET_THEME: ReaderTheme = 'oled'
+
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<ReaderSettings>(loadSettings())
   const palette = computed(() => READER_PALETTES[settings.value.theme])
+  // Pocket mode hides the reader and must force the OLED surface, but the
+  // user's chosen theme is restored untouched when the overlay closes.
+  const pocketThemeActive = ref(false)
+  const activeTheme = computed<ReaderTheme>(() =>
+    pocketThemeActive.value ? POCKET_THEME : settings.value.theme,
+  )
+  const activePalette = computed(() => READER_PALETTES[activeTheme.value])
+
+  function setPocketThemeActive(active: boolean): void {
+    pocketThemeActive.value = active
+  }
 
   function patch(partial: Partial<ReaderSettings>): void {
     settings.value = sanitize({ ...settings.value, ...partial })
@@ -176,5 +189,13 @@ export const useSettingsStore = defineStore('settings', () => {
     { deep: true },
   )
 
-  return { settings, palette, patch, reset }
+  return {
+    settings,
+    palette,
+    activeTheme,
+    activePalette,
+    setPocketThemeActive,
+    patch,
+    reset,
+  }
 })

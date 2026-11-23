@@ -189,7 +189,7 @@ export const READER_THEME_GROUPS: ReaderThemeGroup[] = [
   {
     id: 'solid',
     label: '纯色',
-    hint: '纸白、米黄、护眼、月白、天青适合白天；夜读、靛蓝、黛紫、省电为深色纸面，省电是纯黑背景，OLED 屏更省电。',
+    hint: '纸白、米黄、护眼、月白、天青适合白天；夜读、靛蓝、黛紫为深色纸面；省电为 OLED 纯黑模式，进入口袋模式会自动切换。',
     themes: ['paper', 'sepia', 'green', 'snow', 'sky', 'night', 'indigo', 'violet', 'oled'],
   },
   {
@@ -392,7 +392,7 @@ export const READER_PALETTES: Record<ReaderTheme, ReaderPalette> = {
     muted: '#77726a',
     highlight: 'rgba(196, 150, 84, 0.22)',
     accent: '#c79a5b',
-    uiBg: '#0b0b0b',
+    uiBg: '#000000',
     dark: true,
   },
   bamboo: {
