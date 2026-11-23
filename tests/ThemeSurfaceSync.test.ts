@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { computed, ref } from 'vue'
 import { bindThemeSurface } from '../src/ui/themeSurface'
 import { READER_PALETTES, READER_THEME_ORDER, type ReaderTheme } from '../src/types'
@@ -157,5 +158,92 @@ describe('主题表面同步更新', () => {
     expect(
       document.documentElement.style.getPropertyValue('--status-bar-bg'),
     ).toBe(READER_PALETTES.paper.bg)
+  })
+
+  describe('iOS 主屏幕独立模式', () => {
+    beforeEach(() => {
+      Object.defineProperty(navigator, 'standalone', {
+        configurable: true,
+        value: true,
+      })
+    })
+
+    afterEach(() => {
+      delete (navigator as Navigator & { standalone?: boolean }).standalone
+    })
+
+    it('index.html 声明固定白色系统图标', () => {
+      const html = readFileSync('index.html', 'utf8')
+      expect(html).toContain(
+        'name="apple-mobile-web-app-status-bar-style" content="black-translucent"',
+      )
+    })
+
+    it('浅色主题用墨色表面承托白色图标，页面背景保持不变', () => {
+      const theme = ref<ReaderTheme>('paper')
+      const palette = computed(() => READER_PALETTES[theme.value])
+
+      stop = bindThemeSurface(
+        () => palette.value,
+        () => theme.value,
+      )
+
+      expect(
+        document.documentElement.style.getPropertyValue('--status-bar-bg'),
+      ).toBe(READER_PALETTES.paper.fg)
+      expect(themeColorMeta?.content).toBe(READER_PALETTES.paper.fg)
+      expect(document.documentElement.style.getPropertyValue('--app-bg')).toBe(
+        READER_PALETTES.paper.bg,
+      )
+    })
+
+    it('所有主题的状态栏表面都保持深色可读', () => {
+      const theme = ref<ReaderTheme>('paper')
+      const palette = computed(() => READER_PALETTES[theme.value])
+
+      stop = bindThemeSurface(
+        () => palette.value,
+        () => theme.value,
+      )
+
+      for (const next of READER_THEME_ORDER) {
+        theme.value = next
+        const nextPalette = READER_PALETTES[next]
+        const expected = nextPalette.dark ? nextPalette.bg : nextPalette.fg
+        expect(
+          document.documentElement.style.getPropertyValue('--status-bar-bg'),
+        ).toBe(expected)
+        expect(themeColorMeta?.content).toBe(expected)
+        expect(document.documentElement.style.getPropertyValue('--app-bg')).toBe(
+          nextPalette.bg,
+        )
+      }
+    })
+
+    it('口袋模式为纯黑，退出后恢复原主题的深色状态栏表面', () => {
+      const theme = ref<ReaderTheme>('sky')
+      const palette = computed(() => READER_PALETTES[theme.value])
+
+      stop = bindThemeSurface(
+        () => palette.value,
+        () => theme.value,
+      )
+
+      expect(
+        document.documentElement.style.getPropertyValue('--status-bar-bg'),
+      ).toBe(READER_PALETTES.sky.fg)
+
+      theme.value = 'oled'
+      expect(
+        document.documentElement.style.getPropertyValue('--status-bar-bg'),
+      ).toBe('#000000')
+      expect(themeColorMeta?.content).toBe('#000000')
+
+      theme.value = 'sky'
+      expect(
+        document.documentElement.style.getPropertyValue('--status-bar-bg'),
+      ).toBe(READER_PALETTES.sky.fg)
+      expect(themeColorMeta?.content).toBe(READER_PALETTES.sky.fg)
+    })
   })
 })

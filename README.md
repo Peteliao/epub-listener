@@ -208,7 +208,7 @@ tests/           Vitest 测试与固定语料
 
 ## 测试与部署
 
-- 测试：`npm test`，当前 **85 个测试文件 / 736 项通过**
+- 测试：`npm test`，当前 **85 个测试文件 / 740 项通过**
 - 读音门禁：`npm run audit:all`（新鲜 checkout 可运行，不依赖全书语料；声学冒烟可用 `--strict` 设为必需）
 - 构建：`npm run build`（`vue-tsc --noEmit` + vite）
 - CI：推送到 `main` 后，[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 会依次执行 `npm ci`、`npm test`、`npm run audit:all`、`npm run build`，然后发布到 GitHub Pages
