@@ -177,5 +177,13 @@ describe('2026-11-23 第十轮：两个新探测器在修复前基线仍能发�
     const like = leads.find((item: any) => item.word === '立刻')
     expect(like).toBeTruthy()
     expect(like.phones.join(' ')).toBe('li4 ke4')
+    expect(like.risk).toBe('stop-second')
+    const riskTypes = wf.discoverOovAcousticLeads(
+      '外婆来了。\n老人来了。\n声音很低。',
+      baseline,
+      { limit: 10, minCount: 1 },
+    )
+    expect(riskTypes.find((item: any) => item.word === '外婆')?.risk).toBe('stop-second')
+    expect(riskTypes.find((item: any) => item.word === '老人')?.risk).toBe('generic')
   })
 })

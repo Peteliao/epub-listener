@@ -588,6 +588,16 @@ const OOV_STOPWORDS = new Set([
   '可以', '应该', '已经', '因为', '所以', '但是', '而且', '如果', '虽然',
 ])
 
+// 立刻 的病根是第二个音节 ke4 的塞音闭合：模型在整句里只留下约 30ms
+// 弱爆破。第二音节以 b/p/d/t/g/k 开头的 OOV 双字词先列为 stop-second，
+// 优先做完整原句的 none/lead/tail/both 包络测量，而不是等用户再反馈。
+const STOP_SECOND = /^(b|p|d|t|g|k)/
+
+function oovRisk(phones) {
+  const second = String(phones[1] ?? '').toLowerCase()
+  return STOP_SECOND.test(second) ? 'stop-second' : 'generic'
+}
+
 /**
  * 2026-11-23 tenth round: OOV two-character words whose *phones look right*.
  *
@@ -644,6 +654,7 @@ export function discoverOovAcousticLeads(text, assets, { limit = 20, minCount = 
           kind: 'oov-acoustic',
           word,
           phones: singles,
+          risk: oovRisk(singles),
           confidence: 'review',
           count: 0,
           evidence: [],
@@ -659,7 +670,10 @@ export function discoverOovAcousticLeads(text, assets, { limit = 20, minCount = 
   }
   return [...buckets.values()]
     .filter((item) => item.count >= minCount)
-    .sort((left, right) => right.count - left.count || left.word.localeCompare(right.word, 'zh'))
+    .sort((left, right) =>
+      (left.risk === 'stop-second' ? 0 : 1) - (right.risk === 'stop-second' ? 0 : 1)
+      || right.count - left.count
+      || left.word.localeCompare(right.word, 'zh'))
     .slice(0, limit)
 }
 

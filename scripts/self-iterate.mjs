@@ -241,10 +241,11 @@ async function verify(assets) {
         ?.actual ?? `未发现（segmentation ${segmentation.length} 条）`,
     },
     {
-      name: 'OOV 声学盲区可发现「立刻」',
-      ok: boundary.some((item) => item.kind === 'oov-acoustic' && item.word === '立刻'),
+      name: 'OOV 声学盲区可发现「立刻」并标为 stop-second',
+      ok: boundary.some((item) => item.kind === 'oov-acoustic'
+        && item.word === '立刻' && item.risk === 'stop-second'),
       detail: boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻')
-        ? `音素 ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').phones.join(' ')}`
+        ? `音素 ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').phones.join(' ')} · ${boundary.find((item) => item.kind === 'oov-acoustic' && item.word === '立刻').risk}`
         : `未发现（boundary ${boundary.length} 条）`,
     },
     { name: 'fusion 族可召回已修复词', ok: fusion.some((item) => item.word === '来到了' && item.blend === 'lao'), detail: `修复前基线召回 ${fusion.length} 条融合风险词` },
@@ -310,11 +311,17 @@ function renderSummary({ corpus, replays, byFamily, phone, boundary, segmentatio
   }
   if (!phone.length) lines.push('| — | — | — | — | 0 | — | — |')
   lines.push('', '## boundary 族（未登录二字词，交给 WASM A/B）', '',
-    '| 词 | 音素 | 出现 | 证据 |', '| --- | --- | ---: | --- |')
-  for (const item of boundary.slice(0, options.limit)) {
-    lines.push(`| ${item.word} | ${item.phones.join(' ')} | ${item.count} | ${String(item.evidence[0] ?? '').replace(/\|/g, '\\|').slice(0, 50)} |`)
+    '| 词 | 音素 | 出现 | 风险 | 证据 |', '| --- | --- | ---: | --- | --- |')
+  // OOV stop-second first: those are the 立刻-shaped risks, and the dictionary
+  // boundary candidates already have high confidence and can follow.
+  const orderedBoundary = [...boundary].sort((left, right) => {
+    const rank = (item) => (item.risk === 'stop-second' ? 0 : item.kind === 'oov-acoustic' ? 1 : 2)
+    return rank(left) - rank(right) || right.count - left.count
+  })
+  for (const item of orderedBoundary.slice(0, options.limit)) {
+    lines.push(`| ${item.word} | ${item.phones.join(' ')} | ${item.count} | ${item.risk ?? '—'} | ${String(item.evidence[0] ?? '').replace(/\|/g, '\\|').slice(0, 50)} |`)
   }
-  if (!boundary.length) lines.push('| — | — | 0 | — |')
+  if (!boundary.length) lines.push('| — | — | 0 | — | — |')
   lines.push('', '## segmentation 族（覆盖词被最长匹配截走）', '',
     '| 覆盖词 | 实际命中 | 证据 |', '| --- | --- | --- |')
   for (const item of segmentation.slice(0, options.limit)) {
