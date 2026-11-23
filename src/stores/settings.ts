@@ -11,8 +11,37 @@ import {
 } from '@/types'
 
 const STORAGE_KEY = 'shusheng.settings.v1'
+const POCKET_RETURN_KEY = 'shusheng.pocket-return-theme.v1'
 const ENGINES: TtsEngine[] = ['system', 'sherpa']
 const PAUSE_PRESETS: PausePreset[] = ['compact', 'standard', 'relaxed']
+
+function persistStoredSettings(value: ReaderSettings): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+  } catch {
+    // Private browsing may reject writes; settings stay in memory.
+  }
+}
+
+function readPocketReturnTheme(): ReaderTheme | null {
+  try {
+    const raw = window.localStorage.getItem(POCKET_RETURN_KEY)
+    return READER_THEME_ORDER.includes(raw as ReaderTheme)
+      ? (raw as ReaderTheme)
+      : null
+  } catch {
+    return null
+  }
+}
+
+function writePocketReturnTheme(theme: ReaderTheme | null): void {
+  try {
+    if (theme) window.localStorage.setItem(POCKET_RETURN_KEY, theme)
+    else window.localStorage.removeItem(POCKET_RETURN_KEY)
+  } catch {
+    // The in-memory restore still covers a normal pocket exit.
+  }
+}
 
 function sanitize(raw: unknown): ReaderSettings {
   const source =
@@ -156,17 +185,41 @@ const POCKET_THEME: ReaderTheme = 'oled'
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<ReaderSettings>(loadSettings())
+  const pendingPocketReturn = readPocketReturnTheme()
+  if (pendingPocketReturn) {
+    // A previous session ended inside pocket mode; put the hidden theme back.
+    settings.value = sanitize({
+      ...settings.value,
+      theme: pendingPocketReturn,
+    })
+    writePocketReturnTheme(null)
+    persistStoredSettings(settings.value)
+  }
   const palette = computed(() => READER_PALETTES[settings.value.theme])
-  // Pocket mode hides the reader and must force the OLED surface, but the
-  // user's chosen theme is restored untouched when the overlay closes.
+  // Pocket mode swaps the real theme so every consumer, including iOS status
+  // bar tinting, sees the OLED palette; the previous theme is restored on exit.
   const pocketThemeActive = ref(false)
-  const activeTheme = computed<ReaderTheme>(() =>
-    pocketThemeActive.value ? POCKET_THEME : settings.value.theme,
-  )
+  let pocketReturnTheme: ReaderTheme | null = null
+  const activeTheme = computed<ReaderTheme>(() => settings.value.theme)
   const activePalette = computed(() => READER_PALETTES[activeTheme.value])
 
   function setPocketThemeActive(active: boolean): void {
-    pocketThemeActive.value = active
+    if (active === pocketThemeActive.value) return
+    if (active) {
+      pocketThemeActive.value = true
+      pocketReturnTheme = settings.value.theme
+      if (pocketReturnTheme !== POCKET_THEME) {
+        writePocketReturnTheme(pocketReturnTheme)
+        patch({ theme: POCKET_THEME })
+      }
+      return
+    }
+    const restore =
+      pocketReturnTheme ?? readPocketReturnTheme() ?? DEFAULT_SETTINGS.theme
+    pocketThemeActive.value = false
+    pocketReturnTheme = null
+    writePocketReturnTheme(null)
+    if (settings.value.theme !== restore) patch({ theme: restore })
   }
 
   function patch(partial: Partial<ReaderSettings>): void {
@@ -177,17 +230,7 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value = { ...DEFAULT_SETTINGS }
   }
 
-  watch(
-    settings,
-    (value) => {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-      } catch {
-        // Private browsing may reject writes; settings stay in memory.
-      }
-    },
-    { deep: true },
-  )
+  watch(settings, persistStoredSettings, { deep: true })
 
   return {
     settings,
