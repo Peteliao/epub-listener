@@ -26,6 +26,7 @@ import {
   buildRuntimeLexicon, loadWordLists, prepareRuntimeTextWithOverlay, readAsset,
   utteranceParts, WORD_BOUNDARY,
 } from './lib/wordFamily.mjs'
+import { currentProvenance } from './lib/provenance.mjs'
 
 const CASES = resolve(ROOT, 'src/core/tts/omissionCases.v1.jsonl')
 const OUT = resolve(ROOT, 'scripts/out/envelope-report.json')
@@ -115,6 +116,21 @@ function renderAligned(synth, sentence, word, assets, lists) {
   const fullAudio = synth.generateText(prepared)
   const index = sentence.indexOf(word)
   const prefix = index >= 0 ? sentence.slice(0, index) : ''
+  if (!prefix.trim()) {
+    return {
+      samples: fullAudio.samples,
+      sampleRate: fullAudio.sampleRate,
+      prefixEndMs: 0,
+      alignment: {
+        method: 'sentence-start',
+        confidence: 'high',
+        correlation: 1,
+        margin: 1,
+        offsetMs: 0,
+        endMs: 0,
+      },
+    }
+  }
   const prefixAudio = synth.generateText(prepareRuntimeTextWithOverlay(prefix, assets, lists))
   const aligned = alignPrefix(
     prefixAudio.samples,
@@ -194,7 +210,11 @@ async function main(options) {
   } finally {
     synth.free()
   }
-  writeFileSync(OUT, `${JSON.stringify({ strict: options.strict, results }, null, 2)}\n`, 'utf8')
+  writeFileSync(OUT, `${JSON.stringify({
+    provenance: currentProvenance(),
+    strict: options.strict,
+    results,
+  }, null, 2)}\n`, 'utf8')
   const lines = [
     '# 山岚整句包络报告（advisory）',
     '',

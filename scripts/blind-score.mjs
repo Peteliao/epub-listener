@@ -28,7 +28,7 @@ const ROOT_OUT = resolve(ROOT, 'scripts/out/blind')
 function parseArgs(argv) {
   const options = {
     before: 'before', after: 'after', out: '', validate: '',
-    bundle: '', rater: 'rater-1', reveal: '', sheets: '',
+    bundle: '', rater: '', reveal: '', sheets: '',
   }
   for (const arg of argv) {
     if (arg.startsWith('--before=')) options.before = arg.slice(9)
@@ -41,6 +41,7 @@ function parseArgs(argv) {
     else if (arg.startsWith('--sheets=')) options.sheets = arg.slice(9)
     else if (arg === '--help' || arg === '-h') {
       console.log('用法: npm run blind:score -- [--bundle=dir --rater=name] [--validate=file] [--reveal=key --sheets=a.json,b.json]')
+      console.log('      --bundle 必须给出独立评分者身份；--reveal 会在解盲前校验所有评分表完整且属于同一实验。')
       process.exit(0)
     }
   }
@@ -95,9 +96,12 @@ function reveal(options) {
   const key = JSON.parse(readFileSync(keyPath, 'utf8'))
   const bundleDir = keyPath.replace(/\.key\.json$/, '')
   const bundle = JSON.parse(readFileSync(join(bundleDir, 'manifest.json'), 'utf8'))
+  if (key.experimentId && bundle.experimentId && key.experimentId !== bundle.experimentId) {
+    throw new Error(`密钥与清单实验 ID 不一致：${key.experimentId} / ${bundle.experimentId}`)
+  }
   const sheets = options.sheets.split(',').map((file) => readJson(file.trim()))
   const result = revealScores(sheets, key, bundle)
-  const out = join(dirname(resolve(ROOT, options.reveal)), 'reveal.json')
+  const out = `${bundleDir}.reveal.json`
   writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
   console.log('解盲完成（仅限评分结束后）：')
   for (const rater of result.raters) {
@@ -107,10 +111,14 @@ function reveal(options) {
     console.log(`  评分者一致性：${Math.round(result.agreement * 100)}%`)
   }
   console.log(`报告 ${out}`)
+  console.log('可运行 npm run quality:report 汇总解盲结果（正式结论至少需要两名独立评分者）。')
 }
 
 function create(options) {
   if (options.bundle) {
+    if (!options.rater.trim()) {
+      throw new Error('--bundle 必须指定 --rater=姓名，避免多名评分者共用同一身份')
+    }
     const bundleDir = resolve(ROOT, options.bundle)
     const bundle = JSON.parse(readFileSync(join(bundleDir, 'manifest.json'), 'utf8'))
     const out = options.out

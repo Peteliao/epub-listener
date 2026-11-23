@@ -1,7 +1,9 @@
+import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { weightedTotal } from './blindScore.mjs'
-import { normalizePeak, readWav, writeWav } from './wav.mjs'
+import { validateBlindScoreSheet, weightedTotal } from './blindScore.mjs'
+import { currentProvenance } from './provenance.mjs'
+import { normalizeLoudness, readWav, writeWav } from './wav.mjs'
 
 const CODE_ALPHABET = 'CDEFGHJKLMNPQRSTUVWXYZ23456789'
 
@@ -47,15 +49,23 @@ function randomCode(rng, used) {
   }
 }
 
+function newExperimentId() {
+  const day = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  return `ab-${day}-${randomBytes(3).toString('hex')}`
+}
+
 /**
- * Deterministic double-blind plan. The returned `key` is written to a separate
- * file and must never be shipped with the score sheet before reveal.
+ * Double-blind plan. Every round gets a fresh crypto seed unless one is passed
+ * explicitly (tests / reproducing an incident). The seed and the before/after
+ * mapping stay in the private key file; the public manifest contains neither.
  */
-export function buildBlindPlan(ids, { seed = 'shanlan-blind-v1' } = {}) {
-  const rng = rngFromSeed(seed)
+export function buildBlindPlan(ids, { seed, experimentId } = {}) {
+  const resolvedSeed = seed ?? randomBytes(16).toString('hex')
+  const rng = rngFromSeed(resolvedSeed)
   const used = new Set()
   return {
-    seed,
+    experimentId: experimentId ?? newExperimentId(),
+    seed: resolvedSeed,
     items: ids.map((id) => {
       const before = randomCode(rng, used)
       const after = randomCode(rng, used)
@@ -64,9 +74,10 @@ export function buildBlindPlan(ids, { seed = 'shanlan-blind-v1' } = {}) {
   }
 }
 
+/** Public bundle data: experiment id, random codes and playback order only. */
 export function publicManifest(plan) {
   return {
-    seed: plan.seed,
+    experimentId: plan.experimentId,
     items: plan.items.map(({ id, order }) => ({ id, codes: order })),
   }
 }
@@ -79,9 +90,15 @@ export function createBlindBundle({ beforeDir, afterDir, plan, outDir, normalize
   const audioDir = join(outDir, 'audio')
   mkdirSync(audioDir, { recursive: true })
 
-  const manifest = publicManifest(plan)
-  const key = { seed: plan.seed, items: [] }
-  manifest.items = []
+  const manifest = { ...publicManifest(plan), createdAt: new Date().toISOString(), items: [] }
+  const key = {
+    experimentId: plan.experimentId,
+    seed: plan.seed,
+    provenance: currentProvenance({ experimentId: plan.experimentId }),
+    sources: { before: before.provenance ?? null, after: after.provenance ?? null },
+    normalization: normalize ? 'active-rms' : 'none',
+    items: [],
+  }
   for (const item of plan.items) {
     const sourceBefore = beforeById.get(item.id)
     const sourceAfter = afterById.get(item.id)
@@ -94,7 +111,9 @@ export function createBlindBundle({ beforeDir, afterDir, plan, outDir, normalize
     }
     for (const code of item.order) {
       const wav = readWav(sources[code])
-      const samples = normalize ? normalizePeak(wav.samples) : wav.samples
+      const samples = normalize
+        ? normalizeLoudness(wav.samples, wav.sampleRate)
+        : wav.samples
       writeWav(join(audioDir, `${code}.wav`), samples, wav.sampleRate)
     }
     manifest.items.push({ id: item.id, category: sourceBefore.category, codes: item.order })
@@ -108,10 +127,78 @@ export function createBlindBundle({ beforeDir, afterDir, plan, outDir, normalize
   return { manifestPath, keyPath, audioDir }
 }
 
+function codeSet(codes) {
+  return [...(codes ?? [])].sort().join(',')
+}
+
+/**
+ * Unmasking is irreversible: refuse unless every sheet is complete, belongs to
+ * this experiment, and uses exactly the public random codes.
+ */
+export function validateRevealInputs(sheets, key, manifest) {
+  const errors = []
+  if (!Array.isArray(sheets) || !sheets.length) errors.push('没有评分表')
+  const keyById = new Map((key.items ?? []).map((item) => [item.id, item]))
+  const manifestById = new Map((manifest.items ?? []).map((item) => [item.id, item]))
+  const seenRaters = new Set()
+
+  for (const mapping of key.items ?? []) {
+    const publicItem = manifestById.get(mapping.id)
+    if (!publicItem) {
+      errors.push(`密钥条目 ${mapping.id} 不在公开清单中`)
+      continue
+    }
+    if (codeSet([mapping.before, mapping.after]) !== codeSet(publicItem.codes)) {
+      errors.push(`${mapping.id} 的解盲密钥与公开清单代号不一致`)
+    }
+  }
+
+  for (const [index, sheet] of (sheets ?? []).entries()) {
+    const name = sheet?.rater || `评分表 ${index + 1}`
+    if (!sheet?.rater) errors.push(`${name} 缺少评分者身份`)
+    else if (seenRaters.has(sheet.rater)) errors.push(`重复评分者：${sheet.rater}`)
+    else seenRaters.add(sheet.rater)
+    if (key.experimentId && sheet?.experimentId !== key.experimentId) {
+      errors.push(`${name} 属于另一个实验（${sheet?.experimentId ?? '无 ID'}）`)
+    }
+
+    const validation = validateBlindScoreSheet(sheet)
+    for (const error of validation.errors) errors.push(`${name}: ${error}`)
+    if (!validation.complete) errors.push(`${name}: 评分未完成`)
+
+    const scoredIds = new Set()
+    for (const item of sheet?.items ?? []) {
+      if (scoredIds.has(item.id)) errors.push(`${name}: 重复条目 ${item.id}`)
+      scoredIds.add(item.id)
+      const mapping = keyById.get(item.id)
+      const publicItem = manifestById.get(item.id)
+      if (!mapping) {
+        errors.push(`${name}: ${item.id} 不在解盲密钥中`)
+        continue
+      }
+      if (!publicItem) errors.push(`${name}: ${item.id} 不在公开清单中`)
+      else if (codeSet(item.codes) !== codeSet(publicItem.codes)) {
+        errors.push(`${name}: ${item.id} 代号与公开清单不一致`)
+      }
+      if (codeSet(item.codes) !== codeSet([mapping.before, mapping.after])) {
+        errors.push(`${name}: ${item.id} 代号与解盲密钥不一致`)
+      }
+    }
+    for (const id of manifestById.keys()) {
+      if (!scoredIds.has(id)) errors.push(`${name}: 缺少条目 ${id}`)
+    }
+  }
+  return errors
+}
+
 export function revealScores(sheets, key, manifest) {
+  const errors = validateRevealInputs(sheets, key, manifest)
+  if (errors.length) {
+    throw new Error(`解盲前校验失败：\n${errors.join('\n')}`)
+  }
   const codes = new Map(key.items.map((item) => [item.id, item]))
   const perRater = sheets.map((sheet) => {
-    const rater = sheet.rater ?? 'rater'
+    const rater = sheet.rater
     const items = (sheet.items ?? []).map((item) => {
       const mapping = codes.get(item.id)
       if (!mapping) return { id: item.id, error: '缺少解盲映射' }
@@ -161,5 +248,14 @@ export function revealScores(sheets, key, manifest) {
     }
     agreement = compared ? agree / compared : null
   }
-  return { seed: key.seed, raters: perRater, overall, agreement, items: manifest.items }
+  return {
+    experimentId: key.experimentId ?? null,
+    revealedAt: new Date().toISOString(),
+    provenance: key.provenance ?? null,
+    sources: key.sources ?? null,
+    raters: perRater,
+    overall,
+    agreement,
+    items: manifest.items,
+  }
 }

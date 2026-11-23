@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { ROOT, loadMatchaAssets } from './lib/reading.mjs'
 import { createMatchaSynth } from './lib/matchaSynth.mjs'
+import { currentProvenance } from './lib/provenance.mjs'
 import {
   buildRuntimeLexicon, loadWordLists, prepareRuntimeTextWithOverlay, readAsset,
 } from './lib/wordFamily.mjs'
@@ -77,6 +78,7 @@ async function main(options) {
     tag: options.tag,
     corpus: options.corpus,
     count: rendered.length,
+    provenance: currentProvenance(),
     items: rendered,
   }
   writeFileSync(join(dir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')

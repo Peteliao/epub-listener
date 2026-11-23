@@ -42,6 +42,11 @@ export function frameEnvelope(samples, sampleRate, frameMs = 10) {
  * Find where `prefixSamples` occurs inside `fullSamples` by sliding its voiced
  * RMS envelope over the full envelope. Returns endMs of the aligned prefix and
  * a confidence based on correlation strength and the runner-up margin.
+ *
+ * `expectedMs` is the expected END of the prefix in the full audio (the callers
+ * pass the prefix's own voiced end). The search window is centred on
+ * `expectedMs - template.length`, not on `expectedMs` itself; otherwise a
+ * prefix longer than the window can only ever be found at its tail.
  */
 export function alignPrefix(prefixSamples, fullSamples, sampleRate, options = {}) {
   const config = { ...ALIGNMENT_DEFAULTS, ...options }
@@ -75,14 +80,17 @@ export function alignPrefix(prefixSamples, fullSamples, sampleRate, options = {}
       correlation: 0, margin: 0, confidence: 'low', method: 'envelope-correlation',
     }
   }
-  const expected = Math.round((options.expectedMs ?? 0) / config.frameMs)
+  const hasExpected = Number.isFinite(options.expectedMs)
   const window = Math.round(config.windowMs / config.frameMs)
-  const from = Number.isFinite(expected)
-    ? Math.max(0, Math.min(maxStart, expected - window))
-    : 0
-  const to = Number.isFinite(expected)
-    ? Math.min(maxStart, expected + window)
-    : maxStart
+  const expectedStart = hasExpected
+    ? Math.round(options.expectedMs / config.frameMs) - template.length
+    : null
+  const from = expectedStart == null
+    ? 0
+    : Math.max(0, Math.min(maxStart, expectedStart - window))
+  const to = expectedStart == null
+    ? maxStart
+    : Math.min(maxStart, expectedStart + window)
 
   let best = { start: from, score: -1 }
   let second = { start: from, score: -1 }
@@ -117,7 +125,10 @@ export function alignPrefix(prefixSamples, fullSamples, sampleRate, options = {}
         : 'low'
   return {
     offsetMs: best.start * config.frameMs,
-    endMs: (best.start + last + 1) * config.frameMs,
+    // `best.start` aligns with the template's first voiced frame. Adding
+    // `last` would re-add the prefix's own leading silence and drift the word
+    // boundary by `first * frameMs`.
+    endMs: (best.start + template.length) * config.frameMs,
     correlation,
     margin,
     confidence,

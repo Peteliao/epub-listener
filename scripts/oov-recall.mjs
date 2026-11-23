@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path'
 import { ROOT, loadMatchaAssets } from './lib/reading.mjs'
 import { loadCorpus } from './lib/corpus.mjs'
 import { collectRecallSample } from './lib/oovRecall.mjs'
+import { currentProvenance } from './lib/provenance.mjs'
 
 const OUT = resolve(ROOT, 'scripts/out/oov-recall.jsonl')
 const SUMMARY = resolve(ROOT, 'scripts/out/oov-recall.md')
@@ -42,7 +43,11 @@ async function main(options) {
   mkdirSync(dirname(options.summary), { recursive: true })
   writeFileSync(
     options.out,
-    `${result.sample.map((item) => JSON.stringify(item)).join('\n')}\n`,
+    [
+      `# provenance ${JSON.stringify(currentProvenance())}`,
+      ...result.sample.map((item) => JSON.stringify(item)),
+      '',
+    ].join('\n'),
     'utf8',
   )
   const lines = [

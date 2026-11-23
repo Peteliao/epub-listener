@@ -75,3 +75,88 @@ export function normalizePeak(samples, targetPeak = 0.9) {
   }
   return output
 }
+
+export const LOUDNESS_DEFAULTS = Object.freeze({
+  frameMs: 20,
+  targetDb: -20,
+  ceiling: 0.95,
+  // Frames more than 25 dB below the loudest frame are pauses, not speech.
+  gateBelowMaxDb: 25,
+})
+
+/**
+ * Active-speech level of an EVALUATION COPY. Pauses are excluded so that a
+ * version with longer inter-sentence silence is not made louder as a result.
+ * This is RMS over active frames, not a full EBU R128/LUFS implementation.
+ */
+export function measureSpeechLevel(samples, sampleRate, options = {}) {
+  const config = { ...LOUDNESS_DEFAULTS, ...options }
+  const frame = Math.max(1, Math.round((sampleRate * config.frameMs) / 1000))
+  const count = Math.floor(samples.length / frame)
+  if (!count) {
+    let peak = 0
+    for (const value of samples) peak = Math.max(peak, Math.abs(value))
+    return { peak, activeRms: 0, activeDb: -Infinity, activeFrames: 0, totalFrames: 0 }
+  }
+  // Peak must cover the final partial frame too; otherwise a transient there
+  // escapes the ceiling check and the normalised copy clips.
+  let peak = 0
+  for (const value of samples) peak = Math.max(peak, Math.abs(value))
+  let maxFrameRms = 0
+  const frameRms = new Float32Array(count)
+  for (let index = 0; index < count; index += 1) {
+    let sum = 0
+    const offset = index * frame
+    for (let i = 0; i < frame; i += 1) {
+      const value = samples[offset + i] ?? 0
+      sum += value * value
+    }
+    const rms = Math.sqrt(sum / frame)
+    frameRms[index] = rms
+    if (rms > maxFrameRms) maxFrameRms = rms
+  }
+  if (maxFrameRms < 1e-6) {
+    return { peak, activeRms: 0, activeDb: -Infinity, activeFrames: 0, totalFrames: count }
+  }
+  // Use the 95th percentile rather than the single loudest frame so one click
+  // cannot gate out the rest of the speech.
+  const sorted = [...frameRms].sort((left, right) => left - right)
+  const reference = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]
+  const gate = reference * 10 ** (-config.gateBelowMaxDb / 20)
+  let activeFrames = 0
+  let sumSquares = 0
+  for (const rms of frameRms) {
+    if (rms < gate) continue
+    activeFrames += 1
+    sumSquares += rms * rms
+  }
+  const activeRms = Math.sqrt(sumSquares / activeFrames)
+  return {
+    peak,
+    activeRms,
+    activeDb: 20 * Math.log10(activeRms),
+    activeFrames,
+    totalFrames: count,
+  }
+}
+
+/**
+ * Loudness-normalise an EVALUATION COPY to an active-speech RMS target while
+ * keeping a peak ceiling. Returns a new buffer; the rendered original is never
+ * modified. Pauses do not inflate the measured level.
+ */
+export function normalizeLoudness(samples, sampleRate, options = {}) {
+  const config = { ...LOUDNESS_DEFAULTS, ...options }
+  const level = measureSpeechLevel(samples, sampleRate, config)
+  if (level.activeRms < 1e-6 || level.peak < 1e-6) {
+    return new Float32Array(samples.length)
+  }
+  const targetRms = 10 ** (config.targetDb / 20)
+  let gain = targetRms / level.activeRms
+  if (level.peak * gain > config.ceiling) gain = config.ceiling / level.peak
+  const output = new Float32Array(samples.length)
+  for (let index = 0; index < samples.length; index += 1) {
+    output[index] = samples[index] * gain
+  }
+  return output
+}

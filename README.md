@@ -640,7 +640,7 @@ Matcha 没有可直接控制的基频/情绪标签，贸然调语速或给句子
 **P0 真正双盲 A/B**
 
 - 新增 `npm run blind:ab -- --before=before --after=after`：
-  - 固定随机种子生成不可推断的 4 位代号；
+  - 每轮用 `crypto.randomBytes()` 生成独立种子和实验 ID（第十七轮的固定种子可被公开清单反推，第十八轮已废弃）；
   - 每条的播放顺序随机；
   - 评分清单只有代号，版本映射写在独立 `.key.json`，评分结束前不打开；
   - 评测副本做峰值响度归一化，原始 WAV 不改。
@@ -690,6 +690,43 @@ Matcha 没有可直接控制的基频/情绪标签，贸然调语速或给句子
 顺带稳定了词族门禁：`Matcha` 的 `noiseScale > 0` 会让单次渲染的浊音岛数随机波动（`讨便宜` 有时 1、有时 2–3），硬阈值 `>=2` 不变，改为三次独立渲染取中位数后再判定。
 
 **验证**：`npm test` **82 文件 / 696 项通过**；`npm run audit:all` **15/15 通过**（新增外部语料对照 advisory 门禁）；`npm run build`（vue-tsc + vite）通过。
+
+### 2026-11-23 第十八轮：对齐修正 / 双盲保密 / 质量门禁 / 版本指纹
+
+按静态审查发现的 P0/P1 问题修复，不扩词典、不改 Matcha：
+
+**P0 时间对齐结束时间**
+
+- `alignPrefix()` 的 `endMs` 改为 `(best.start + template.length) * frameMs`。旧代码再加 `last`，把前缀开头的静音重复计入，最多偏移 `first * 10ms`。
+- `expectedMs` 明确为「前缀在整句中的期望结束时间」，搜索窗口按 `expectedMs - template.length` 居中；不传 `expectedMs` 时搜索整段音频。修复长前缀只能在后半段找到、目标词在句首时定位错误的问题。
+- 目标词位于句首且没有前缀文本时，`audit-envelope` 直接用 `sentence-start` 高置信度边界。
+- 新增测试：0/20/100ms 起始静音、多个低能量区、重复词消歧、长前缀、句首/句尾、无 expected 全段搜索。
+
+**P0 双盲不可反推**
+
+- `blind:ab` 每轮用 `crypto.randomBytes()` 生成种子和 `experimentId`；公开 `manifest.json` 只含实验 ID、随机代号和播放顺序，**不再包含 seed**。
+- seed、before/after 映射、来源指纹只写入独立 `.key.json`；评分表也不再带 seed。
+- `blind:score --reveal` 在解盲前强制校验：评分表完整、评分者不重复、实验 ID/代号与公开清单和密钥一致；未完成或跨实验直接拒绝。解盲报告按实验写 `<bundle>.reveal.json`。
+- 评测副本改为**活动语音 RMS 响度归一化**（20ms 帧，剔除比 95 分位帧低 25dB 的停顿，目标 -20dBFS，峰值上限 0.95），仍只作用于盲听副本，原始 WAV 不变。这是近似活动语音电平，不是完整 EBU R128/LUFS。
+
+**P0 质量门禁**
+
+- 高置信度包络 `FAIL` 直接进入最终 `FAIL`；中/低置信度 `FAIL` 只进入 `NEEDS_LISTENING`。
+- `S` 级但定位不确定、OOV 待复听、缺少声学冒烟、缺少解盲结果、独立评分者少于 2 人，均不能 `PASS`。
+- 历史回归同时检查 `failures` 与 `checks`，不再只看 `failures`。
+- 质量报告新增状态原因列表；`PASS` 现在要求「硬性通过 + 包络无高置信度异常 + 至少两名评分者 + 数据版本一致」。
+
+**P1 数据版本指纹**
+
+- 新增 `scripts/lib/provenance.mjs`：记录 commit、package version、suite version、voice pack（取 `public/models/manifest.json` 内 SHA-256）、lexicon 源文件、固定语料指纹、`experimentId`、`generatedAt`。
+- `audit-all` 生成一次实验 ID 并通过 `SHANLAN_EXPERIMENT_ID` 传给子门禁；`audit-envelope`、`oov-recall`、`self-iterate --verify`、`blind:render`、`blind:ab` 均写入同一结构。
+- `quality:report` 以 `gate-results.json` 的 `experimentId` 为基准逐份比对；来自其他实验、缺失指纹为 `UNVERIFIED`、版本不一致为 `MISMATCH`，两者都不能 `PASS`。盲听 A/B 天然跨越 before/after 版本，只比较 voice pack / corpus / suite version，避免把正常的 A/B 误判为混用数据。
+
+**P1 外部语料来源**
+
+- 新增 `scripts/data/bytedance-zh-wiki/SOURCE.md`：原始来源与获取日期、许可未确认状态、派生文件 SHA-256、转换过程、允许/禁止用途与回退方式。原始 77MB 文件仍未入库。
+
+**验证**：`npm test` **82 文件 / 716 项通过**；`npm run build`（vue-tsc + vite）通过；盲听 CLI 已用本地合成 WAV 跑通「建包 → 双评分者 → 解盲 → 一致性」全流程。`npm run quality:report` 在旧 `scripts/out` 上运行会因缺少新指纹显示 `UNVERIFIED`，重新跑 `audit:all` 后才会给出 `PASS`/`WARNING`；盲听仍需两名独立评分者完成后才允许 `PASS`。
 
 ### 2026-11-12 本地浏览器自检（无需用户协助）
 

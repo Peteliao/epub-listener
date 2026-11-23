@@ -101,7 +101,7 @@ export function createBlindScoreSheet({ bundle, rater = 'rater-1' }) {
     version: 2,
     createdAt: new Date().toISOString(),
     rater,
-    seed: bundle.seed,
+    experimentId: bundle.experimentId ?? null,
     weights: { ...BLIND_WEIGHTS },
     items: (bundle.items ?? []).map((item) => ({
       id: item.id,

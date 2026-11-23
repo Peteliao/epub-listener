@@ -24,6 +24,19 @@ function concat(...parts: Float32Array[]): Float32Array {
   return samples
 }
 
+function silence(ms: number): Float32Array {
+  return new Float32Array(Math.round((RATE * ms) / 1000))
+}
+
+/** Two-level tone: a flat RMS envelope cannot disambiguate the offset. */
+function stepTone(lowMs = 120, highMs = 180): Float32Array {
+  return concat(tone(lowMs, 220, 0.15), tone(highMs, 220, 0.45))
+}
+
+function tail(ms = 400): Float32Array {
+  return tone(ms, 330, 0.2)
+}
+
 describe('2026-11-23 第十七轮：整句包络时间对齐', () => {
   it('用包络相关性找到前缀在完整句里的真实偏移', async () => {
     const { alignPrefix } = await loadAlignment()
@@ -75,5 +88,106 @@ describe('2026-11-23 第十七轮：整句包络时间对齐', () => {
     expect(decisionFor('weak-second', { confidence: 'medium' })).toBe('NEEDS_LISTENING')
     expect(decisionFor('ok', { confidence: 'low' })).toBe('NEEDS_LISTENING')
     expect(decisionFor('ok', { confidence: 'high' })).toBe('PASS')
+  })
+
+  it('前缀开头 0 / 20 / 100ms 静音都不会把结束时间算多', async () => {
+    const { alignPrefix } = await loadAlignment()
+    const body = stepTone()
+    const bodyMs = (body.length / RATE) * 1000
+    for (const leadMs of [0, 20, 100]) {
+      const prefix = concat(silence(leadMs), body)
+      const full = concat(silence(500), body, tail())
+      const result = alignPrefix(prefix, full, RATE, {
+        expectedMs: 500 + bodyMs,
+      })
+      expect(result.confidence, `lead ${leadMs}ms`).toBe('high')
+      expect(result.offsetMs).toBeGreaterThanOrEqual(490)
+      expect(result.offsetMs).toBeLessThanOrEqual(510)
+      expect(result.endMs).toBeGreaterThanOrEqual(790)
+      expect(result.endMs).toBeLessThanOrEqual(810)
+    }
+  })
+
+  it('前缀中间多个低能量区仍按整段模板对齐', async () => {
+    const { alignPrefix } = await loadAlignment()
+    const prefix = concat(
+      tone(150, 220, 0.4),
+      tone(60, 220, 0.02),
+      tone(120, 220, 0.15),
+      tone(40, 220, 0.02),
+      tone(180, 220, 0.45),
+    )
+    const full = concat(silence(300), prefix, tail(300))
+    const prefixMs = (prefix.length / RATE) * 1000
+    const result = alignPrefix(prefix, full, RATE, { expectedMs: 300 + prefixMs })
+    expect(result.confidence).toBe('high')
+    expect(result.offsetMs).toBeGreaterThanOrEqual(280)
+    expect(result.offsetMs).toBeLessThanOrEqual(320)
+    expect(result.endMs).toBeGreaterThanOrEqual(300 + prefixMs - 20)
+    expect(result.endMs).toBeLessThanOrEqual(300 + prefixMs + 20)
+  })
+
+  it('重复出现时 expected 窗口选中第二次，整段搜索保持低置信度', async () => {
+    const { alignPrefix } = await loadAlignment()
+    const prefix = stepTone()
+    const prefixMs = (prefix.length / RATE) * 1000
+    const full = concat(prefix, silence(600), prefix, tail(300))
+    const secondStart = 300 + 600
+    const picked = alignPrefix(prefix, full, RATE, {
+      expectedMs: secondStart + prefixMs,
+    })
+    expect(picked.confidence).toBe('high')
+    expect(picked.offsetMs).toBeGreaterThanOrEqual(secondStart - 10)
+    expect(picked.offsetMs).toBeLessThanOrEqual(secondStart + 10)
+    expect(picked.endMs).toBeGreaterThanOrEqual(secondStart + prefixMs - 10)
+    expect(picked.endMs).toBeLessThanOrEqual(secondStart + prefixMs + 10)
+
+    // Without an expected window both copies correlate equally: the honest
+    // answer is NEEDS_LISTENING, not an arbitrary pick.
+    const ambiguous = alignPrefix(prefix, full, RATE)
+    expect(ambiguous.confidence).toBe('low')
+  })
+
+  it('长前缀仍能找到句首位置（expectedMs 按前缀结束时间居中）', async () => {
+    const { alignPrefix } = await loadAlignment()
+    const prefix = concat(tone(900, 220, 0.15), tone(300, 220, 0.45))
+    const prefixMs = (prefix.length / RATE) * 1000
+    const full = concat(silence(200), prefix, tail(300))
+    const result = alignPrefix(prefix, full, RATE, { expectedMs: 200 + prefixMs })
+    expect(result.confidence).toBe('high')
+    expect(result.offsetMs).toBeGreaterThanOrEqual(190)
+    expect(result.offsetMs).toBeLessThanOrEqual(210)
+    expect(result.endMs).toBeGreaterThanOrEqual(200 + prefixMs - 10)
+    expect(result.endMs).toBeLessThanOrEqual(200 + prefixMs + 10)
+  })
+
+  it('目标词在句首 / 句尾时边界仍可确定', async () => {
+    const { alignPrefix } = await loadAlignment()
+    const prefix = stepTone()
+    const prefixMs = (prefix.length / RATE) * 1000
+
+    const atStart = concat(prefix, tail(500))
+    const start = alignPrefix(prefix, atStart, RATE, { expectedMs: prefixMs })
+    expect(start.confidence).toBe('high')
+    expect(start.offsetMs).toBeLessThanOrEqual(10)
+    expect(start.endMs).toBeGreaterThanOrEqual(prefixMs - 10)
+    expect(start.endMs).toBeLessThanOrEqual(prefixMs + 10)
+
+    const atEnd = concat(silence(800), prefix)
+    const end = alignPrefix(prefix, atEnd, RATE, { expectedMs: 800 + prefixMs })
+    expect(end.confidence).toBe('high')
+    expect(end.offsetMs).toBeGreaterThanOrEqual(790)
+    expect(end.offsetMs).toBeLessThanOrEqual(810)
+    expect(end.endMs).toBeGreaterThanOrEqual(800 + prefixMs - 10)
+    expect(end.endMs).toBeLessThanOrEqual(800 + prefixMs + 10)
+  })
+
+  it('没有 expectedMs 时搜索整段音频，而不是只看前 800ms', async () => {
+    const { alignPrefix } = await loadAlignment()
+    const prefix = stepTone()
+    const full = concat(silence(1500), prefix, tail(300))
+    const result = alignPrefix(prefix, full, RATE)
+    expect(result.offsetMs).toBeGreaterThanOrEqual(1490)
+    expect(result.offsetMs).toBeLessThanOrEqual(1510)
   })
 })

@@ -6,9 +6,11 @@
 // gitignored full-book corpus. The acoustic smoke test is optional by default
 // because it loads a 130MB WASM model; use --strict to make it mandatory.
 import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { ROOT } from './lib/reading.mjs'
+import { currentProvenance } from './lib/provenance.mjs'
 
 const RESULTS = resolve(ROOT, 'scripts/out/gate-results.json')
 const CANDIDATES = resolve(ROOT, 'scripts/out/overlay-candidates.txt')
@@ -66,6 +68,10 @@ async function hasCandidates() {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
+  const experimentId = process.env.SHANLAN_EXPERIMENT_ID
+    || `qe-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${randomBytes(2).toString('hex')}`
+  process.env.SHANLAN_EXPERIMENT_ID = experimentId
+  console.log(`实验 ID：${experimentId}`)
   const gates = [
     {
       name: '黄金集与一致性快照',
@@ -206,6 +212,7 @@ async function main() {
     await writeFile(options.out, `${JSON.stringify({
       generatedAt: new Date().toISOString(),
       strict: options.strict,
+      provenance: currentProvenance({ experimentId }),
       gates: results,
       summary: {
         total: results.length,
@@ -251,6 +258,7 @@ async function main() {
   const payload = {
     generatedAt: new Date().toISOString(),
     strict: options.strict,
+    provenance: currentProvenance({ experimentId }),
     gates: results,
     summary: {
       total: results.length,

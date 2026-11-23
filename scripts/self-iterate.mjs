@@ -26,6 +26,7 @@ import {
   loadHistory, pinCases, replayAll,
 } from './lib/iterationFamilies.mjs'
 import { scanFusionRisks } from './lib/fusionRisk.mjs'
+import { currentProvenance } from './lib/provenance.mjs'
 
 const OUT = resolve(ROOT, 'scripts/out/self-iteration.json')
 const SUMMARY = resolve(ROOT, 'scripts/out/self-iteration.md')
@@ -262,6 +263,7 @@ async function verify(assets) {
   const passed = checks.filter((item) => item.ok).length
   const report = {
     generatedAt: new Date().toISOString(),
+    provenance: currentProvenance(),
     verify: true,
     cases: cases.length,
     byFamily,
