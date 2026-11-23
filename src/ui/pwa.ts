@@ -1,4 +1,10 @@
 import { ref } from 'vue'
+import {
+  checkForAppUpdate,
+  type UpdateCheckResult,
+} from './updateCheck'
+
+export type { UpdateCheckResult } from './updateCheck'
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -6,6 +12,7 @@ interface InstallPromptEvent extends Event {
 }
 
 export const updateReady = ref(false)
+export const checkingUpdate = ref(false)
 export const installAvailable = ref(false)
 export const isStandalone = ref(false)
 /** Build id reported by the worker that currently controls this page. */
@@ -36,6 +43,7 @@ const AUTO_UPDATE_KEY = 'shusheng:auto-update'
 const CONTROLLER_RELOAD_KEY = 'shusheng:controller-reload'
 
 let registration: ServiceWorkerRegistration | null = null
+let registrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
 let deferredPrompt: InstallPromptEvent | null = null
 let refreshing = false
 let started = false
@@ -62,7 +70,7 @@ export function setupPwa(): void {
     installAvailable.value = false
   })
 
-  if (import.meta.env.PROD) void registerWorker()
+  if (import.meta.env.PROD) registrationPromise = registerWorker()
 }
 
 function requestBuildId(): void {
@@ -104,8 +112,8 @@ function claimAutoUpdate(): boolean {
   }
 }
 
-async function registerWorker(): Promise<void> {
-  if (!('serviceWorker' in navigator)) return
+async function registerWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!('serviceWorker' in navigator)) return null
   hadController = !!navigator.serviceWorker.controller
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -142,7 +150,7 @@ async function registerWorker(): Promise<void> {
       // only opening the app, so an old build cannot keep running silently.
       if (claimAutoUpdate()) {
         applyUpdate()
-        return
+        return reg
       }
       updateReady.value = true
     }
@@ -170,8 +178,10 @@ async function registerWorker(): Promise<void> {
         maybeAutoApplyUpdate()
       })
     }
+    return reg
   } catch {
     // PWA support is an enhancement; the app keeps working without it.
+    return null
   }
 }
 
@@ -200,6 +210,18 @@ export function applyUpdate(): void {
   window.setTimeout(() => {
     if (refreshing) window.location.reload()
   }, 1500)
+}
+
+export async function checkForUpdate(): Promise<UpdateCheckResult> {
+  if (checkingUpdate.value) return 'pending'
+  checkingUpdate.value = true
+  try {
+    const activeRegistration = registration ?? (await registrationPromise)
+    if (!activeRegistration) return 'unavailable'
+    return await checkForAppUpdate(activeRegistration, applyUpdate)
+  } finally {
+    checkingUpdate.value = false
+  }
 }
 
 export function dismissUpdate(): void {

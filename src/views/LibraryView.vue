@@ -23,7 +23,14 @@ import AppIcon from '@/components/AppIcon.vue'
 import ReadingStatsSheet from '@/components/ReadingStatsSheet.vue'
 import { showToast } from '@/ui/toast'
 import { navigateToReader } from '@/ui/nav'
-import { appBuildId, installAvailable, isStandalone, promptInstall } from '@/ui/pwa'
+import {
+  appBuildId,
+  checkForUpdate,
+  checkingUpdate,
+  installAvailable,
+  isStandalone,
+  promptInstall,
+} from '@/ui/pwa'
 import {
   LIBRARY_TOUR_KEY,
   READER_TOUR_KEY,
@@ -69,6 +76,10 @@ const buildLabel = computed(() => {
   if (!import.meta.env.PROD) return '开发模式'
   return appBuildId.value ? `构建 ${appBuildId.value}` : '构建未知'
 })
+
+const buildCheckLabel = computed(() =>
+  checkingUpdate.value ? '正在检查更新…' : `${buildLabel.value} · 检查更新`,
+)
 
 const installHint = computed(() => {
   if (isStandalone.value || installHintDismissed.value) return null
@@ -117,6 +128,22 @@ async function installApp(): Promise<void> {
   if (!installAvailable.value) return
   const accepted = await promptInstall()
   if (accepted) showToast('正在把书声安装到桌面…')
+}
+
+async function checkUpdates(): Promise<void> {
+  if (checkingUpdate.value) return
+  const result = await checkForUpdate()
+  if (result === 'updated') {
+    showToast('发现新版本，正在更新…')
+  } else if (result === 'pending') {
+    showToast('新版本仍在下载，完成后会自动更新。')
+  } else if (result === 'current') {
+    showToast('已是最新构建。')
+  } else if (result === 'failed') {
+    showToast('检查更新失败，请稍后重试。', 'error')
+  } else {
+    showToast('当前环境无法检查更新，请刷新页面重试。')
+  }
 }
 
 const COVER_THEMES = [
@@ -588,7 +615,17 @@ onBeforeUnmount(() => {
       </section>
 
       <footer class="library__foot">
-        系统语音或离线 AI 音色 · 书籍与进度仅保存在本机 · {{ buildLabel }}
+        系统语音或离线 AI 音色 · 书籍与进度仅保存在本机 ·
+        <button
+          type="button"
+          class="library__build"
+          :disabled="checkingUpdate"
+          :aria-label="`${buildLabel}，点击检查更新`"
+          title="检查是否有新版本"
+          @click="checkUpdates"
+        >
+          {{ buildCheckLabel }}
+        </button>
       </footer>
     </div>
 
@@ -1332,6 +1369,41 @@ onBeforeUnmount(() => {
   letter-spacing: 0.08em;
   color: var(--app-muted);
   opacity: 0.8;
+}
+
+.library__build {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin: -7px -4px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.library__build:hover:not(:disabled) {
+  color: var(--app-accent);
+  background: color-mix(in srgb, var(--app-fg) 5%, transparent);
+}
+
+.library__build:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
+}
+
+.library__build:disabled {
+  cursor: progress;
+  text-decoration: none;
+  opacity: 0.7;
 }
 
 .file-input {
