@@ -90,6 +90,16 @@ describe('Highlighter', () => {
     expect(sentence.speechText.replaceAll('，', '')).toBe(sentence.text.replaceAll('，', ''))
   })
 
+  it('puts a comma at a forced semantic split without changing display text', () => {
+    const first = '甲'.repeat(60)
+    const second = '乙'.repeat(60)
+    const highlighter = build(`<p>${first}可是${second}。</p>`)
+    expect(highlighter.sentences).toHaveLength(2)
+    expect(highlighter.sentences[0]!.text).toBe(first)
+    expect(highlighter.sentences[0]!.speechText.endsWith('，')).toBe(true)
+    expect(highlighter.sentences[1]!.text.startsWith('可是')).toBe(true)
+  })
+
   it('keeps headings and list items as separate sentences', () => {
     const highlighter = build(
       '<h1>第一章</h1><ul><li>第一件事</li><li>第二件事</li></ul><p>他走进屋子，看到桌上有一封没有署名的信。</p>',

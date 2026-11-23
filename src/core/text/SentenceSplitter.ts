@@ -5,6 +5,8 @@ export interface SentenceRange {
   paragraphEnd: boolean
   /** The range is (part of) a quoted dialogue, not narration. */
   dialogue: boolean
+  /** A forced long-sentence cut landed on a semantic clause edge. */
+  semanticBreak?: boolean
 }
 
 export interface SplitSentencesOptions {
@@ -21,6 +23,7 @@ interface RawRange {
   end: number
   paragraph: number
   dialogue?: boolean
+  semanticBreak?: boolean
 }
 
 interface DialogueSpan {
@@ -340,6 +343,54 @@ function splitsNumberFromHan(text: string, cut: number): boolean {
   return (/\d/.test(before) && HAN.test(after)) || (HAN.test(before) && /\d/.test(after))
 }
 
+// A forced cut (no punctuation, no whitespace) should still respect a clause
+// edge. These are deliberately conservative connectives; ambiguous forms such
+// as 就是/只是/不过/还是/所以 are excluded because they also occur inside words.
+const SEMANTIC_BEFORE = [
+  '但是', '可是', '然而', '而是', '因此', '因而', '于是', '那么',
+  '然后', '接着', '随后', '如果', '假如', '要是', '虽然', '尽管',
+  '即使', '无论', '不管', '只要', '只有', '除非', '由于',
+  '而且', '并且', '况且', '何况', '否则', '不然',
+  '例如', '比如', '譬如', '尤其是', '特别是', '也就是说', '换句话说',
+]
+const SOFT_TAIL = /[了着过吗呢吧啊呀嘛哦哈么]/
+const DANGLING_TAIL = /[的地得之和与或及并而则就都也还更最不没无非每各某本该此这那在对把被让给从向往于以为由随据按所者]/
+
+function semanticCut(
+  text: string,
+  start: number,
+  limit: number,
+  floor: number,
+): { cut: number; semantic: boolean } {
+  // Prefer the latest connective so the first piece is as long as possible.
+  for (let index = limit; index > floor; index -= 1) {
+    if (!SEMANTIC_BEFORE.some((word) => text.startsWith(word, index))) continue
+    const before = text[index - 1] ?? ''
+    if (index > start && !/[，,、；;：:。！？!?…—\s]/.test(before)) {
+      return { cut: index, semantic: true }
+    }
+  }
+
+  // No connective: a clause-final particle still gives a natural edge.
+  for (let index = limit; index > floor; index -= 1) {
+    if (SOFT_TAIL.test(text[index - 1] ?? '')) {
+      return { cut: index, semantic: true }
+    }
+  }
+
+  // Avoid ending a hard cut on a function word that would leave the next piece
+  // starting with its head (…的 / …和 / …在). This may not find a full clause,
+  // but it is strictly safer than cutting immediately after the particle.
+  let cut = limit
+  while (
+    cut > floor &&
+    (DANGLING_TAIL.test(text[cut - 1] ?? '') || DANGLING_TAIL.test(text[cut] ?? ''))
+  ) {
+    cut -= 1
+  }
+  return { cut: Math.max(cut, start + 1), semantic: false }
+}
+
 function splitLongRange(range: RawRange, text: string, maxLength: number): RawRange[] {
   let start = range.start
   const end = range.end
@@ -352,6 +403,8 @@ function splitLongRange(range: RawRange, text: string, maxLength: number): RawRa
     // sounds better than slicing through a clause.
     const secondaryFloor = start + Math.floor(maxLength * 0.35)
     let cut = -1
+    let semantic = false
+    let semanticCandidate = -1
 
     for (let i = limit; i > secondaryFloor; i -= 1) {
       if (SECONDARY.has(text[i - 1]!)) {
@@ -370,7 +423,12 @@ function splitLongRange(range: RawRange, text: string, maxLength: number): RawRa
       }
     }
 
-    if (cut === -1) cut = limit
+    if (cut === -1) {
+      const found = semanticCut(text, start, limit, earliestCut)
+      cut = found.cut
+      semantic = found.semantic
+      semanticCandidate = cut
+    }
 
     // Never bisect a surrogate pair.
     if (
@@ -406,11 +464,13 @@ function splitLongRange(range: RawRange, text: string, maxLength: number): RawRa
     }
 
     if (cut <= start) cut = start + maxLength
+    if (cut !== semanticCandidate) semantic = false
 
     const piece = trimRawRange(text, start, cut)
     if (piece) {
       piece.paragraph = range.paragraph
       piece.dialogue = range.dialogue
+      piece.semanticBreak = semantic
       pieces.push(piece)
     }
 
@@ -459,5 +519,6 @@ export function splitSentences(text: string, options: SplitSentencesOptions = {}
       paragraphEnd:
         index === list.length - 1 || list[index + 1]!.paragraph !== range.paragraph,
       dialogue: range.dialogue === true,
+      semanticBreak: range.semanticBreak === true,
     }))
 }

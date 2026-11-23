@@ -426,8 +426,15 @@ export class Highlighter {
 
     for (const range of ranges) {
       // Display text stays untouched; only the TTS string receives the single
-      // semantic comma planned for a long contrast/consequence clause.
-      const speechText = planSpeechPhrasing(normalizeSpeechText(range.text))
+      // semantic comma planned for a long contrast/consequence clause. A forced
+      // split that landed on a clause edge also gets a comma so the two pieces
+      // do not run together.
+      const normalized = normalizeSpeechText(range.text)
+      const edged =
+        range.semanticBreak && normalized && !/[。！？!?…，,、：:；;]$/.test(normalized)
+          ? `${normalized}，`
+          : normalized
+      const speechText = planSpeechPhrasing(edged)
       if (!speechText) continue
 
       const slices: FragmentSlice[] = []

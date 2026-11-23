@@ -124,6 +124,31 @@ describe('splitSentences', () => {
     ])
   })
 
+  it('prefers a semantic connective before a hard cut', () => {
+    const input = `${'甲'.repeat(60)}可是${'乙'.repeat(60)}。`
+    const result = splitSentences(input, { maxLength: 80, mergeShort: false })
+    expect(result.map((sentence) => sentence.text)).toEqual([
+      '甲'.repeat(60),
+      `可是${'乙'.repeat(60)}。`,
+    ])
+    expect(result[0]!.semanticBreak).toBe(true)
+    expect(result[1]!.semanticBreak).toBe(false)
+  })
+
+  it('prefers a clause-final particle when no connective is available', () => {
+    const input = `${'甲'.repeat(70)}了${'乙'.repeat(30)}。`
+    const result = splitSentences(input, { maxLength: 80, mergeShort: false })
+    expect(result[0]!.text).toBe(`${'甲'.repeat(70)}了`)
+    expect(result[0]!.semanticBreak).toBe(true)
+  })
+
+  it('does not leave a dangling 的 at the end of a forced cut', () => {
+    const input = `${'甲'.repeat(79)}的${'乙'.repeat(20)}。`
+    const result = splitSentences(input, { maxLength: 80, mergeShort: false })
+    expect(result[0]!.text.endsWith('的')).toBe(false)
+    expect(result.map((sentence) => sentence.text).join('')).toBe(input)
+  })
+
   it('hard-splits text without any punctuation', () => {
     const input = '甲'.repeat(200)
     const result = splitSentences(input)

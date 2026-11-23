@@ -32,6 +32,7 @@
     "audit:acoustics": "node scripts/audit-acoustics.mjs",
     "acoustics:verify": "node scripts/audit-acoustics.mjs --verify",
     "audit:omission": "node scripts/audit-omission.mjs",
+    "audit:envelope": "node scripts/audit-envelope.mjs",
     "audit:word-family": "node scripts/audit-word-family.mjs",
     "audit:word-family:audio": "node scripts/audit-word-family.mjs --measure --audio",
     "feedback:loop": "node scripts/feedback-loop.mjs",

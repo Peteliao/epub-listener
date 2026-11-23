@@ -38,8 +38,8 @@ pronunciation-health.mjs 汇总。新鲜 checkout 也能运行（不依赖全书
   --out=路径  结果文件
 
 门禁：黄金集与快照 / 覆盖表格式 / 规则编译 / P0 扫描召回 / 反馈闭环 /
-P3 自迭代召回 / 反馈原句可听性回归 / 词族逐词可听性 / 历史基线全量重放 /
-影响面 diff（仅当有候选覆盖行）/ 声学冒烟 / 健康度。
+P3 自迭代召回 / 反馈原句可听性回归 / 词族逐词可听性 / 整句包络（advisory）/
+历史基线全量重放 / 影响面 diff（仅当有候选覆盖行）/ 声学冒烟 / 健康度。
 
 新书接入（全在开发期本机执行，书籍内容不上传）：
   npm run scan:risks -- <新书.epub>          生成全书风险清单并排序
@@ -138,6 +138,14 @@ async function main() {
         '--summary=scripts/out/word-family-verify.md',
       ],
       required: true,
+    },
+    {
+      name: '整句包络（advisory）',
+      // The 立刻 lesson: syllable ablation can look normal while the second
+      // syllable is only a 30ms burst. This optional gate measures the full
+      // sentence envelope and lets the metric guide future OOV candidates.
+      args: ['scripts/audit-envelope.mjs', '--case=om-0007', '--strict'],
+      required: false,
     },
     {
       name: '历史基线全量重放',

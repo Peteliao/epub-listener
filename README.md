@@ -497,9 +497,13 @@ normal。长句代理指标分歧的 6 条按项目惯例每轮照测并列出�
 - 只改 `speechText`，`sentence.text` 和页面高亮逐字不变；最多一个停顿，避免「停顿太碎」。
 - 例子：`他本来想……还掉可是走到半路……` → 朗读串 `……还掉，可是走到半路……`；`……逃避那么他最终……` → `……逃避，那么他最终……`。
 
+**长句切分语义边界保护**：`SentenceSplitter` 在 80 字强制切分且没有标点/空格时，优先切在 `但是/可是/然而/因此/于是/那么/如果/虽然/即使/而且/例如` 等连接词前；没有连接词时切在 `了/着/过/吗/呢/吧` 等句末助词后；最后避开 `的/和/在/对/把/被` 等悬空功能词。`SentenceRange.semanticBreak` 标记该边界，`Highlighter` 只在朗读串末尾补一个逗号，显示文本不变。
+
+**整句包络分析**：新增 `scripts/lib/envelope.mjs` 与 `npm run audit:envelope`。用前缀合成估算目标词起点，分析整句 burst：没有第二个 burst → `merged`；第二音节 <60ms 或峰值 <第一音节 25% → `weak-second`；否则 `ok`。这是 advisory 排序/对比工具，不替代听感；当前 `om-0007` 的 both 判定为 `ok`，单元测试覆盖 `weak-second` 与 `merged`。
+
 这是 2.0 的第一块，不涉及 Matcha 模型/韵律标签；后续的疑问句语调、对白情绪、固定盲听集仍按建议分阶段做。
 
-**验证**：`npm test` **67 文件 / 634 项通过**；`npm run audit:all` **12/12 通过**；`npm run build`（vue-tsc + vite）通过。
+**验证**：`npm test` **68 文件 / 642 项通过**；`npm run audit:all` **13/13 通过**（整句包络为可选 advisory 门禁）；`npm run audit:envelope -- --case=om-0007 --strict` 通过；`npm run build`（vue-tsc + vite）通过。
 
 ### 2026-11-12 本地浏览器自检（无需用户协助）
 
