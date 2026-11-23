@@ -1775,3 +1775,33 @@
 做那一行 zuo4 na4 yi4 hang2
 做哪一行 zuo4 na3 yi4 hang2
 在这一行 zai4 zhe4 yi4 hang2
+
+# 2026-11-23 第十三轮：三声连续与一/不变调补齐。
+# 这些常用词在基础词典里缺失，前端会退回单字本调：3+3 读成 3+3，
+# 一/不 读成 yi1/bu4。bookLexicon 只处理声母/韵母差异，一/不 的纯声调
+# 变化不会自动生成覆盖行，所以必须在人工表按词钉住。
+# 规则沿用本文件开头：3+3 → 2+3；一/不 按后字调值变调。只加多字词。
+# 3+3 → 2+3
+很好 hen2 hao3
+永远 yong2 yuan3
+水果 shui2 guo3
+领导 ling2 dao3
+管理 guan2 li3
+表演 biao2 yan3
+展览 zhan2 lan3
+舞蹈 wu2 dao3
+小姐 xiao2 jie3
+总统 zong2 tong3
+想法 xiang2 fa3
+手表 shou2 biao3
+古老 gu2 lao3
+勇敢 yong2 gan3
+整理 zheng2 li3
+选举 xuan2 ju3
+辅导 fu2 dao3
+指导 zhi2 dao3
+彼此 bi2 ci3
+# 一：后字四声 → yí(2)；后字一/二/三声 → yì(4)
+一样 yi2 yang4
+一天 yi4 tian1
+一边 yi4 bian1
