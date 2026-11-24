@@ -43,8 +43,14 @@ onBeforeUnmount(() => {
 <template>
   <div class="app-shell">
     <!-- iOS 27 blurs whatever is rendered at the top edge of installed PWAs;
-         an opaque surface there makes the system blur invisible. -->
-    <div class="status-surface" aria-hidden="true"></div>
+         an opaque surface there makes the system blur invisible. Safari 26
+         samples the frontmost fixed element at the top for the status bar, so
+         the colour is written inline and the layer stays above every modal. -->
+    <div
+      class="status-surface"
+      aria-hidden="true"
+      :style="{ backgroundColor: settingsStore.activePalette.bg }"
+    ></div>
     <ReaderView v-if="route.name === 'reader'" :key="route.bookId" :book-id="route.bookId" />
     <LibraryView v-else />
     <ToastHost />
@@ -79,15 +85,21 @@ onBeforeUnmount(() => {
   top: 0;
   right: 0;
   left: 0;
-  z-index: 4;
+  /* Safari 26/27 samples the frontmost qualifying element at the top. Sheets
+     (100) and toasts (120) are fixed and transparent there, so this surface
+     has to sit above them or the system bar freezes in the previous theme
+     until the panel closes. It ignores pointer events, so nothing is blocked. */
+  z-index: 130;
   height: calc(env(safe-area-inset-top, 0px) + 1px);
   /* Solid only: the system bar cannot render gradients or patterns. */
   background-color: var(--status-bar-bg, var(--app-bg));
   pointer-events: none;
 }
 
-/* iOS standalone paints a progressive blur over the top edge. The surface
-   must stay painted past the safe area or the system blur reappears. */
+/* Safari 26 paints the status bar from the background-color of a fixed
+   element at the very top. Below 11px the colour fades while scrolling or
+   refuses to switch at runtime; 11px+ switches instantly and also covers the
+   iOS 27 edge blur. */
 @media (display-mode: standalone) {
   @supports (-webkit-touch-callout: none) {
     .status-surface {

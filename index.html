@@ -6,6 +6,9 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"
     />
+    <!-- theme-color no longer tints the iOS status bar (Safari 26 samples the
+         topmost fixed element on the page instead), but rewriting its content
+         still wakes Safari's tint observer and it drives Android Chrome's UI. -->
     <meta name="theme-color" content="#f7f0e4" />
     <title>书声 · 网页听书 | EPUB/TXT/MOBI/AZW3/FB2 朗读器，中英混读与 iOS 锁屏听书</title>
     <meta

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { computed, ref } from 'vue'
 import { bindThemeSurface } from '../src/ui/themeSurface'
@@ -250,6 +250,147 @@ describe('主题表面同步更新', () => {
         document.documentElement.style.getPropertyValue('--status-bar-bg'),
       ).toBe(READER_PALETTES.sky.bg)
       expect(themeColorMeta?.content).toBe(READER_PALETTES.sky.bg)
+    })
+  })
+
+  describe('Safari 26 状态栏取色', () => {
+    let frames: FrameRequestCallback[]
+    let writes: string[]
+
+    beforeEach(() => {
+      frames = []
+      writes = []
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        frames.push(callback)
+        return frames.length
+      })
+      const meta = themeColorMeta as HTMLMetaElement
+      const setAttribute = meta.setAttribute.bind(meta)
+      vi.spyOn(meta, 'setAttribute').mockImplementation((name, value) => {
+        if (name === 'content') writes.push(String(value))
+        setAttribute(name, value)
+      })
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+      document.body.removeAttribute('style')
+    })
+
+    function flushFrames(): void {
+      let rounds = 0
+      while (frames.length > 0 && rounds < 12) {
+        const pending = frames
+        frames = []
+        for (const callback of pending) callback(0)
+        rounds += 1
+      }
+    }
+
+    /** jsdom normalises inline colours to rgb(). */
+    function rgb(hex: string): string {
+      const value = hex.replace('#', '')
+      return `rgb(${Number.parseInt(value.slice(0, 2), 16)}, ${Number.parseInt(
+        value.slice(2, 4),
+        16,
+      )}, ${Number.parseInt(value.slice(4, 6), 16)})`
+    }
+
+    it('换主题时先落目标色，再用相邻色值唤醒观察器后还原', () => {
+      const theme = ref<ReaderTheme>('paper')
+      const palette = computed(() => READER_PALETTES[theme.value])
+      const meta = themeColorMeta as HTMLMetaElement
+
+      stop = bindThemeSurface(
+        () => palette.value,
+        () => theme.value,
+      )
+
+      theme.value = 'night'
+      expect(meta.content).toBe(READER_PALETTES.night.bg)
+
+      flushFrames()
+
+      expect(writes).toContain(`${READER_PALETTES.night.bg}fe`)
+      expect(meta.content).toBe(READER_PALETTES.night.bg)
+    })
+
+    it('口袋模式的纯黑同样先落盘再唤醒观察器', () => {
+      const theme = ref<ReaderTheme>('sepia')
+      const palette = computed(() => READER_PALETTES[theme.value])
+      const meta = themeColorMeta as HTMLMetaElement
+
+      stop = bindThemeSurface(
+        () => palette.value,
+        () => theme.value,
+      )
+
+      theme.value = 'oled'
+      expect(meta.content).toBe('#000000')
+      expect(document.body.style.backgroundColor).toBe(rgb('#000000'))
+
+      flushFrames()
+
+      expect(writes).toContain('#000000fe')
+      expect(meta.content).toBe('#000000')
+    })
+
+    it('连续切换主题不会被上一轮的还原写回旧色', () => {
+      const theme = ref<ReaderTheme>('paper')
+      const palette = computed(() => READER_PALETTES[theme.value])
+      const meta = themeColorMeta as HTMLMetaElement
+
+      stop = bindThemeSurface(
+        () => palette.value,
+        () => theme.value,
+      )
+
+      theme.value = 'night'
+      theme.value = 'oled'
+      flushFrames()
+
+      expect(meta.content).toBe('#000000')
+      expect(
+        writes.filter((value) => value === READER_PALETTES.night.bg),
+      ).toHaveLength(1)
+    })
+
+    it('body 的内联背景色跟随主题，供 Safari 工具条采样', () => {
+      const theme = ref<ReaderTheme>('paper')
+      const palette = computed(() => READER_PALETTES[theme.value])
+
+      stop = bindThemeSurface(
+        () => palette.value,
+        () => theme.value,
+      )
+
+      expect(document.body.style.backgroundColor).toBe(
+        rgb(READER_PALETTES.paper.bg),
+      )
+
+      theme.value = 'sepia'
+      expect(document.body.style.backgroundColor).toBe(
+        rgb(READER_PALETTES.sepia.bg),
+      )
+    })
+
+    it('顶部色条内联写入背景色、位于所有弹层之上且高度满足采样阈值', () => {
+      const app = readFileSync('src/App.vue', 'utf8')
+      expect(app).toMatch(
+        /:style="\{ backgroundColor: settingsStore\.activePalette\.bg \}"/,
+      )
+      expect(app).toMatch(
+        /\.status-surface \{[\s\S]*?z-index: 130;[\s\S]*?background-color: var\(--status-bar-bg, var\(--app-bg\)\);/,
+      )
+      expect(app).toMatch(/env\(safe-area-inset-top, 0px\) \+ 12px/)
+    })
+
+    it('index.html 保留 theme-color 作为唤醒观察器的把手', () => {
+      const html = readFileSync('index.html', 'utf8')
+      expect(html).toMatch(
+        /<meta name="theme-color" content="#[0-9a-f]{6}" \/>/,
+      )
     })
   })
 })
