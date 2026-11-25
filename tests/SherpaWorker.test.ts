@@ -29,8 +29,27 @@ const TOKEN_SYMBOLS = [
   'yin2', 'xing2', 'hang2', 'shi4', 'jie4', ',', '.', '!', '?', '"',
 ]
 const TOKENS_TEXT = TOKEN_SYMBOLS.map((symbol, id) => `${symbol} ${id}`).join('\n')
+const MODEL_PARTS = [
+  { name: 'acoustic.onnx.part1', bytes: new Uint8Array([11]) },
+  { name: 'acoustic.onnx.part2', bytes: new Uint8Array([12, 13]) },
+]
+const VITS_CONFIG = {
+  model: 'acoustic.onnx',
+  lexicon: 'lexicon.txt',
+  tokens: 'tokens.txt',
+  noiseScale: 0.667,
+  noiseScaleW: 0.8,
+  lengthScale: 1,
+}
 
 type Packet = Record<string, unknown> & { type: string }
+interface CachedFile {
+  name: string
+  url: string
+  bytes: number
+  sha256: string
+  parts?: CachedFile[]
+}
 interface GenerationConfig {
   sid: number
   speed: number
@@ -52,15 +71,20 @@ function runtime(options: {
   overlay?: string
   config?: Record<string, string | number>
   ruleFsts?: string[]
+  parts?: Record<string, Array<{ name: string; bytes: Uint8Array }>>
 } = {}) {
   const messages: Packet[] = []
   const files = new Map<string, Uint8Array>()
-  const assets = new Map<string, Uint8Array>([
+  const logicalAssets = new Map<string, Uint8Array>([
     ['lexicon.txt', encoder.encode(options.lexicon ?? BASE_LEXICON)],
     ['tokens.txt', encoder.encode(TOKENS_TEXT)],
     ['acoustic.onnx', new Uint8Array([11, 12, 13])],
     ['vocoder.onnx', new Uint8Array([21, 22, 23])],
   ])
+  const assets = new Map(logicalAssets)
+  for (const segments of Object.values(options.parts ?? {})) {
+    for (const segment of segments) assets.set(segment.name, segment.bytes)
+  }
   const audio = () => ({ samples: new Float32Array([0.2, 0.1]), sampleRate: 22050 })
   const generateWithConfig = vi.fn((_input: string, _config: GenerationConfig) => audio())
   const generate = vi.fn((_options: { text: string }) => audio())
@@ -152,11 +176,21 @@ function runtime(options: {
       },
       ruleFsts: options.ruleFsts ?? [],
     },
-    files: [...assets].map(([name, bytes]) => ({
+    files: [...logicalAssets].map(([name, bytes]) => ({
       name,
       url: `https://example.test/models/${name}`,
       bytes: bytes.byteLength,
       sha256: createHash('sha256').update(bytes).digest('hex'),
+      ...(options.parts?.[name]
+        ? {
+            parts: options.parts[name].map((part) => ({
+              name: part.name,
+              url: `https://example.test/models/${part.name}`,
+              bytes: part.bytes.byteLength,
+              sha256: createHash('sha256').update(part.bytes).digest('hex'),
+            })),
+          }
+        : {}),
     })),
   }
   return {
@@ -174,6 +208,11 @@ function runtime(options: {
 }
 
 type Runtime = ReturnType<typeof runtime>
+
+function cachedModel(worker: Runtime): CachedFile {
+  const files = worker.init.files as CachedFile[]
+  return files.find((file) => file.name === 'acoustic.onnx')!
+}
 
 function synth(jobId: string, text = '你好', extra: Record<string, unknown> = {}): Packet {
   return { type: 'synth', lang: 'zh', jobId, epoch: 7, text, speakerId: 0, ...extra }
@@ -274,6 +313,70 @@ describe('Matcha shadow frontend golden tokens', () => {
       '你 ni3\n好 hao3\n你好 ni3 unknown-phone\n',
       'ni3 1\nhao3 2\n',
     )).toMatchObject({ supported: false, reason: 'invalid-lexicon-entry' })
+  })
+})
+
+describe('Sherpa worker split model files', () => {
+  async function expectInitError(worker: Runtime, message: string): Promise<void> {
+    worker.send(worker.init)
+    await worker.drain()
+    expect(worker.messages.at(-1)).toMatchObject({
+      type: 'error',
+      code: 'init-failed',
+      message: expect.stringContaining(message),
+    })
+  }
+
+  it('reassembles verified parts before writing the logical model file', async () => {
+    const worker = runtime({
+      modelType: 'vits',
+      config: VITS_CONFIG,
+      parts: { 'acoustic.onnx': MODEL_PARTS },
+    })
+    await ready(worker)
+    const write = worker.fs.writeFile.mock.calls.find(([path]) => path === '/models/zh/acoustic.onnx')
+    expect(write).toBeDefined()
+    expect([...(write![1] as Uint8Array)]).toEqual([11, 12, 13])
+  })
+
+  it('rejects a missing model part', async () => {
+    const worker = runtime({
+      modelType: 'vits',
+      config: VITS_CONFIG,
+      parts: { 'acoustic.onnx': MODEL_PARTS },
+    })
+    cachedModel(worker).parts![1]!.url = 'https://example.test/models/missing.part2'
+    await expectInitError(worker, 'acoustic.onnx.part2 缺失')
+  })
+
+  it('rejects a model part with the wrong byte count', async () => {
+    const worker = runtime({
+      modelType: 'vits',
+      config: VITS_CONFIG,
+      parts: { 'acoustic.onnx': MODEL_PARTS },
+    })
+    cachedModel(worker).parts![1]!.bytes += 1
+    await expectInitError(worker, 'acoustic.onnx.part2 大小不符')
+  })
+
+  it('rejects a model part with the wrong hash', async () => {
+    const worker = runtime({
+      modelType: 'vits',
+      config: VITS_CONFIG,
+      parts: { 'acoustic.onnx': MODEL_PARTS },
+    })
+    cachedModel(worker).parts![0]!.sha256 = '0'.repeat(64)
+    await expectInitError(worker, 'acoustic.onnx.part1 校验失败')
+  })
+
+  it('rejects correctly sized parts whose merged model hash is wrong', async () => {
+    const worker = runtime({
+      modelType: 'vits',
+      config: VITS_CONFIG,
+      parts: { 'acoustic.onnx': MODEL_PARTS },
+    })
+    cachedModel(worker).sha256 = '0'.repeat(64)
+    await expectInitError(worker, 'acoustic.onnx 校验失败')
   })
 })
 

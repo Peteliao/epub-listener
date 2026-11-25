@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -19,7 +19,13 @@ const manifest = JSON.parse(
       ruleFsts: string[]
     }
     voices: Array<{ id: string; speakerId: number; sampleRate: number }>
-    files: Array<{ name: string; url: string; bytes: number; sha256: string }>
+    files: Array<{
+      name: string
+      url: string
+      bytes: number
+      sha256: string
+      parts?: Array<{ name: string; url: string; bytes: number; sha256: string }>
+    }>
   }>
 }
 const pack = manifest.packs.find((item) => item.id === 'vits-melo-zh-en')!
@@ -62,19 +68,32 @@ describe('Melo voice pack', () => {
     ]) {
       expect(names.has(String(name))).toBe(true)
     }
-    expect(readFileSync(resolve(packDir, 'model.int8.onnx')).subarray(0, 4)).toEqual(
-      Buffer.from([0x08, 0x07, 0x12, 0x0d]),
-    )
   })
 
   it('ships verified assets whose byte counts and hashes match the manifest', () => {
     expect(pack.files.reduce((total, file) => total + file.bytes, 0)).toBe(pack.totalBytes)
     for (const file of pack.files) {
-      const path = resolve(root, 'public', file.url)
-      const bytes = readFileSync(path)
-      expect(statSync(path).size, file.name).toBe(file.bytes)
-      expect(sha256(bytes), file.name).toBe(file.sha256)
+      for (const entry of file.parts ?? [file]) {
+        const path = resolve(root, 'public', entry.url)
+        const bytes = readFileSync(path)
+        expect(statSync(path).size, entry.name).toBe(entry.bytes)
+        expect(sha256(bytes), entry.name).toBe(entry.sha256)
+      }
     }
+  })
+
+  it('splits the model below 50 MB and reconstructs the original ONNX bytes', () => {
+    const model = pack.files.find((file) => file.name === 'model.int8.onnx')!
+    expect(model.parts).toHaveLength(2)
+    expect(model.parts!.every((part) => part.bytes < 50_000_000)).toBe(true)
+    expect(existsSync(resolve(root, 'public', model.url))).toBe(false)
+
+    const merged = Buffer.concat(
+      model.parts!.map((part) => readFileSync(resolve(root, 'public', part.url))),
+    )
+    expect(merged.byteLength).toBe(model.bytes)
+    expect(sha256(merged)).toBe(model.sha256)
+    expect(merged.subarray(0, 4)).toEqual(Buffer.from([0x08, 0x07, 0x12, 0x0d]))
   })
 
   it('includes the upstream MIT license', () => {

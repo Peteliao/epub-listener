@@ -105,7 +105,7 @@
       "id": "vits-melo-zh-en",
       "lang": "zh",
       "name": "Melo 中英女声",
-      "version": "2026.11.25",
+      "version": "2026.11.25.1",
       "description": "44.1 kHz 自然女声，支持中英混读，采用 int8 轻量模型",
       "license": {
         "label": "MIT",
@@ -146,7 +146,21 @@
           "name": "model.int8.onnx",
           "url": "models/vits-melo-zh-en/model.int8.onnx",
           "bytes": 53517430,
-          "sha256": "f085f5079e05f039b800aeb542f5253c26a303211b0c6465d0d9387977855a63"
+          "sha256": "f085f5079e05f039b800aeb542f5253c26a303211b0c6465d0d9387977855a63",
+          "parts": [
+            {
+              "name": "model.int8.onnx.part1",
+              "url": "models/vits-melo-zh-en/model.int8.onnx.part1",
+              "bytes": 33554432,
+              "sha256": "20add91054f4af60cf29de81f0b8bf83fe96dbf3e8994a6bd0166c9990a23d83"
+            },
+            {
+              "name": "model.int8.onnx.part2",
+              "url": "models/vits-melo-zh-en/model.int8.onnx.part2",
+              "bytes": 19962998,
+              "sha256": "6d0fb17f85e23d329faaf11729e0f15bef6a09cbc6a22ab1b88a8bf203029f33"
+            }
+          ]
         },
         {
           "name": "lexicon.txt",

@@ -1,5 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+public/models/vits-melo-zh-en/model.int8.onnx.part* binary
 
 # Model lexicons/tokens are hash-verified byte-for-byte; keep LF everywhere
 public/models/**/*.txt text eol=lf

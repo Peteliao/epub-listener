@@ -384,6 +384,29 @@ function ensureDir(fs, dir) {
   }
 }
 
+async function readVerifiedFile(cache, file) {
+  const response = await cache.match(file.url)
+  if (!response) {
+    throw new Error(`离线音色文件 ${file.name} 缺失，请重新下载音色包。`)
+  }
+
+  let buffer
+  try {
+    buffer = await response.arrayBuffer()
+  } catch {
+    throw new Error(`无法读取离线音色文件 ${file.name}，请重新下载音色包。`)
+  }
+  if (buffer.byteLength !== file.bytes) {
+    throw new Error(`离线音色文件 ${file.name} 大小不符，请重新下载音色包。`)
+  }
+
+  const digest = await sha256Hex(buffer)
+  if (digest !== file.sha256.toLowerCase()) {
+    throw new Error(`离线音色文件 ${file.name} 校验失败，请重新下载音色包。`)
+  }
+  return buffer
+}
+
 async function writeModelFiles(fs, data, dir) {
   if (!Array.isArray(data.files) || data.files.length === 0) {
     throw new Error('离线音色文件清单为空。')
@@ -407,24 +430,26 @@ async function writeModelFiles(fs, data, dir) {
       throw new Error('离线音色文件清单格式不正确。')
     }
 
-    const response = await cache.match(file.url)
-    if (!response) {
-      throw new Error(`离线音色文件 ${file.name} 缺失，请重新下载音色包。`)
-    }
-
+    const parts = Array.isArray(file.parts) && file.parts.length ? file.parts : [file]
     let buffer
-    try {
-      buffer = await response.arrayBuffer()
-    } catch {
-      throw new Error(`无法读取离线音色文件 ${file.name}，请重新下载音色包。`)
-    }
-    if (buffer.byteLength !== file.bytes) {
-      throw new Error(`离线音色文件 ${file.name} 大小不符，请重新下载音色包。`)
-    }
-
-    const digest = await sha256Hex(buffer)
-    if (digest !== file.sha256.toLowerCase()) {
-      throw new Error(`离线音色文件 ${file.name} 校验失败，请重新下载音色包。`)
+    if (parts.length === 1) {
+      buffer = await readVerifiedFile(cache, file)
+    } else {
+      const merged = new Uint8Array(file.bytes)
+      let offset = 0
+      for (const part of parts) {
+        const partBuffer = await readVerifiedFile(cache, part)
+        merged.set(new Uint8Array(partBuffer), offset)
+        offset += partBuffer.byteLength
+      }
+      if (offset !== file.bytes) {
+        throw new Error(`离线音色文件 ${file.name} 大小不符，请重新下载音色包。`)
+      }
+      const digest = await sha256Hex(merged)
+      if (digest !== file.sha256.toLowerCase()) {
+        throw new Error(`离线音色文件 ${file.name} 校验失败，请重新下载音色包。`)
+      }
+      buffer = merged.buffer
     }
 
     const lexiconName =

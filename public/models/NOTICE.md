@@ -21,7 +21,9 @@ licensing terms: https://www.data-baker.com/data/index/TNtts/.
 
 Melo uses its own lexicon and tokens. English words absent from that lexicon
 are not guaranteed to be pronounced; 山岚's curated pronunciation overlay is
-not applied to Melo or other VITS packs.
+not applied to Melo or other VITS packs. Its ONNX model is shipped as two
+verified parts below GitHub's 50 MB warning threshold and reassembled in worker
+memory before being loaded by sherpa-onnx.
 
 The Hojo browser runtime is a local JavaScript port of the upstream inference
 code. It runs on [ONNX Runtime Web](https://github.com/microsoft/onnxruntime)
