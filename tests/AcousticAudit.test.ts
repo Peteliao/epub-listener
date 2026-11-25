@@ -63,6 +63,7 @@ describe('real WASM acoustic audit', () => {
     const { createMatchaSynth } = await loadSynth()
     const synth = await createMatchaSynth()
     try {
+      expect(synth.config().ruleFsts).toEqual(['phone.fst', 'date.fst', 'number.fst'])
       const tokens = ['ying1', 'li4', 'ji2', '.']
       expect(synth.duration(tokens)).toBeGreaterThan(500)
       const values = synth.contributions(tokens, [0, 1, 2])

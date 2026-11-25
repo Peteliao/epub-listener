@@ -61,6 +61,17 @@ function unit(start: number, text: string) {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('ReaderController bilingual playback', () => {
+  it('passes the shadow frontend only to Chinese synthesis requests', () => {
+    const reader = fixture()
+    reader.settings.labPhonemeFrontend = true
+    expect(reader.aiRequest({ lang: 'zh', text: '中文' })).toMatchObject({
+      frontendVersion: 'matcha-g2p-v1',
+    })
+    expect(reader.aiRequest({ lang: 'en', text: 'English' }).frontendVersion).toBeUndefined()
+    reader.settings.labPhonemeFrontend = false
+    expect(reader.aiRequest({ lang: 'zh', text: '中文' }).frontendVersion).toBeUndefined()
+  })
+
   it('prefetches the next language before later same-language chunks across units', () => {
     const reader = fixture()
     reader.units = [unit(0, '第一句。'), unit(1, 'The next sentence.'), unit(2, '第三句。')]

@@ -228,14 +228,20 @@ async function diagnose(cdp) {
   console.log(`诊断台自检通过：${rows.length} 条全部出声`)
 }
 
-/** End-to-end app smoke: open the sample book with 山岚 and start playback. */
-async function smoke(cdp) {
+/** End-to-end app smoke: download a voice pack and play the sample book. */
+async function smoke(cdp, {
+  packName = '山岚',
+  voiceId = 'shanlan',
+  voiceLabel = '山岚',
+  phonemeFrontend = false,
+} = {}) {
   await cdp.send('Log.enable')
   await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
     source:
       `try { localStorage.setItem('shusheng.settings.v1', JSON.stringify({` +
-      `engine:'sherpa', aiVoiceId:'shanlan', groupSentences:true,` +
-      `labSilenceScale:1, pausePreset:'standard', rate:1})) } catch (e) {}`,
+      `engine:'sherpa', aiVoiceId:'${voiceId}', groupSentences:true,` +
+      `labSilenceScale:1, labPhonemeFrontend:false,` +
+      ` pausePreset:'standard', rate:1})) } catch (e) {}`,
   })
   await cdp.send('Page.navigate', { url: `${ORIGIN}/?lab=1` })
 
@@ -255,28 +261,70 @@ async function smoke(cdp) {
     180_000,
   )
 
-  // Download the real 山岚 pack through the app UI so playback uses the WASM
+  // Download the requested pack through the app UI so playback uses the WASM
   // engine rather than the system-voice fallback.
   await cdp.evaluate(
     `document.querySelector('[aria-label="阅读设置"]')?.click()`,
   )
+  const manageLibrary = await cdp.evaluate(
+    `Array.from(document.querySelectorAll('button')).some((button) => button.textContent.trim() === '管理' && button.getAttribute('aria-expanded') === 'false')`,
+  )
+  if (manageLibrary) {
+    await cdp.evaluate(
+      `Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === '管理').click()`,
+    )
+  }
+  const packSelector = `Array.from(document.querySelectorAll('.voice-pack')).find(card => card.querySelector('h4')?.textContent === ${JSON.stringify(packName)})`
   await waitForExpression(
     cdp,
-    `Boolean(Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('下载 山岚')))`,
-    '音色库下载按钮',
+    `Boolean(${packSelector}?.querySelector('.pack-btn')?.textContent.includes(${JSON.stringify(`下载 ${packName}`)}))`,
+    `${packName}音色库下载按钮`,
+    30_000,
+  )
+  const layout = await cdp.evaluate(`(() => ({
+    groups: Array.from(document.querySelectorAll('.group-label')).map((node) => node.textContent.trim()),
+    autoScroll: Array.from(document.querySelectorAll('.setting__title')).filter((node) => node.textContent.trim() === '自动滚动').length,
+    bookLexicon: Array.from(document.querySelectorAll('.setting__title')).filter((node) => node.textContent.trim() === '本书自动补充读音').length,
+  }))()`)
+  const expectedGroups = ['阅读', '朗读', '音色', '英文', '工具与高级']
+  if (JSON.stringify(layout.groups) !== JSON.stringify(expectedGroups)) {
+    throw new Error(`设置面板分区异常：${layout.groups.join(' / ')}`)
+  }
+  if (layout.autoScroll !== 1 || layout.bookLexicon !== 1) {
+    throw new Error(`设置面板功能重复或缺失：自动滚动 ${layout.autoScroll}，本书读音 ${layout.bookLexicon}`)
+  }
+  await cdp.evaluate(`${packSelector}?.querySelector('.pack-btn').click()`)
+  await waitForExpression(
+    cdp,
+    `Boolean(${packSelector}?.querySelector('.pack-state')?.dataset.phase === 'ready')`,
+    `${packName}音色包下载完成`,
+    300_000,
+  )
+  await cdp.evaluate(
+    `Array.from(${packSelector}?.querySelectorAll('.voice-chip') ?? []).find(button => button.querySelector('.voice-chip__label')?.textContent === ${JSON.stringify(voiceLabel)}).click()`,
+  )
+  await waitForExpression(
+    cdp,
+    `Boolean(${packSelector}?.querySelector('.voice-chip.is-active'))`,
+    `${voiceLabel}切换完成`,
     30_000,
   )
   await cdp.evaluate(
-    `Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('下载 山岚')).click()`,
+    `Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '展开')?.click()`,
   )
+  if (phonemeFrontend) {
+    await cdp.evaluate(
+      `Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('开启音素直输'))?.click()`,
+    )
+  }
+  await cdp.evaluate(`document.querySelector('.play-btn').click()`)
   await waitForExpression(
     cdp,
-    `Boolean(document.querySelector('.pack-state[data-phase="ready"]'))`,
-    '山岚音色包下载完成',
-    300_000,
+    `/^(native|matcha-g2p-v1)/.test(Array.from(document.querySelectorAll('.diag-row')).find(row => row.querySelector('.diag-row__label')?.textContent === '最近合成前端')?.querySelector('.diag-row__value')?.textContent ?? '')`,
+    '真实离线合成诊断',
+    180_000,
   )
-  await cdp.evaluate(`document.querySelector('.play-btn').click()`)
-  await sleep(15_000)
+  await sleep(2_000)
   const state = await cdp.evaluate(`(() => {
     const play = document.querySelector('.play-btn')
     const iframes = Array.from(document.querySelectorAll('iframe'))
@@ -290,6 +338,18 @@ async function smoke(cdp) {
       highlighted,
       units: document.querySelectorAll('[data-sid]').length,
       bodyText: document.body.innerText.slice(0, 900),
+      engine: Array.from(document.querySelectorAll('.diag-row')).find(
+        (row) => row.querySelector('.diag-row__label')?.textContent === '引擎',
+      )?.querySelector('.diag-row__value')?.textContent ?? null,
+      voice: Array.from(document.querySelectorAll('.diag-row')).find(
+        (row) => row.querySelector('.diag-row__label')?.textContent === '音色',
+      )?.querySelector('.diag-row__value')?.textContent ?? null,
+      pack: Array.from(document.querySelectorAll('.diag-row')).find(
+        (row) => row.querySelector('.diag-row__label')?.textContent === '音色包',
+      )?.querySelector('.diag-row__value')?.textContent ?? null,
+      frontend: Array.from(document.querySelectorAll('.diag-row')).find(
+        (row) => row.querySelector('.diag-row__label')?.textContent === '最近合成前端',
+      )?.querySelector('.diag-row__value')?.textContent ?? null,
     }
   })()`)
   const errors = cdp.events
@@ -300,6 +360,29 @@ async function smoke(cdp) {
   if (state.label !== '暂停朗读') {
     throw new Error(`播放状态异常：${state.label}`)
   }
+  if (!state.highlighted) throw new Error('朗读开始后没有正文高亮')
+  if (state.engine !== '离线 AI') throw new Error(`实际朗读引擎异常：${state.engine}`)
+  if (state.voice !== voiceLabel) throw new Error(`音色切换异常：${state.voice}`)
+  if (phonemeFrontend && !/matcha-g2p-v1|native-fallback/.test(state.frontend ?? '')) {
+    throw new Error(`D1 前端诊断缺失：${state.frontend}`)
+  }
+  if (phonemeFrontend) console.log(`D1 实际前端：${state.frontend}`)
+
+  await cdp.evaluate(`document.querySelector('.play-btn').click()`)
+  await waitForExpression(
+    cdp,
+    `document.querySelector('.play-btn')?.getAttribute('aria-label') === '开始朗读'`,
+    '暂停朗读',
+    30_000,
+  )
+  await cdp.evaluate(`document.querySelector('.play-btn').click()`)
+  await waitForExpression(
+    cdp,
+    `document.querySelector('.play-btn')?.getAttribute('aria-label') === '暂停朗读'`,
+    '恢复朗读',
+    30_000,
+  )
+  console.log(`${voiceLabel}：下载、切换、播放、暂停与恢复通过`)
 }
 
 async function main() {
@@ -321,6 +404,18 @@ async function main() {
     await cdp.send('Runtime.enable')
     if (process.argv.includes('--smoke')) {
       await smoke(cdp)
+      return
+    }
+    if (process.argv.includes('--phoneme-smoke')) {
+      await smoke(cdp, { phonemeFrontend: true })
+      return
+    }
+    if (process.argv.includes('--melo-smoke')) {
+      await smoke(cdp, {
+        packName: 'Melo 中英女声',
+        voiceId: 'melo-zh',
+        voiceLabel: 'Melo 女声',
+      })
       return
     }
     if (process.argv.includes('--diagnose')) {

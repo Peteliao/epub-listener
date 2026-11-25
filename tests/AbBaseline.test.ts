@@ -125,6 +125,7 @@ describe('山岚 A/B baseline (real WASM, 20 fixed sentences)', () => {
       )
     }
     expect(DEFAULT_SETTINGS.labSilenceScale).toBe(1)
+    expect(DEFAULT_SETTINGS.labPhonemeFrontend).toBe(false)
   })
 
   it('justifies the 90-character group cap', () => {

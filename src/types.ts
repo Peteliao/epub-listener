@@ -85,6 +85,8 @@ export interface ReaderSettings {
   /** null keeps the value declared by the voice pack. */
   labNoiseScale: number | null
   labSilenceScale: number
+  /** Shadow-test the local Matcha G2P instead of the model's native frontend. */
+  labPhonemeFrontend: boolean
 }
 
 export interface StoredBook {
@@ -160,6 +162,7 @@ export const DEFAULT_SETTINGS: ReaderSettings = {
   pausePreset: 'standard',
   labNoiseScale: null,
   labSilenceScale: 1,
+  labPhonemeFrontend: false,
 }
 
 export interface ReaderPalette {

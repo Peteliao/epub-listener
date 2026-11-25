@@ -500,6 +500,52 @@ describe('SherpaDriver', () => {
     expect(worker.ofType('synth')[0]!.text).toBe('可能是学\u200b会计出身的，')
   })
 
+  it('keeps native text as the default and sends the opt-in frontend identity', async () => {
+    const worker = await initialize('sherpa')
+    driver.speak({ text: '当前', lang: 'zh', rate: 1 }, {})
+    driver.speak({ text: '当前', lang: 'zh', rate: 1, frontendVersion: 'matcha-g2p-v1' }, {})
+    expect(worker.ofType('synth')[0]).not.toHaveProperty('frontendVersion')
+    expect(worker.ofType('synth')[1]).toMatchObject({
+      frontendVersion: 'matcha-g2p-v1', text: '当前',
+    })
+  })
+
+  it('isolates native, G2P and explicit token audio in the cache', async () => {
+    const worker = await initialize('sherpa')
+    driver.preload([
+      { text: '会计', lang: 'zh', rate: 1 },
+      { text: '会计', lang: 'zh', rate: 1, frontendVersion: 'matcha-g2p-v1' },
+      { text: '', lang: 'zh', rate: 1, tokens: ['kuai4', 'ji4'] },
+    ])
+    const jobs = worker.ofType('synth')
+    expect(jobs).toHaveLength(3)
+    expect(jobs[2]).toMatchObject({ text: '', tokens: ['kuai4', 'ji4'] })
+    expect(new Set(jobs.map((job) => job.jobId)).size).toBe(3)
+    for (const job of jobs) worker.result(job)
+    await flush()
+    driver.preload([
+      { text: '会计', lang: 'zh', rate: 1 },
+      { text: '会计', lang: 'zh', rate: 1, frontendVersion: 'matcha-g2p-v1' },
+      { text: '', lang: 'zh', rate: 1, tokens: ['kuai4', 'ji4'] },
+    ])
+    await flush()
+    expect(worker.ofType('synth')).toHaveLength(3)
+    const hits = driver.stats?.cacheHits ?? 0
+    driver.speak({ text: '会计', lang: 'zh', rate: 1 }, {})
+    expect(worker.ofType('synth')).toHaveLength(3)
+    expect(driver.stats?.cacheHits).toBe(hits + 1)
+  })
+
+  it('rejects malformed explicit token sequences before posting work', async () => {
+    const worker = await initialize('sherpa')
+    const onError = vi.fn()
+    for (const tokens of [[], [''], [1] as unknown as string[], Array(8193).fill('a')]) {
+      driver.speak({ text: '', lang: 'zh', rate: 1, tokens }, { onError })
+    }
+    expect(onError).toHaveBeenCalledTimes(4)
+    expect(worker.ofType('synth')).toEqual([])
+  })
+
   it('rebuilds the runtime when the lexicon overlay changes', async () => {
     const config = pack('zh', 'sherpa')
     const first = driver.init(config)

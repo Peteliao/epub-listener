@@ -47,6 +47,17 @@ describe('shusheng.settings.v1 平滑迁移', () => {
     expect(useSettingsStore().settings.preferChineseOffline).toBe(true)
   })
 
+  it('音素直输开关默认关闭，非法值回退且显式开启可持久化', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ labPhonemeFrontend: 'yes' }))
+    const store = useSettingsStore()
+    expect(store.settings.labPhonemeFrontend).toBe(false)
+    store.patch({ labPhonemeFrontend: true })
+    expect(store.settings.labPhonemeFrontend).toBe(true)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ labPhonemeFrontend: true }))
+    setActivePinia(createPinia())
+    expect(useSettingsStore().settings.labPhonemeFrontend).toBe(true)
+  })
+
   it('patch 与 reset 都经过 sanitize，开关可逆', () => {
     const store = useSettingsStore()
     expect(store.settings.preferChineseOffline).toBe(true)

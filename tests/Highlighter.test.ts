@@ -79,6 +79,14 @@ describe('Highlighter', () => {
     )
   })
 
+  it('adds a vocative pause without changing displayed book text', () => {
+    const highlighter = build('<p>“叔叔您觉得做得到吗？”</p>')
+    expect(highlighter.sentences).toHaveLength(1)
+    expect(highlighter.sentences[0]!.text).toBe('“叔叔您觉得做得到吗？”')
+    expect(highlighter.sentences[0]!.speechText).toBe('“叔叔，您觉得做得到吗？”')
+    expect(document.body.textContent).toBe('“叔叔您觉得做得到吗？”')
+  })
+
   it('adds a semantic comma before a long-clause contrast in speech only', () => {
     const highlighter = build(
       '<p>他本来想今天早上去图书馆把上周借的那本关于中国古代建筑史的书还掉可是走到半路发现借书卡忘在家里了。</p>',

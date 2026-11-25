@@ -102,6 +102,86 @@
       "engine": "sherpa"
     },
     {
+      "id": "vits-melo-zh-en",
+      "lang": "zh",
+      "name": "Melo 中英女声",
+      "version": "2026.11.25",
+      "description": "44.1 kHz 自然女声，支持中英混读，采用 int8 轻量模型",
+      "license": {
+        "label": "MIT",
+        "commercialUse": true,
+        "url": "https://github.com/myshell-ai/MeloTTS/blob/main/LICENSE",
+        "notice": "MeloTTS Chinese 模型由 MyShell.ai 以 MIT 许可释出；随包许可证见 models/vits-melo-zh-en/LICENSE。"
+      },
+      "baseUrl": "models/vits-melo-zh-en/",
+      "model": {
+        "type": "vits",
+        "config": {
+          "model": "model.int8.onnx",
+          "lexicon": "lexicon.txt",
+          "tokens": "tokens.txt",
+          "noiseScale": 0.667,
+          "noiseScaleW": 0.8,
+          "lengthScale": 1
+        },
+        "ruleFsts": [
+          "phone.fst",
+          "date.fst",
+          "number.fst"
+        ],
+        "warmupText": "你好，欢迎收听。"
+      },
+      "voices": [
+        {
+          "id": "melo-zh",
+          "speakerId": 0,
+          "sampleRate": 44100,
+          "label": "Melo 女声",
+          "description": "自然女声，支持中文与英文混读，英文词以模型词典为准"
+        }
+      ],
+      "totalBytes": 60568022,
+      "files": [
+        {
+          "name": "model.int8.onnx",
+          "url": "models/vits-melo-zh-en/model.int8.onnx",
+          "bytes": 53517430,
+          "sha256": "f085f5079e05f039b800aeb542f5253c26a303211b0c6465d0d9387977855a63"
+        },
+        {
+          "name": "lexicon.txt",
+          "url": "models/vits-melo-zh-en/lexicon.txt",
+          "bytes": 6837671,
+          "sha256": "7236884b02435ac5d10cf69b4be40a61b45aa676b5300f0e412f185748fee528"
+        },
+        {
+          "name": "tokens.txt",
+          "url": "models/vits-melo-zh-en/tokens.txt",
+          "bytes": 655,
+          "sha256": "d18664a7e12bd7ea1022ddaf951e534e136815016c5a809d6b64156bffb4369d"
+        },
+        {
+          "name": "phone.fst",
+          "url": "models/vits-melo-zh-en/phone.fst",
+          "bytes": 88630,
+          "sha256": "1ac2b6fa56b1442320c4de7db08353bab8963a2b57f365eebcdd3a2d3562f8d7"
+        },
+        {
+          "name": "date.fst",
+          "url": "models/vits-melo-zh-en/date.fst",
+          "bytes": 59154,
+          "sha256": "eb8aa079ae3cb81d8f4404992f39d61a0cb990947512b5b8d1e54d1f6980e718"
+        },
+        {
+          "name": "number.fst",
+          "url": "models/vits-melo-zh-en/number.fst",
+          "bytes": 64482,
+          "sha256": "743f402181fcfebf76cc2f0546b71fa26476e626fbe4e460fb7b4c3a7a8bd5bd"
+        }
+      ],
+      "engine": "sherpa"
+    },
+    {
       "id": "piper-zh-xiaoya",
       "lang": "zh",
       "name": "小雅",

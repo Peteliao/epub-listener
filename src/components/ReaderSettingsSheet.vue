@@ -76,6 +76,7 @@ function resolveLabMode(): boolean {
 
 const labMode = resolveLabMode()
 const showDiagnostics = ref(labMode)
+const showVoiceLibrary = ref(false)
 
 const PAUSE_PRESETS: Array<{ value: PausePreset; label: string; hint: string }> = [
   { value: 'compact', label: '紧凑', hint: `${PAUSE_PRESET_SCALES.compact}×` },
@@ -144,22 +145,16 @@ const englishVoiceLabel = computed(
     englishPack.value?.voices[0]?.label ??
     '英文音色',
 )
-// 山岚 stays above the English settings so the two favourite voices sit together.
-const primaryPacks = computed<AiPackStatus[]>(() =>
-  props.ai?.supported
-    ? props.ai.packs.filter((pack) => pack.lang !== 'bi').slice(0, 1)
-    : [],
-)
-const bilingualPacks = computed<AiPackStatus[]>(() =>
-  props.ai?.supported
-    ? props.ai.packs.filter((pack) => pack.lang === 'bi')
-    : [],
-)
-const morePacks = computed<AiPackStatus[]>(() =>
-  props.ai?.supported
-    ? props.ai.packs.filter((pack) => pack.lang !== 'bi').slice(1)
-    : [],
-)
+const chinesePacks = computed<AiPackStatus[]>(() => {
+  if (!props.ai?.supported) return []
+  const selectedPackId = props.ai.selectedVoice?.packId
+  return props.ai.packs
+    .filter((pack) => pack.lang !== 'en')
+    .sort(
+      (left, right) =>
+        Number(right.id === selectedPackId) - Number(left.id === selectedPackId),
+    )
+})
 const selectedVoiceId = computed(() => props.ai?.selectedVoiceId ?? null)
 const englishAiActive = computed(
   () => props.settings.englishAi && englishPackReady.value,
@@ -184,7 +179,9 @@ const chineseOfflineNote = computed(() => {
     return '已关闭：中文段落按所选引擎朗读，可随时重新开启。'
   }
   if (props.settings.engine === 'sherpa') {
-    return '当前已使用离线 AI 引擎，中文段落全部应用读音词典。'
+    return props.ai?.selectedVoice?.modelType === 'matcha'
+      ? '当前已使用离线 AI 引擎，中文段落应用人工读音表与本书自动补充。'
+      : '当前已使用离线 AI 引擎，中文段落由所选音色在本机合成。'
   }
   if (!props.ai?.supported) return '当前浏览器不支持离线音色，暂由系统语音朗读。'
   if (props.ai.selectedVoice?.modelType !== 'matcha') {
@@ -217,6 +214,21 @@ watch(
     confirmRemoveId.value = null
     pendingVoice.value = null
   },
+)
+
+watch(
+  () => [
+    props.open,
+    props.settings.engine,
+    props.ai?.supported,
+    aiReady.value,
+  ] as const,
+  ([open, engine, supported, ready]) => {
+    if (open && engine === 'sherpa' && supported && !ready) {
+      showVoiceLibrary.value = true
+    }
+  },
+  { immediate: true },
 )
 
 watch(
@@ -288,6 +300,12 @@ const diagnosticRows = computed<Array<{ label: string; value: string }>>(() => {
         value: `v${diag.bookLexiconVersion} · ${diag.curatedHash}`,
       },
       { label: '句组', value: `${diag.units} 组 / ${diag.sentences} 句` },
+      {
+        label: '最近合成前端',
+        value: diag.frontend
+          ? `${diag.frontend}${diag.frontendTokens === null ? '' : ` · ${diag.frontendTokens} tokens`}`
+          : '等待合成',
+      },
     )
     const stats = diag.stats
     if (stats) {
@@ -586,7 +604,27 @@ function removeEnglishPack(): void {
 
 <template>
   <Sheet :open="open" title="阅读与朗读" @close="emit('close')">
-    <p class="group-label">音色</p>
+    <p class="group-label">阅读</p>
+    <section class="setting">
+      <div class="switch-row">
+        <div class="switch-copy">
+          <h3 class="setting__title">自动滚动</h3>
+          <p>朗读时让当前句子保持在视野中</p>
+        </div>
+        <button
+          type="button"
+          class="switch"
+          role="switch"
+          :aria-checked="settings.autoScroll"
+          :class="{ 'is-on': settings.autoScroll }"
+          @click="emit('patch', { autoScroll: !settings.autoScroll })"
+        >
+          <span></span>
+        </button>
+      </div>
+    </section>
+
+    <p class="group-label">朗读</p>
     <section class="setting">
       <h3 class="setting__title">朗读引擎</h3>
       <div class="engines">
@@ -647,7 +685,7 @@ function removeEnglishPack(): void {
         <div class="switch-copy">
           <h3 class="setting__title">中文优先离线朗读</h3>
           <p>
-            山岚音色包就绪时，中文段落优先由本机合成，让人工读音表与本书自动补充参与发音；英文段落与未就绪时的回退不变
+            所选中文离线音色就绪时，中文段落优先由本机合成；英文段落与未就绪时的回退不变
           </p>
           <p class="book-lexicon-state">{{ chineseOfflineNote }}</p>
         </div>
@@ -668,265 +706,8 @@ function removeEnglishPack(): void {
       </div>
     </section>
 
-    <section class="setting">
-      <div class="pack-head">
-        <div>
-          <h3 class="setting__title">开源音色库</h3>
-          <p class="pack-sub">下载后离线可用，文字全程不离开本机</p>
-        </div>
-        <span v-if="ai?.runtimeBytes" class="runtime-tip">
-          共享运行时 {{ formatBytes(ai.runtimeBytes) }}
-        </span>
-      </div>
-
-      <p v-if="!ai" class="setting__note">正在读取音色包信息…</p>
-
-      <template v-else-if="!ai.supported">
-        <p class="setting__note">
-          当前浏览器不支持离线 AI 音色，需要 WebAssembly、Cache Storage 和
-          AudioContext。你仍然可以使用系统语音。
-        </p>
-      </template>
-
-      <template v-else>
-        <p v-if="!ai.packs.length && ai.phase === 'error'" class="pack-error-text">
-          {{ ai.error || '无法读取音色清单，请检查网络后刷新页面。' }}
-        </p>
-        <p v-else-if="!ai.packs.length" class="setting__note">
-          正在读取音色包信息…
-        </p>
-        <p v-else class="pack-desc">
-          包含可商用与仅限非商业音色，下载前请查看许可说明。
-        </p>
-
-        <VoicePackCard
-          v-for="pack in primaryPacks"
-          :key="pack.id"
-          :pack="pack"
-          :selected="isPackSelected(pack)"
-          :selected-voice-id="selectedVoiceId"
-          :pending-voice-id="pendingVoiceId(pack)"
-          :pending-voice-label="pendingLabel(pack)"
-          :busy="packBusy"
-          :confirm-remove="confirmRemoveId === pack.id"
-          @select="(voiceId) => selectVoice(voiceId, pack)"
-          @download="(voiceId) => requestDownload(pack.id, voiceId)"
-          @remove="requestRemove(pack.id)"
-          @cancel-remove="confirmRemoveId = null"
-          @cancel-pending="pendingVoice = null"
-        />
-
-        <VoicePackCard
-          v-for="pack in bilingualPacks"
-          :key="pack.id"
-          :pack="pack"
-          :selected="isPackSelected(pack)"
-          :selected-voice-id="selectedVoiceId"
-          :selected-english-voice-id="englishSelectionFor(pack)"
-          :variant-preference="settings.aiVariant"
-          :pending-voice-id="pendingVoiceId(pack)"
-          :pending-voice-label="pendingLabel(pack)"
-          :busy="packBusy"
-          :confirm-remove="confirmRemoveId === pack.id"
-          @select="(voiceId) => selectVoice(voiceId, pack)"
-          @select-english="(voiceId) => selectAiEnglishVoice(pack, voiceId)"
-          @variant="changeAiVariant"
-          @download="(voiceId) => requestDownload(pack.id, voiceId)"
-          @remove="requestRemove(pack.id)"
-          @cancel-remove="confirmRemoveId = null"
-          @cancel-pending="pendingVoice = null"
-        />
-      </template>
-    </section>
-
-    <section class="setting">
-      <div class="voice-head">
-        <div>
-          <h3 class="setting__title">英文朗读</h3>
-          <p class="voice-sub">
-            英文段落可单独使用离线音色；未下载或启动失败时自动改用系统英文语音
-          </p>
-        </div>
-        <button
-          type="button"
-          class="voice-refresh"
-          @click="refreshSystemVoices"
-        >
-          重新检测
-        </button>
-      </div>
-
-      <VoicePackCard
-        v-if="englishPack"
-        variant="en"
-        :pack="englishPack"
-        :selected="sherpaEnglishSelected"
-        :busy="packBusy"
-        :confirm-remove="englishPack ? confirmRemoveId === englishPack.id : false"
-        removable-when-selected
-        @download="downloadEnglishPack"
-        @remove="removeEnglishPack"
-        @cancel-remove="confirmRemoveId = null"
-      />
-
-      <p
-        v-if="englishPack && selectedPack?.lang === 'bi'"
-        class="setting__note"
-      >
-        当前中文音色自带英文声线；Kristin 可在切回山岚等中文音色时使用。
-      </p>
-
-      <div
-        v-if="englishVoicePack && ai?.supported"
-        class="switch-row english-ai-row"
-      >
-        <div class="switch-copy">
-          <h3 class="setting__title">英文使用离线音色</h3>
-          <p>
-            离线 AI 朗读时，英文段落也由本机合成，锁屏后可继续；未下载或启动失败时自动改用系统英文语音
-          </p>
-        </div>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          :aria-checked="settings.englishAi"
-          :class="{ 'is-on': settings.englishAi }"
-          @click="emit('patch', { englishAi: !settings.englishAi })"
-        >
-          <span></span>
-        </button>
-      </div>
-
-      <div v-if="settings.engine === 'sherpa'" class="switch-row english-lock-row">
-        <div class="switch-copy">
-          <h3 class="setting__title">锁屏跳过英文</h3>
-          <p>
-            仅锁屏且英文走系统语音时生效：跳过后解锁自动恢复，并提示跳过段数；离线英文音色不受影响
-          </p>
-        </div>
-        <button
-          type="button"
-          class="switch"
-          role="switch"
-          :aria-checked="settings.skipEnglishWhenLocked"
-          :class="{ 'is-on': settings.skipEnglishWhenLocked }"
-          @click="
-            emit('patch', {
-              skipEnglishWhenLocked: !settings.skipEnglishWhenLocked,
-            })
-          "
-        >
-          <span></span>
-        </button>
-      </div>
-
-      <h3 class="setting__title preset-title">系统英文音色（备用）</h3>
-      <div class="english-row">
-        <div class="select-wrap english-select">
-          <select
-            :value="settings.englishVoiceURI ?? ''"
-            aria-label="英文朗读音色"
-            @change="changeEnglishVoice"
-          >
-            <option value="">自动选择英文语音</option>
-            <option
-              v-for="voice in englishVoices"
-              :key="voice.uri"
-              :value="voice.uri"
-            >
-              {{ voice.name }} · {{ voice.lang }}{{ voice.local ? ' · 本地' : '' }}
-            </option>
-          </select>
-          <span class="select-caret" aria-hidden="true">⌄</span>
-        </div>
-        <button
-          type="button"
-          class="voice-preview-btn"
-          :disabled="isPlaying"
-          @click="previewEnglishSystemVoice"
-        >
-          试听
-        </button>
-      </div>
-
-      <div class="english-tone">
-        <div class="lab-head">
-          <span>英文音量</span>
-          <span class="lab-value">
-            {{ Math.round(settings.englishVolume * 100) }}%
-          </span>
-        </div>
-        <input
-          class="lab-range"
-          type="range"
-          min="0.6"
-          max="1.2"
-          step="0.05"
-          :value="settings.englishVolume"
-          aria-label="英文音量"
-          @change="changeEnglishVolume"
-        />
-        <div class="lab-head">
-          <span>英文语速</span>
-          <span class="lab-value">{{ settings.englishRate.toFixed(1) }}×</span>
-        </div>
-        <input
-          class="lab-range"
-          type="range"
-          min="0.6"
-          max="1.4"
-          step="0.1"
-          :value="settings.englishRate"
-          aria-label="英文语速"
-          @change="changeEnglishRate"
-        />
-        <p class="english-tone__hint">
-          英文语速在总语速上叠加，离线英文音色同样应用这两项设置；系统语音音量最高 100%。
-        </p>
-      </div>
-
-      <p v-if="!englishVoices.length" class="setting__note">
-        尚未检测到英文系统语音；离线英文音色未开启时，英文段落可能无声或音色异常。
-      </p>
-      <p v-else-if="isPlaying" class="setting__note">
-        朗读中暂不能试听音色，可先暂停。
-      </p>
-      <p v-else-if="isIos" class="setting__note">
-        安装更多英文音色：设置 → 辅助功能 → 朗读内容 → 声音 → 英语。
-      </p>
-      <p v-else class="setting__note">
-        离线英文音色开启时优先使用本机合成，关闭后英文部分由系统英文语音朗读。
-      </p>
-    </section>
-
     <section v-if="ai?.supported" class="setting">
-      <h3 v-if="morePacks.length" class="setting__title">更多中文音色</h3>
-      <VoicePackCard
-        v-for="pack in morePacks"
-        :key="pack.id"
-        :pack="pack"
-        :selected="isPackSelected(pack)"
-        :selected-voice-id="selectedVoiceId"
-        :pending-voice-id="pendingVoiceId(pack)"
-        :pending-voice-label="pendingLabel(pack)"
-        :busy="packBusy"
-        :confirm-remove="confirmRemoveId === pack.id"
-        @select="(voiceId) => selectVoice(voiceId, pack)"
-        @download="(voiceId) => requestDownload(pack.id, voiceId)"
-        @remove="requestRemove(pack.id)"
-        @cancel-remove="confirmRemoveId = null"
-        @cancel-pending="pendingVoice = null"
-      />
-
-      <p v-if="isPlaying" class="setting__note">
-        朗读时暂不能下载或删除音色包，可切换已缓存的音色。
-      </p>
-      <p v-else class="setting__note">
-        音色包仅保存在本机，可随时单独删除；建议在 Wi-Fi 环境下载。
-      </p>
-
-      <div class="switch-row book-lexicon-row">
+      <div class="switch-row">
         <div class="switch-copy">
           <h3 class="setting__title">本书自动补充读音</h3>
           <p>为词库未收录的词按上下文补充读音，不改动词库和人工表</p>
@@ -946,6 +727,129 @@ function removeEnglishPack(): void {
         >
           <span></span>
         </button>
+      </div>
+    </section>
+
+    <section class="setting">
+      <div class="switch-row">
+        <div class="switch-copy">
+          <h3 class="setting__title">连读模式</h3>
+          <p>同段落 2–3 句合成一组朗读，句间不再额外停顿，只在组与段之间换气</p>
+        </div>
+        <button
+          type="button"
+          class="switch"
+          role="switch"
+          :aria-checked="settings.groupSentences"
+          :class="{ 'is-on': settings.groupSentences }"
+          @click="emit('patch', { groupSentences: !settings.groupSentences })"
+        >
+          <span></span>
+        </button>
+      </div>
+
+      <h3 class="setting__title preset-title">停顿节奏</h3>
+      <div class="preset-grid" role="radiogroup" aria-label="停顿节奏">
+        <button
+          v-for="preset in PAUSE_PRESETS"
+          :key="preset.value"
+          type="button"
+          class="preset"
+          role="radio"
+          :aria-checked="settings.pausePreset === preset.value"
+          :class="{ 'is-active': settings.pausePreset === preset.value }"
+          @click="emit('patch', { pausePreset: preset.value })"
+        >
+          <span class="preset__label">{{ preset.label }}</span>
+          <span class="preset__hint">{{ preset.hint }}</span>
+        </button>
+      </div>
+      <p class="setting__note">
+        停顿会随语速自动缩短；连读关闭时同样作用于句间停顿。
+      </p>
+    </section>
+
+    <p class="group-label">音色</p>
+    <section class="setting">
+      <div class="pack-head">
+        <div>
+          <h3 class="setting__title">中文离线音色</h3>
+          <p class="pack-sub">
+            {{
+              settings.engine === 'sherpa' && aiReady
+                ? `当前使用 ${aiVoiceLabel}`
+                : ai?.supported
+                  ? `已选择 ${aiVoiceLabel}，可下载或切换`
+                  : '当前浏览器不支持离线 AI 音色'
+            }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="voice-refresh"
+          :aria-expanded="showVoiceLibrary"
+          @click="showVoiceLibrary = !showVoiceLibrary"
+        >
+          {{ showVoiceLibrary ? '收起' : '管理' }}
+        </button>
+      </div>
+
+      <div v-if="showVoiceLibrary" class="voice-library">
+        <div class="pack-head voice-library__meta">
+          <p class="pack-desc">下载后离线可用，文字全程不离开本机</p>
+          <span v-if="ai?.runtimeBytes" class="runtime-tip">
+            共享运行时 {{ formatBytes(ai.runtimeBytes) }}
+          </span>
+        </div>
+
+        <p v-if="!ai" class="setting__note">正在读取音色包信息…</p>
+
+        <template v-else-if="!ai.supported">
+          <p class="setting__note">
+            当前浏览器不支持离线 AI 音色，需要 WebAssembly、Cache Storage 和
+            AudioContext。你仍然可以使用系统语音。
+          </p>
+        </template>
+
+        <template v-else>
+          <p v-if="!ai.packs.length && ai.phase === 'error'" class="pack-error-text">
+            {{ ai.error || '无法读取音色清单，请检查网络后刷新页面。' }}
+          </p>
+          <p v-else-if="!ai.packs.length" class="setting__note">
+            正在读取音色包信息…
+          </p>
+          <p v-else class="pack-desc">
+            包含可商用与仅限非商业音色，下载前请查看许可说明。
+          </p>
+
+          <VoicePackCard
+            v-for="pack in chinesePacks"
+            :key="pack.id"
+            :pack="pack"
+            :selected="isPackSelected(pack)"
+            :selected-voice-id="selectedVoiceId"
+            :selected-english-voice-id="englishSelectionFor(pack)"
+            :variant-preference="settings.aiVariant"
+            :pending-voice-id="pendingVoiceId(pack)"
+            :pending-voice-label="pendingLabel(pack)"
+            :busy="packBusy"
+            :confirm-remove="confirmRemoveId === pack.id"
+            @select="(voiceId) => selectVoice(voiceId, pack)"
+            @select-english="(voiceId) => selectAiEnglishVoice(pack, voiceId)"
+            @variant="changeAiVariant"
+            @download="(voiceId) => requestDownload(pack.id, voiceId)"
+            @remove="requestRemove(pack.id)"
+            @cancel-remove="confirmRemoveId = null"
+            @cancel-pending="pendingVoice = null"
+          />
+
+          <p v-if="isPlaying" class="setting__note">
+            朗读时暂不能下载或删除音色包，可切换已缓存的音色。
+          </p>
+          <p v-else class="setting__note">
+            音色包仅保存在本机，可随时单独删除；建议在 Wi-Fi 环境下载。
+          </p>
+        </template>
       </div>
     </section>
 
@@ -1107,63 +1011,169 @@ function removeEnglishPack(): void {
       </template>
     </section>
 
-    <p class="group-label">朗读</p>
+    <p class="group-label">英文</p>
     <section class="setting">
-      <div class="switch-row">
+      <div class="voice-head">
+        <div>
+          <h3 class="setting__title">英文朗读</h3>
+          <p class="voice-sub">
+            英文段落可单独使用离线音色；未下载或启动失败时自动改用系统英文语音
+          </p>
+        </div>
+        <button
+          type="button"
+          class="voice-refresh"
+          @click="refreshSystemVoices"
+        >
+          重新检测
+        </button>
+      </div>
+
+      <div
+        v-if="englishVoicePack && ai?.supported"
+        class="switch-row english-ai-row"
+      >
         <div class="switch-copy">
-          <h3 class="setting__title">连读模式</h3>
-          <p>同段落 2–3 句合成一组朗读，句间不再额外停顿，只在组与段之间换气</p>
+          <h3 class="setting__title">英文使用离线音色</h3>
+          <p>
+            离线 AI 朗读时，英文段落也由本机合成，锁屏后可继续；未下载或启动失败时自动改用系统英文语音
+          </p>
         </div>
         <button
           type="button"
           class="switch"
           role="switch"
-          :aria-checked="settings.groupSentences"
-          :class="{ 'is-on': settings.groupSentences }"
-          @click="emit('patch', { groupSentences: !settings.groupSentences })"
+          :aria-checked="settings.englishAi"
+          :class="{ 'is-on': settings.englishAi }"
+          @click="emit('patch', { englishAi: !settings.englishAi })"
         >
           <span></span>
         </button>
       </div>
 
-      <h3 class="setting__title preset-title">停顿节奏</h3>
-      <div class="preset-grid" role="radiogroup" aria-label="停顿节奏">
-        <button
-          v-for="preset in PAUSE_PRESETS"
-          :key="preset.value"
-          type="button"
-          class="preset"
-          role="radio"
-          :aria-checked="settings.pausePreset === preset.value"
-          :class="{ 'is-active': settings.pausePreset === preset.value }"
-          @click="emit('patch', { pausePreset: preset.value })"
-        >
-          <span class="preset__label">{{ preset.label }}</span>
-          <span class="preset__hint">{{ preset.hint }}</span>
-        </button>
-      </div>
-      <p class="setting__note">
-        停顿会随语速自动缩短；连读关闭时同样作用于句间停顿。
+      <VoicePackCard
+        v-if="englishPack"
+        variant="en"
+        :pack="englishPack"
+        :selected="sherpaEnglishSelected"
+        :busy="packBusy"
+        :confirm-remove="englishPack ? confirmRemoveId === englishPack.id : false"
+        removable-when-selected
+        @download="downloadEnglishPack"
+        @remove="removeEnglishPack"
+        @cancel-remove="confirmRemoveId = null"
+      />
+
+      <p
+        v-if="englishPack && selectedPack?.lang === 'bi'"
+        class="setting__note"
+      >
+        当前中文音色自带英文声线；Kristin 可在切回山岚等中文音色时使用。
       </p>
 
-      <div class="switch-row setting-sub-row">
+      <div v-if="settings.engine === 'sherpa'" class="switch-row english-lock-row">
         <div class="switch-copy">
-          <h3 class="setting__title">自动滚动</h3>
-          <p>朗读时让当前句子保持在视野中</p>
+          <h3 class="setting__title">锁屏跳过英文</h3>
+          <p>
+            仅锁屏且英文走系统语音时生效：跳过后解锁自动恢复，并提示跳过段数；离线英文音色不受影响
+          </p>
         </div>
         <button
           type="button"
           class="switch"
           role="switch"
-          :aria-checked="settings.autoScroll"
-          :class="{ 'is-on': settings.autoScroll }"
-          @click="emit('patch', { autoScroll: !settings.autoScroll })"
+          :aria-checked="settings.skipEnglishWhenLocked"
+          :class="{ 'is-on': settings.skipEnglishWhenLocked }"
+          @click="
+            emit('patch', {
+              skipEnglishWhenLocked: !settings.skipEnglishWhenLocked,
+            })
+          "
         >
           <span></span>
         </button>
       </div>
+
+      <h3 class="setting__title preset-title">系统英文音色（备用）</h3>
+      <div class="english-row">
+        <div class="select-wrap english-select">
+          <select
+            :value="settings.englishVoiceURI ?? ''"
+            aria-label="英文朗读音色"
+            @change="changeEnglishVoice"
+          >
+            <option value="">自动选择英文语音</option>
+            <option
+              v-for="voice in englishVoices"
+              :key="voice.uri"
+              :value="voice.uri"
+            >
+              {{ voice.name }} · {{ voice.lang }}{{ voice.local ? ' · 本地' : '' }}
+            </option>
+          </select>
+          <span class="select-caret" aria-hidden="true">⌄</span>
+        </div>
+        <button
+          type="button"
+          class="voice-preview-btn"
+          :disabled="isPlaying"
+          @click="previewEnglishSystemVoice"
+        >
+          试听
+        </button>
+      </div>
+
+      <div class="english-tone">
+        <div class="lab-head">
+          <span>英文音量</span>
+          <span class="lab-value">
+            {{ Math.round(settings.englishVolume * 100) }}%
+          </span>
+        </div>
+        <input
+          class="lab-range"
+          type="range"
+          min="0.6"
+          max="1.2"
+          step="0.05"
+          :value="settings.englishVolume"
+          aria-label="英文音量"
+          @change="changeEnglishVolume"
+        />
+        <div class="lab-head">
+          <span>英文语速</span>
+          <span class="lab-value">{{ settings.englishRate.toFixed(1) }}×</span>
+        </div>
+        <input
+          class="lab-range"
+          type="range"
+          min="0.6"
+          max="1.4"
+          step="0.1"
+          :value="settings.englishRate"
+          aria-label="英文语速"
+          @change="changeEnglishRate"
+        />
+        <p class="english-tone__hint">
+          英文语速在总语速上叠加，离线英文音色同样应用这两项设置；系统语音音量最高 100%。
+        </p>
+      </div>
+
+      <p v-if="!englishVoices.length" class="setting__note">
+        尚未检测到英文系统语音；离线英文音色未开启时，英文段落可能无声或音色异常。
+      </p>
+      <p v-else-if="isPlaying" class="setting__note">
+        朗读中暂不能试听音色，可先暂停。
+      </p>
+      <p v-else-if="isIos" class="setting__note">
+        安装更多英文音色：设置 → 辅助功能 → 朗读内容 → 声音 → 英语。
+      </p>
+      <p v-else class="setting__note">
+        离线英文音色开启时优先使用本机合成，关闭后英文部分由系统英文语音朗读。
+      </p>
     </section>
 
+    <p class="group-label">工具与高级</p>
     <section class="setting">
       <div class="voice-head">
         <div>
@@ -1252,6 +1262,22 @@ function removeEnglishPack(): void {
               重置为 1
             </button>
           </div>
+        </div>
+        <div class="lab-block" v-if="settings.engine === 'sherpa'">
+          <div class="lab-head">
+            <span>音素直输前端 · D1 影子实验</span>
+            <span class="lab-value">{{ settings.labPhonemeFrontend ? '本地 G2P' : '模型前端' }}</span>
+          </div>
+          <p class="setting__note">
+            默认关闭。开启后用本地词典生成 tokens；不支持的词自动回退模型前端，英文与其他音色不受影响。
+          </p>
+          <button
+            type="button"
+            class="pack-link"
+            @click="emit('patch', { labPhonemeFrontend: !settings.labPhonemeFrontend })"
+          >
+            {{ settings.labPhonemeFrontend ? '关闭音素直输' : '开启音素直输' }}
+          </button>
         </div>
       </template>
 
@@ -1368,7 +1394,7 @@ function removeEnglishPack(): void {
   padding-top: 12px;
 }
 
-.setting-sub-row,
+.english-ai-row,
 .english-lock-row {
   margin-top: 16px;
   padding-top: 16px;
@@ -1693,10 +1719,16 @@ function removeEnglishPack(): void {
   border-top: 1px dashed color-mix(in srgb, var(--app-fg) 12%, transparent);
 }
 
-.book-lexicon-row {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px dashed color-mix(in srgb, var(--app-fg) 12%, transparent);
+.voice-library {
+  margin-top: 12px;
+}
+
+.voice-library__meta {
+  align-items: baseline;
+}
+
+.voice-library__meta .pack-desc {
+  margin-top: 0;
 }
 
 .switch-copy p {

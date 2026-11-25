@@ -155,6 +155,11 @@ function sanitize(raw: unknown): ReaderSettings {
       ? Math.min(1.5, Math.max(0.5, Math.round(source.labSilenceScale * 100) / 100))
       : DEFAULT_SETTINGS.labSilenceScale
 
+  const labPhonemeFrontend =
+    typeof source.labPhonemeFrontend === 'boolean'
+      ? source.labPhonemeFrontend
+      : DEFAULT_SETTINGS.labPhonemeFrontend
+
   return {
     theme,
     fontSize,
@@ -176,6 +181,7 @@ function sanitize(raw: unknown): ReaderSettings {
     pausePreset,
     labNoiseScale,
     labSilenceScale,
+    labPhonemeFrontend,
   }
 }
 

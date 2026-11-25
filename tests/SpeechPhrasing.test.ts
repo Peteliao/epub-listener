@@ -5,6 +5,24 @@ const LONG_BUT = '他本来想今天早上去图书馆把上周借的那本关�
 const LONG_BECAUSE = '他之所以没有立即回答是因为他需要时间整理自己的思绪并且确认这句话不会伤害到对方。'
 const LONG_IF = '如果一个人总是习惯于在遇到问题的时候逃避那么他最终失去的可能不仅仅是解决问题的机会还有改变自己的能力。'
 
+describe('2026-11-25 第十二轮：自然度与音素前端', () => {
+  it('在直接称呼语后插入停顿，只改朗读文本', () => {
+    expect(planSpeechPhrasing('叔叔您觉得做得到吗？')).toBe('叔叔，您觉得做得到吗？')
+    expect(planSpeechPhrasing('“老师您先请。”')).toBe('“老师，您先请。”')
+    expect(planSpeechPhrasing('阿姨你觉得累不累？')).toBe('阿姨，你觉得累不累？')
+    expect(planSpeechPhrasing('叔叔您觉得做得到吗？', { maxBreaths: 0 }))
+      .toBe('叔叔您觉得做得到吗？')
+  })
+
+  it('称呼语规则幂等，不误改亲属关系或普通叙述', () => {
+    expect(planSpeechPhrasing('叔叔，您觉得做得到吗？')).toBe('叔叔，您觉得做得到吗？')
+    expect(planSpeechPhrasing('叔叔您的书找到了。')).toBe('叔叔您的书找到了。')
+    expect(planSpeechPhrasing('叔叔说这本书很好看。')).toBe('叔叔说这本书很好看。')
+    expect(planSpeechPhrasing('他问叔叔您好。')).toBe('他问叔叔您好。')
+    expect(planSpeechPhrasing('老师您先请，“阿姨您再来。”')).toBe('老师，您先请，“阿姨您再来。”')
+  })
+})
+
 describe('2026-11-23 第十一轮：长句语义停顿', () => {
   it('在长分句的转折/递进连接词前插入一个语义逗号', () => {
     expect(planSpeechPhrasing(LONG_BUT)).toContain('，可是')

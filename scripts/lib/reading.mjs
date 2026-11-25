@@ -181,6 +181,7 @@ export async function loadMatchaAssets(overlayText) {
     tokens,
     tokensText,
     overlay,
+    overlayText: source,
     effective,
     maxLength: maxWordLength(effective),
     neutrals: TRAINED_NEUTRAL_PHONES,

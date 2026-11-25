@@ -42,6 +42,7 @@ function createSlot(lang) {
     files: [],
     releasedModelBytes: 0,
     oovWords: null,
+    frontend: null,
   }
 }
 
@@ -59,6 +60,22 @@ const slots = {
 // as an OOV character, leaving their audio unchanged.
 const UTTERANCE_RESET = '\u2060'
 const UTTERANCE_RESET_GAP_MS = 120
+const WORD_JOINER = '\u200b'
+const MATCHA_FRONTEND_VERSION = 'matcha-g2p-v1'
+const MAX_TOKENS_PER_REQUEST = 8192
+
+// These are the punctuation symbols the Baker frontend actually emits. In
+// particular, Chinese commas/enumeration marks/colons all become the comma
+// token; semicolons are consumed as sentence boundaries without a token, and
+// an ellipsis is three periods. Quotes, em dashes and other OOV punctuation are
+// dropped, while uncovered Han/Latin/number text is never silently discarded.
+const MATCHA_PUNCTUATION = {
+  '，': ',', ',': ',', '、': ',', '：': ',', ':': ',',
+  '。': '.', '.': '.', '．': '.', '！': '!', '!': '!', '？': '?', '?': '?',
+  '…': '...',
+}
+const OOV_PUNCTUATION = /[\p{P}\p{S}\p{Z}\p{C}]/u
+const UNSUPPORTED_TEXT = /[\p{Script=Han}\p{L}\p{N}\p{M}]/u
 
 function utteranceParts(text, enabled) {
   if (!enabled || !text.includes(UTTERANCE_RESET)) return null
@@ -288,6 +305,12 @@ async function init(data) {
       .map((file) => file?.name)
       .filter((name) => typeof name === 'string')
     if (lang === 'en') slot.oovWords = buildOovWords(fs, data, slot.dir)
+    if (lang === 'zh' && slot.modelType === 'matcha') {
+      // Read back what writeModelFiles actually put in MEMFS, including the
+      // lexicon overlay. The optional shadow frontend must never diverge from
+      // the native instance's effective lexicon/token inventory.
+      slot.frontend = buildMatchaFrontend(fs, data, slot.dir)
+    }
 
     const warmupStart = performance.now()
     let warmedUp = false
@@ -544,6 +567,157 @@ function buildOovWords(fs, data, dir) {
   }
 }
 
+function buildMatchaFrontend(fs, data, dir) {
+  const tokensName = data.model?.config?.tokens
+  if (typeof tokensName !== 'string' || !tokensName) return null
+  try {
+    const tokensText = new TextDecoder().decode(fs.readFile(`${dir}/${tokensName}`))
+    const lexiconName = data.model?.config?.lexicon
+    let lexiconText = ''
+    if (typeof lexiconName === 'string' && lexiconName) {
+      try {
+        // This is the patched MEMFS file, not the unpatched pack asset.
+        lexiconText = new TextDecoder().decode(fs.readFile(`${dir}/${lexiconName}`))
+      } catch {
+        // Explicit tokens can still be validated. Text requests will conservatively
+        // fall back to native because there are no usable lexicon entries.
+      }
+    }
+    return createMatchaFrontend(lexiconText, tokensText)
+  } catch {
+    // The frontend is opt-in; a missing token inventory must not prevent the
+    // existing native model from initializing.
+    return null
+  }
+}
+
+/** Pure, deliberately small Matcha shadow frontend (no jieba/FST/number rules). */
+function createMatchaFrontend(lexiconText, tokensText) {
+  const tokens = new Set()
+  for (const line of String(tokensText).replace(/^\uFEFF/, '').split(/\r?\n/)) {
+    // tokens.txt is "symbol id". Its first Baker row has an empty symbol (id 0);
+    // trimming before parsing would invent a valid token named "0".
+    const match = /^(\S+)\s+(\d+)\s*$/.exec(line)
+    if (!match) continue
+    const id = Number(match[2])
+    if (Number.isSafeInteger(id) && id >= 0) tokens.add(match[1])
+  }
+  if (tokens.size === 0) return null
+
+  const entries = new Map()
+  for (const line of String(lexiconText).replace(/^\uFEFF/, '').split(/\r?\n/)) {
+    const fields = line.trim().split(/\s+/)
+    if (fields.length < 2 || !fields[0] || line.trim().startsWith('#')) continue
+    const [word, ...phones] = fields
+    // Matcha's map uses the last row. Keep invalid rows as explicit holes so a
+    // bad overlay cannot silently fall through to shorter/base readings.
+    entries.delete(word)
+    entries.set(word, phones.every((phone) => tokens.has(phone)) ? phones : null)
+  }
+  let maxWordLength = 0
+  for (const word of entries.keys()) {
+    maxWordLength = Math.max(maxWordLength, Array.from(word).length)
+  }
+  return { tokens, entries, maxWordLength }
+}
+
+/**
+ * Longest-match only. U+200B/U+2060 force a fresh lookup; punctuation is mapped
+ * or dropped. Any uncovered Han, letter, number or mark makes the whole result
+ * unsupported so synthesize() can retry the complete request as native text.
+ */
+function matchaTextToTokens(text, frontend) {
+  const unsupported = (reason, index) => ({ supported: false, tokens: [], reason, index })
+  if (!frontend || typeof text !== 'string') return unsupported('frontend-unavailable', 0)
+  const chars = Array.from(text)
+  const tokens = []
+
+  const appendToken = (token, index) => {
+    if (!frontend.tokens.has(token)) {
+      return unsupported('missing-punctuation-token', index)
+    }
+    tokens.push(token)
+    return tokens.length > MAX_TOKENS_PER_REQUEST
+      ? unsupported('token-limit', index)
+      : null
+  }
+
+  const appendRange = (start, end) => {
+    let index = start
+    while (index < end) {
+      const char = chars[index]
+      const punctuation = MATCHA_PUNCTUATION[char]
+      if (punctuation) {
+        for (const token of punctuation) {
+          const failure = appendToken(token, index)
+          if (failure) return failure
+        }
+        index += 1
+        continue
+      }
+      if (OOV_PUNCTUATION.test(char)) {
+        index += 1
+        continue
+      }
+
+      let matchedLength = 0
+      let phones = null
+      for (
+        let length = Math.min(frontend.maxWordLength, end - index);
+        length >= 1;
+        length -= 1
+      ) {
+        const candidate = chars.slice(index, index + length).join('')
+        const reading = frontend.entries.get(candidate)
+        if (reading === undefined) continue
+        matchedLength = length
+        phones = reading
+        break
+      }
+      if (!phones) {
+        if (matchedLength > 0) return unsupported('invalid-lexicon-entry', index)
+        return UNSUPPORTED_TEXT.test(char)
+          ? unsupported('uncovered-text', index)
+          : unsupported('unsupported-character', index)
+      }
+      for (const phone of phones) {
+        const failure = appendToken(phone, index)
+        if (failure) return failure
+      }
+      index += matchedLength
+    }
+    return null
+  }
+
+  let rangeStart = 0
+  for (let index = 0; index < chars.length; index += 1) {
+    if (chars[index] !== WORD_JOINER && chars[index] !== UTTERANCE_RESET) continue
+    const failure = appendRange(rangeStart, index)
+    if (failure) return failure
+    rangeStart = index + 1
+  }
+  const failure = appendRange(rangeStart, chars.length)
+  if (failure) return failure
+  return tokens.length > 0
+    ? { supported: true, tokens }
+    : unsupported('empty', 0)
+}
+
+function validateMatchaTokens(value, frontend) {
+  if (!frontend || !Array.isArray(value) || value.length === 0) {
+    throw new Error('tokens 必须是非空数组。')
+  }
+  if (value.length > MAX_TOKENS_PER_REQUEST) {
+    throw new Error(`tokens 数量不能超过 ${MAX_TOKENS_PER_REQUEST}。`)
+  }
+  for (const token of value) {
+    if (typeof token !== 'string' || !frontend.tokens.has(token)) {
+      throw new Error('tokens 包含非法或未知的 token。')
+    }
+  }
+  return value.slice()
+}
+
 const WORD_PATTERN = /[A-Za-z]+(?:['’][A-Za-z]+)*/g
 
 // Keep in sync with LETTER_NAMES in src/core/text/englishText.ts.
@@ -663,28 +837,94 @@ async function synthesize(data) {
         ? spellOovWords(data.text, slot.oovWords)
         : data.text
 
-    // Words marked for a real utterance reset are synthesised independently and
-    // joined with a short silence, so they start a fresh utterance instead of
-    // inheriting the prosody of a long clause. Other engines just drop the OOV
-    // sentinel and keep their single-pass audio.
-    const parts = utteranceParts(text, lang === 'zh' && slot.modelType === 'matcha')
-    if (!parts) text = text.replaceAll(UTTERANCE_RESET, '')
+    // Opt-in only. The default and every fallback below retain the original
+    // native text path, including its U+2060 split/120ms join behavior.
+    const canUseMatchaFrontend = lang === 'zh' && slot.modelType === 'matcha'
+    let frontend = 'native'
+    let tokenCount = null
+    let directTokens = null
+    let parts = null
 
-    const generate = (input) =>
-      typeof slot.tts.generateWithConfig === 'function'
+    if (data.tokens !== undefined) {
+      if (!canUseMatchaFrontend) {
+        post({
+          type: 'error',
+          lang,
+          epoch: data.epoch,
+          jobId: data.jobId,
+          code: 'invalid-tokens',
+          message: 'tokens 直输仅支持中文 Matcha 音色。',
+        })
+        return
+      }
+      try {
+        directTokens = validateMatchaTokens(data.tokens, slot.frontend)
+        frontend = 'tokens-direct'
+        tokenCount = directTokens.length
+      } catch (error) {
+        post({
+          type: 'error',
+          lang,
+          epoch: data.epoch,
+          jobId: data.jobId,
+          code: 'invalid-tokens',
+          message: error instanceof Error ? error.message : 'tokens 格式不正确。',
+        })
+        return
+      }
+    } else if (canUseMatchaFrontend && data.frontendVersion !== undefined) {
+      frontend = 'native-fallback'
+      if (data.frontendVersion === MATCHA_FRONTEND_VERSION && slot.frontend) {
+        const resetParts = utteranceParts(text, true)
+        const inputs = resetParts || [text]
+        // Convert every part before generating any audio. One unsupported part
+        // invalidates the whole shadow request; no partial/fused fallback.
+        const converted = inputs.map((input) => matchaTextToTokens(input, slot.frontend))
+        const count = converted.reduce(
+          (sum, part) => sum + (part.supported ? part.tokens.length : 0),
+          0,
+        )
+        if (
+          converted.every((part) => part.supported) &&
+          count > 0 && count <= MAX_TOKENS_PER_REQUEST
+        ) {
+          directTokens = converted[0].tokens
+          parts = resetParts ? converted : null
+          frontend = MATCHA_FRONTEND_VERSION
+          tokenCount = count
+        }
+      }
+    }
+
+    if (!directTokens) {
+      parts = utteranceParts(text, lang === 'zh' && slot.modelType === 'matcha')
+      if (!parts) text = text.replaceAll(UTTERANCE_RESET, '')
+    }
+
+    const generate = (input, tokens) => {
+      if (tokens) {
+        if (typeof slot.tts.generateWithConfig !== 'function') {
+          throw new Error('当前离线音色运行时不支持 tokens 直输。')
+        }
+        return slot.tts.generateWithConfig('', { ...config, tokens: [tokens] })
+      }
+      return typeof slot.tts.generateWithConfig === 'function'
         ? slot.tts.generateWithConfig(input, config)
         : slot.tts.generate({ text: input, sid, speed: config.speed })
+    }
 
     // generate() drops silenceScale/extra, so use the full generation config.
     // Without this every comma/period pause is squeezed to 20% of its length.
-    const rendered = parts ? parts.map(generate) : null
+    const rendered = parts
+      ? parts.map((part) => generate(part.tokens ? '' : part, part.tokens))
+      : null
     const result = rendered
       ? joinUtteranceAudio(
         rendered,
         rendered[0].sampleRate || slot.sampleRate,
         UTTERANCE_RESET_GAP_MS,
       )
-      : generate(text)
+      : generate(directTokens ? '' : text, directTokens || undefined)
     if (!result || !result.samples || result.samples.length === 0) {
       throw new Error('The model returned an empty audio buffer.')
     }
@@ -708,6 +948,8 @@ async function synthesize(data) {
         samples: buffer,
         sampleRate: result.sampleRate || slot.sampleRate,
         synthMs: Math.round(performance.now() - startedAt),
+        frontend,
+        tokenCount,
       },
       [buffer],
     )
@@ -816,6 +1058,7 @@ function cleanupSlot(slot) {
   slot.modelType = ''
   slot.releasedModelBytes = 0
   slot.oovWords = null
+  slot.frontend = null
 }
 
 function unlinkSlotFiles(fs, slot, keep) {

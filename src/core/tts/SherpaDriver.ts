@@ -8,12 +8,18 @@ import {
   preparePronunciationText,
 } from './pronunciationGuard'
 
+export type MatchaFrontendVersion = 'matcha-g2p-v1'
+
 export interface SherpaSynthesisOptions {
   text: string
   rate: number
   lang?: AiPackLang
   volume?: number
   silenceScale?: number
+  /** Opt-in shadow frontend; absent keeps the model's native text frontend. */
+  frontendVersion?: MatchaFrontendVersion
+  /** Complete token sequence for controlled acoustic experiments. */
+  tokens?: readonly string[]
 }
 
 export interface SherpaSpeakOptions extends SherpaSynthesisOptions {
@@ -44,6 +50,8 @@ export interface SherpaStats extends SherpaReadyInfo {
   /** Audio milliseconds per spoken character at 1× speed. */
   lastAudioMsPerChar: number | null
   lastRtf: number | null
+  lastFrontend: string | null
+  lastTokenCount: number | null
   cacheHits: number
   cacheMisses: number
   pending: number
@@ -65,6 +73,8 @@ interface WorkerResultMessage {
   samples: ArrayBuffer
   sampleRate: number
   synthMs: number
+  frontend?: string
+  tokenCount?: number
 }
 
 interface WorkerErrorMessage {
@@ -117,6 +127,8 @@ interface SynthesisRequest {
   speakerId: number
   silenceScale: number
   volume: number
+  frontendVersion?: MatchaFrontendVersion
+  tokens?: readonly string[]
 }
 
 interface PrefetchPlan {
@@ -133,6 +145,8 @@ interface SynthStats {
   lastAudioMs: number | null
   lastAudioMsPerChar: number | null
   lastRtf: number | null
+  lastFrontend: string | null
+  lastTokenCount: number | null
   cacheHits: number
   cacheMisses: number
   cancelledCount: number
@@ -170,6 +184,8 @@ function emptyStats(): SynthStats {
     lastAudioMs: null,
     lastAudioMsPerChar: null,
     lastRtf: null,
+    lastFrontend: null,
+    lastTokenCount: null,
     cacheHits: 0,
     cacheMisses: 0,
     cancelledCount: 0,
@@ -197,6 +213,17 @@ function normalizeLang(lang: AiPackLang | undefined): AiPackLang {
   return lang === 'en' ? 'en' : 'zh'
 }
 
+function normalizeTokens(tokens: readonly string[] | undefined): string[] | undefined {
+  if (tokens === undefined) return undefined
+  if (!Array.isArray(tokens) || tokens.length === 0 || tokens.length > 8192) {
+    throw new Error('音素序列为空或长度无效。')
+  }
+  if (tokens.some((token) => typeof token !== 'string' || !token || token.length > 128)) {
+    throw new Error('音素序列包含无效token。')
+  }
+  return [...tokens]
+}
+
 function synthesisKey(
   engine: AiEngine,
   lang: AiPackLang,
@@ -205,10 +232,13 @@ function synthesisKey(
   speakerId: number,
   silenceScale: number,
   volume: number,
+  frontendVersion?: MatchaFrontendVersion,
+  tokens?: readonly string[],
 ): string {
+  const frontend = tokens ? `tokens:${JSON.stringify(tokens)}` : frontendVersion ?? 'native'
   return `${engine}|${lang}|${speakerId}|${rate.toFixed(2)}|${silenceScale.toFixed(
     2,
-  )}|${volume.toFixed(2)}|${text}`
+  )}|${volume.toFixed(2)}|${frontend}|${text}`
 }
 
 /** Hojo generates at 1×; the media element applies the reading rate. */
@@ -410,6 +440,8 @@ export class SherpaDriver {
       lastAudioMs: stats.lastAudioMs,
       lastAudioMsPerChar: stats.lastAudioMsPerChar,
       lastRtf: stats.lastRtf,
+      lastFrontend: stats.lastFrontend,
+      lastTokenCount: stats.lastTokenCount,
       cacheHits: stats.cacheHits,
       cacheMisses: stats.cacheMisses,
       pending: this.pending.size,
@@ -633,12 +665,18 @@ export class SherpaDriver {
   ): void {
     this.prepareSpeech()
     const generation = this.generation
-    const request = this.synthesisRequest(options)
+    let request: SynthesisRequest
+    try {
+      request = this.synthesisRequest(options)
+    } catch (error) {
+      handlers.onError?.(error instanceof Error ? error.message : '朗读参数无效。')
+      return
+    }
     const { lang, engine, key } = request
     const slot = this.slots[lang]
     const plan: PrefetchPlan = {
       generation,
-      chunks: (options.nextChunks ?? []).filter((chunk) => Boolean(chunk.text)),
+      chunks: (options.nextChunks ?? []).filter((chunk) => Boolean(chunk.text || chunk.tokens?.length)),
       watched: new Set(),
     }
     const cached = slot.cache.get(key)
@@ -826,6 +864,8 @@ export class SherpaDriver {
     const speed = synthesisRate(engine, options.rate)
     const silenceScale = options.silenceScale ?? 1
     const volume = options.volume ?? 1
+    const tokens = normalizeTokens(options.tokens)
+    const frontendVersion = options.tokens ? undefined : options.frontendVersion
     return {
       key: synthesisKey(
         engine,
@@ -835,6 +875,8 @@ export class SherpaDriver {
         slot.speakerId,
         silenceScale,
         volume,
+        frontendVersion,
+        tokens,
       ),
       text: options.text,
       lang,
@@ -843,6 +885,8 @@ export class SherpaDriver {
       speakerId: slot.speakerId,
       silenceScale,
       volume,
+      frontendVersion,
+      tokens,
     }
   }
 
@@ -865,7 +909,8 @@ export class SherpaDriver {
   }
 
   private requestBuffer(request: SynthesisRequest, idle = false): Promise<AudioBuffer> {
-    const { key, text, lang, engine, speed, speakerId, silenceScale, volume } = request
+    const { key, text, lang, engine, speed, speakerId, silenceScale, volume,
+      frontendVersion, tokens } = request
     const slot = this.slots[lang]
     const cached = slot.cache.get(key)
     if (cached) {
@@ -938,6 +983,8 @@ export class SherpaDriver {
         speakerId,
         silenceScale,
         volume,
+        ...(frontendVersion ? { frontendVersion } : {}),
+        ...(tokens ? { tokens: [...tokens] } : {}),
       })
     } catch (error) {
       this.takePending(jobId)
@@ -1016,6 +1063,9 @@ export class SherpaDriver {
         ? (audioMs / pending.chars) * pending.rate
         : null
     slot.stats.lastRtf = audioMs > 0 ? message.synthMs / audioMs : null
+    slot.stats.lastFrontend = typeof message.frontend === 'string' ? message.frontend : null
+    slot.stats.lastTokenCount =
+      typeof message.tokenCount === 'number' ? message.tokenCount : null
 
     const buffer = this.createBuffer(message.samples, message.sampleRate)
     if (!buffer) {

@@ -6,7 +6,7 @@
 // on committed files, never on the gitignored scripts/out probe scripts.
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -37,14 +37,48 @@ export const APP_MIN_WORDS_IN_SENTENCE = 12
  * which is exactly the flat sequence the Matcha front end hands the acoustic
  * model — word boundaries never reach it.
  */
+export const MATCHA_DEFAULTS = Object.freeze({
+  noiseScale: 0.667,
+  silenceScale: 1,
+  speed: 1,
+  lengthScale: 1,
+})
+
+function checkedScale(value, name, { min = 0, max = Number.POSITIVE_INFINITY } = {}) {
+  const scale = Number(value)
+  if (!Number.isFinite(scale) || scale < min || scale > max) {
+    throw new Error(`${name} 必须是 ${min}..${max} 范围内的有限数，实际为 ${value}`)
+  }
+  return scale
+}
+
+function generationOptions(options, fallbackSpeed) {
+  const resolved = typeof options === 'number' ? { speed: options } : (options ?? {})
+  return {
+    speed: checkedScale(resolved.speed ?? fallbackSpeed, 'speed', { min: 0.01, max: 10 }),
+    silenceScale: checkedScale(
+      resolved.silenceScale ?? MATCHA_DEFAULTS.silenceScale,
+      'silenceScale',
+      { min: 0, max: 1.5 },
+    ),
+  }
+}
+
 export async function createMatchaSynth({
   quiet = true,
   minWordsInSentence = APP_MIN_WORDS_IN_SENTENCE,
   lexiconPath = join(MODEL_DIR, 'lexicon.v3.txt'),
+  noiseScale = MATCHA_DEFAULTS.noiseScale,
+  silenceScale = MATCHA_DEFAULTS.silenceScale,
+  lengthScale = MATCHA_DEFAULTS.lengthScale,
+  ruleFsts = ['phone.fst', 'date.fst', 'number.fst'].map((name) => join(MODEL_DIR, name)),
   // Front-end debug logs (real toy tokenisation) are the ground truth for
   // longest-match questions; leave off for measurements.
   debug = false,
 } = {}) {
+  const initialNoiseScale = checkedScale(noiseScale, 'noiseScale', { min: 0, max: 2 })
+  const initialSilenceScale = checkedScale(silenceScale, 'silenceScale', { min: 0, max: 1.5 })
+  const initialLengthScale = checkedScale(lengthScale, 'lengthScale', { min: 0.01, max: 10 })
   const gluePath = join(RUNTIME_DIR, 'sherpa-onnx-wasm-tts.js')
   const apiPath = join(RUNTIME_DIR, 'sherpa-onnx-tts.js')
   const wasmPath = join(RUNTIME_DIR, 'sherpa-onnx-wasm-tts.wasm')
@@ -62,51 +96,73 @@ export async function createMatchaSynth({
         vocoder: join(MODEL_DIR, 'vocos-22khz-univ.onnx'),
         lexicon: lexiconPath,
         tokens: join(MODEL_DIR, 'tokens.txt'),
-        noiseScale: 0.667,
-        lengthScale: 1,
+        noiseScale: initialNoiseScale,
+        lengthScale: initialLengthScale,
       },
       numThreads: 1,
       debug: debug ? 1 : 0,
       provider: 'cpu',
     },
-    ruleFsts: '',
+    ruleFsts: ruleFsts.join(','),
     ruleFars: '',
     maxNumSentences: 20,
-    silenceScale: 1,
+    silenceScale: initialSilenceScale,
   })
   const sampleRate = tts.sampleRate || 22050
+  let sequence = 0
 
-  function generate(tokens) {
-    return tts.generateWithConfig('', {
+  // Matcha's noise scale is an acoustic-model constructor input; silence and
+  // speed are per-generation inputs. Keep one WASM instance for silence sweeps,
+  // and create a new instance when an experiment changes noise.
+  function recordConfig(result, options) {
+    result.synthesisConfig = {
       sid: 0,
-      speed: 1,
-      silenceScale: 1,
+      noiseScale: initialNoiseScale,
+      lengthScale: initialLengthScale,
+      silenceScale: options.silenceScale,
+      speed: options.speed,
+      minWordsInSentence,
+      maxWordsInSentence: 1000,
+      ruleFsts: ruleFsts.map((file) => basename(file)),
+      sequence: ++sequence,
+    }
+    return result
+  }
+
+  function generate(tokens, options = {}) {
+    const config = generationOptions(options, MATCHA_DEFAULTS.speed)
+    return recordConfig(tts.generateWithConfig('', {
+      sid: 0,
+      speed: config.speed,
+      silenceScale: config.silenceScale,
       tokens: [tokens],
       extra: {
         max_words_in_sentence: 1000,
         min_words_in_sentence: minWordsInSentence,
       },
-    })
+    }), config)
   }
 
   /**
    * Real text path: lets the runtime run its own lexicon lookup, so a probe can
    * prove that the token stream the audits assume is the stream the app gets.
+   * The second argument accepts the legacy speed number or an options object.
    */
-  function generateText(text, speed = 1) {
-    return tts.generateWithConfig(String(text), {
+  function generateText(text, options = {}) {
+    const config = generationOptions(options, MATCHA_DEFAULTS.speed)
+    return recordConfig(tts.generateWithConfig(String(text), {
       sid: 0,
-      speed,
-      silenceScale: 1,
+      speed: config.speed,
+      silenceScale: config.silenceScale,
       extra: {
         max_words_in_sentence: 1000,
         min_words_in_sentence: minWordsInSentence,
       },
-    })
+    }), config)
   }
 
-  function duration(tokens) {
-    const result = generate(tokens)
+  function duration(tokens, options = {}) {
+    const result = generate(tokens, options)
     return Math.round(result.samples.length / (result.sampleRate || sampleRate) * 1000)
   }
 
@@ -133,6 +189,13 @@ export async function createMatchaSynth({
 
   return {
     sampleRate,
+    config: () => ({
+      noiseScale: initialNoiseScale,
+      silenceScale: initialSilenceScale,
+      lengthScale: initialLengthScale,
+      minWordsInSentence,
+      ruleFsts: ruleFsts.map((file) => basename(file)),
+    }),
     generate,
     generateText,
     duration,

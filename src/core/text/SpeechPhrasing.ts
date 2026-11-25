@@ -2,10 +2,11 @@
  * Rule-based semantic pause planning for long Chinese clauses.
  *
  * The model already reads a comma as a natural pause. This planner inserts one
- * comma before a contrast/consequence conjunction when the preceding clause is
- * long and no punctuation already marks the boundary. It is deliberately
- * conservative: short clauses, sentence-initial connectives, and positions that
- * already have punctuation are never touched, and at most one pause is added.
+ * after a direct family/title address and before a contrast/consequence
+ * conjunction when the preceding clause is long and no punctuation already
+ * marks the boundary. It is deliberately conservative: short clauses,
+ * sentence-initial connectives, and positions that already have punctuation are
+ * never touched, and at most one semantic pause is added.
  *
  * Only `speechText` is changed; the displayed book text stays byte-for-byte the
  * same. The goal is a listener-friendly breath at the semantic seam, not a new
@@ -29,6 +30,7 @@ const CLAUSE_END = /[。！？!?；;…\n]/
 const ANY_PAUSE = /[，,、：:]/
 const HAN = /\p{Script=Han}/gu
 const SEMANTIC_COMMA = '，'
+const VOCATIVE = /(^|[“”‘’「」『』（）()\s])((?:叔叔|阿姨|爷爷|奶奶|外公|外婆|舅舅|姑姑|老师|师傅|医生|先生|女士|大哥|大姐|同志|同学|小朋友))(您|你)(?![的])/u
 
 export interface SpeechPhrasingOptions {
   /** Minimum Han characters before the conjunction. */
@@ -61,9 +63,9 @@ function findWordAt(text: string, index: number): string | null {
 }
 
 /**
- * Returns `text` with at most one semantic comma before a safe conjunction.
- * Idempotent: after a comma is inserted it becomes the new clause boundary, so
- * a second pass sees a short "before" clause and cannot add another.
+ * Adds a comma after a conservative direct address, or at most one semantic
+ * comma before a safe conjunction. Both transformations only affect speechText
+ * and are idempotent.
  */
 export function planSpeechPhrasing(
   input: string,
@@ -71,15 +73,17 @@ export function planSpeechPhrasing(
 ): string {
   const text = String(input)
   if (!text) return text
-  // A clause that already has any pause punctuation is left alone. This keeps
-  // the planner from stacking a second pause in an already-phrased sentence and
-  // also makes a second pass idempotent: the inserted comma is now a pause.
-  if (ANY_PAUSE.test(text)) return text
   const { minCharsBefore, minCharsAfter, maxBreaths } = {
     ...DEFAULTS,
     ...options,
   }
   if (maxBreaths <= 0) return text
+  const addressed = text.replace(VOCATIVE, '$1$2，$3')
+  if (addressed !== text) return addressed
+  // A clause that already has any pause punctuation is left alone. This keeps
+  // the planner from stacking a second pause in an already-phrased sentence and
+  // also makes a second pass idempotent: the inserted comma is now a pause.
+  if (ANY_PAUSE.test(text)) return text
 
   const insertions: number[] = []
   let lastBoundary = 0

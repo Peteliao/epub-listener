@@ -114,6 +114,8 @@ export interface ReaderDiagnostics {
   sink: MediaSinkDiagnostics
   noiseScale: number | null
   silenceScale: number
+  frontend: string | null
+  frontendTokens: number | null
   /** True when the current chapter had to fall back to the system voice. */
   aiFallback: boolean
   bookLexiconVersion: number
@@ -512,6 +514,8 @@ export class ReaderController {
       sink: this.aiSpeech.sinkDiagnostics,
       noiseScale: stats?.noiseScale ?? this.settings.labNoiseScale,
       silenceScale: this.settings.labSilenceScale,
+      frontend: stats?.lastFrontend ?? null,
+      frontendTokens: stats?.lastTokenCount ?? null,
       aiFallback: this.aiFallback,
       bookLexiconVersion: lexicon.version,
       curatedHash: lexicon.curatedHash,
@@ -1491,6 +1495,10 @@ export class ReaderController {
         : this.settings.rate,
       volume: chunk.lang === 'en' ? this.settings.englishVolume : 1,
       silenceScale: this.settings.labSilenceScale,
+      frontendVersion:
+        this.settings.labPhonemeFrontend && chunk.lang !== 'en'
+          ? 'matcha-g2p-v1'
+          : undefined,
     }
   }
 

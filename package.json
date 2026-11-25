@@ -1,7 +1,7 @@
 {
   "name": "epub-listener",
   "private": true,
-  "version": "0.4.1",
+  "version": "0.4.2",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -16,6 +16,8 @@
     "audit:coverage": "node scripts/audit-coverage.mjs",
     "lab:ab": "node tests/browser/run-ab.mjs",
     "lab:smoke": "node tests/browser/run-ab.mjs --smoke",
+    "lab:phoneme-smoke": "node tests/browser/run-ab.mjs --phoneme-smoke",
+    "lab:melo-smoke": "node tests/browser/run-ab.mjs --melo-smoke",
     "lab:diagnose": "vite --host 127.0.0.1 --port 5288 --strictPort --open /tests/browser/tts-diagnose.html",
     "lab:diagnose:check": "node tests/browser/run-ab.mjs --diagnose",
     "lab:stats": "node scripts/ab-stats.mjs",
@@ -41,6 +43,9 @@
     "oov:recall": "node scripts/oov-recall.mjs",
     "quality:report": "node scripts/quality-report.mjs",
     "blind:render": "node scripts/render-blind.mjs",
+    "blind:render:full": "node scripts/render-blind.mjs --full",
+    "naturalness:render": "node scripts/render-naturalness.mjs",
+    "naturalness:smoke": "node scripts/render-naturalness.mjs --smoke",
     "blind:score": "node scripts/blind-score.mjs",
     "blind:ab": "node scripts/blind-ab.mjs",
     "explain:reading": "node scripts/explain-reading.mjs",
