@@ -1755,6 +1755,14 @@
 做这行 zuo4 zhe4 hang2
 做哪行 zuo4 na3 hang2
 入那行 ru4 na4 hang2
+
+# 2026-11-25 第十一轮反馈：词尾/词首边界均按真实 WASM 三语境消融选定。
+一倒 yi4 dao3 "
+谢天谢地 " xie4 tian1 xie4 di4
+递给 di4 gei3
+# 额外短句「笹垣点了点头」无边界为 360/279ms；词尾边界三语境均恢复正常。
+笹垣 ti4 yuan2 "
+
 入这行 ru4 zhe4 hang2
 入哪行 ru4 na3 hang2
 吃那行饭 chi1 na4 hang2 fan4

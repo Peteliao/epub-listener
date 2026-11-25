@@ -88,8 +88,10 @@ export function protectPronunciations(
       if (covered.some(([start, end]) => index >= start && index < end)) continue
       // Mark every match, even at the sentence edge, so a shorter word nested
       // inside a longer one (会计 inside 学会计) cannot split the longer word.
-      covered.push([index, index + word.length])
       const before = previousCodePoint(source, offsets, index)
+      // 万一倒闭 must keep the existing 倒闭 word instead of 一倒 + 闭.
+      if (word === '一倒' && before === '万' && source.startsWith('闭', index + word.length)) continue
+      covered.push([index, index + word.length])
       if (!before || !HAN.test(before) || before === WORD_BOUNDARY) continue
       insertions.push(index)
     }

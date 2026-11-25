@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  BOOK_LEXICON_VERSION,
   generateBookLexicon,
   MAX_BOOK_OVERLAY_ENTRIES,
   TRAINED_NEUTRAL_PHONES,
@@ -271,5 +272,75 @@ describe('generateBookLexicon', () => {
 
   it('exposes a sane default cap', () => {
     expect(MAX_BOOK_OVERLAY_ENTRIES).toBe(2000)
+  })
+})
+
+describe('2026-11-25 第十四轮：整书一/不变调候选', () => {
+  const phones = [
+    '一 yi1', '不 bu4', '个 ge4', '样 yang4', '顶 ding3', '次 ci4',
+    '去 qu4', '好 hao3', '合 he2', '适 shi4', '堵 du3', '墙 qiang2',
+    '行 hang2', '字 zi4', '人 ren2', '万 wan4', '倒 dao3', '闭 bi4',
+    '统 tong3', '唯 wei2',
+  ]
+  const tokens = phones.flatMap((line) => {
+    const phone = line.split(/\s+/)[1]
+    return [phone, phone.replace(/[0-5]$/, '')]
+  })
+  const input = (chunks: string[], lexiconText = phones.join('\n')): BookLexiconInput => ({
+    chunks,
+    lexiconText,
+    tokensText: [...tokens, 'yi2', 'yi4', 'bu2'].join('\n'),
+    curatedOverlay: '',
+  })
+
+  it('generates yi4 before third tone, yi2 before fourth, and bu2 before fourth', () => {
+    const result = generateBookLexicon(input(['一堵墙。一次。不去。']))
+    expect(result.entries).toEqual(expect.arrayContaining([
+      { word: '一堵', reading: 'yi4 du3', count: 1 },
+      { word: '一次', reading: 'yi2 ci4', count: 1 },
+      { word: '不去', reading: 'bu2 qu4', count: 1 },
+    ]))
+    expect(result.entries.map((entry) => entry.word)).not.toContain('一')
+    expect(result.entries.map((entry) => entry.word)).not.toContain('不')
+  })
+
+  it('keeps the citation tone when no sandhi applies', () => {
+    const result = generateBookLexicon(input(['一个。一样。不好。不合适。']))
+    expect(result.entries.map((entry) => entry.word)).not.toContain('不好')
+    expect(result.entries.map((entry) => entry.word)).not.toContain('不合适')
+  })
+
+  it('does not generate pairs already present in the effective lexicon', () => {
+    const result = generateBookLexicon(input(['一个。'], [
+      ...phones, '一个 yi2 ge4',
+    ].join('\n')))
+    expect(result.entries).toEqual([])
+  })
+
+  it('rejects a pair when any occurrence is covered by a longer known word', () => {
+    const result = generateBookLexicon(input(['一倒。万一倒闭。'], [
+      ...phones, '万一 wan4 yi1', '倒闭 dao3 bi4',
+    ].join('\n')))
+    expect(result.entries.map((entry) => entry.word)).not.toContain('一倒')
+  })
+
+  it('rejects one pair whose following character changes reading across contexts', () => {
+    const result = generateBookLexicon(input(['一行字。一行人。']))
+    expect(result.entries.map((entry) => entry.word)).not.toContain('一行')
+  })
+
+  it('never crosses punctuation when collecting adjacent pairs', () => {
+    const result = generateBookLexicon(input(['一，堵墙。不，去。']))
+    expect(result.entries.map((entry) => entry.word)).not.toContain('一堵')
+    expect(result.entries.map((entry) => entry.word)).not.toContain('不去')
+  })
+
+  it('keeps curated readings authoritative and invalidates old caches', () => {
+    expect(BOOK_LEXICON_VERSION).toBe(8)
+    const result = generateBookLexicon({
+      ...input(['一次。']),
+      curatedOverlay: '一次 yi1 ci4',
+    })
+    expect(result.entries.map((entry) => entry.word)).not.toContain('一次')
   })
 })

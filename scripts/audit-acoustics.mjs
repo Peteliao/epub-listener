@@ -31,6 +31,11 @@ import {
   chooseVariant,
 } from './lib/acousticScoring.mjs'
 import { sentenceCoverage } from './lib/omission.mjs'
+import {
+  auditIFinalSyllables,
+  verifyFormantDetector,
+  I_FINAL_F2_RISK_HZ,
+} from './lib/vowelReduction.mjs'
 
 const RULES_PATH = resolve(ROOT, 'src/core/tts/readingRules.v1.jsonl')
 const EXCEPTIONS_ASSET = resolve(ROOT, 'src/core/tts/acousticExceptions.v1.jsonl')
@@ -139,7 +144,7 @@ function printHelp() {
 用真实 WASM 合成批量检测「音素正确但被吞音/合并/读断」的 C 类问题，并对
 词尾静音边界做 A/B 选型。输出是建议 + 证据音频，绝不自动改覆盖表。
 
-  --verify               用 2026-11-09 反馈的 7 个用例验收（完整原句由当前覆盖表现场重建）
+  --verify               用 7 个反馈用例验收，并做 /i/ F2 探测器确定性自检
   --words=<file>         词表：每行一个词，或 JSONL（含 word 字段）
   --corpus=<file>        从语料中取该词的真实上下文（默认 scripts/out/ming.txt）
   --limit=N              最多测 N 个词（默认 20；--verify 时截取前 N 个内置用例）
@@ -151,7 +156,9 @@ function printHelp() {
   --audio-dir=<dir>      证据 WAV 目录
 
 约束已固化：>=3 字词禁止自动加词尾边界；词内边界永不推荐；所有建议均需
-人工确认。短分句导致的句首重复属 B 类，本审计只标记、不改词典。`)
+人工确认。短分句导致的句首重复属 B 类，本审计只标记、不改词典。
+/i/ 尾音节另做 F2 检测：可信 F2<1700Hz 报元音弱化风险；无声、低置信
+对齐或无可信共振峰只记 unmeasurable，不报弱化。`)
 }
 
 async function loadRulesWords() {
@@ -260,7 +267,8 @@ function resolveVerifyCase(item, assets) {
   const boundaryAt = parts.indexOf('"')
   const currentMode = boundaryAt < 0
     ? 'none'
-    : boundaryAt === parts.length - 1 ? 'tail' : 'internal'
+    : boundaryAt === 0 ? 'lead'
+      : boundaryAt === parts.length - 1 ? 'tail' : 'internal'
   return {
     ...item,
     tokens,
@@ -361,7 +369,7 @@ function measure(synth, base, start, count, cache) {
   return value
 }
 
-function auditCase(synth, item) {
+async function auditCase(synth, item) {
   const base = stripBoundary(item.tokens, item.start, item.count)
   const noneTokens = [...base]
   const tailTokens = insertAt(base, item.start + item.count, '"')
@@ -369,8 +377,8 @@ function auditCase(synth, item) {
     ? insertAt(base, item.start + 1, '"')
     : null
   const currentTokens = item.currentMode === 'tail' ? tailTokens
-    : item.currentMode === 'internal' ? [...item.tokens]
-      : noneTokens
+    : item.currentMode === 'none' ? noneTokens
+      : [...item.tokens]
 
   const cache = new Map()
   const variants = []
@@ -389,6 +397,10 @@ function auditCase(synth, item) {
   const choice = chooseVariant(variants, item.charCount)
   const current = variants.find((variant) => variant.mode === 'current')
   const flagged = current.states.filter((state) => state !== 'normal')
+  const vowelReduction = await auditIFinalSyllables(synth, {
+    ...item,
+    tokens: { current: currentTokens },
+  })
   return {
     word: item.word,
     charCount: item.charCount,
@@ -416,6 +428,7 @@ function auditCase(synth, item) {
     })),
     forbiddenTail: item.charCount >= 3,
     flagged,
+    vowelReduction,
     recommendation: choice.recommendation,
     requiresHuman: choice.requiresHuman,
     needsListening: !choice.keep && current.max > 350,
@@ -480,7 +493,7 @@ async function main() {
   const results = []
   try {
     for (const [index, item] of cases.entries()) {
-      const result = auditCase(synth, item)
+      const result = await auditCase(synth, item)
       if (!options.noAudio) {
         result.audio = await saveEvidence(synth, result, index, options.audioDir)
       }
@@ -503,10 +516,17 @@ async function main() {
       frontend: results.filter((item) => item.class === 'frontend').length,
       needsListening: results.filter((item) => item.needsListening).length,
       changesSuggested: results.filter((item) => item.recommendation !== 'keep').length,
+      iFinalChecks: results.reduce((sum, item) => sum + item.vowelReduction.length, 0),
+      vowelReductionRisks: results.reduce((sum, item) =>
+        sum + item.vowelReduction.filter((check) => check.status === 'risk').length, 0),
+      vowelReductionUnmeasurable: results.reduce((sum, item) =>
+        sum + item.vowelReduction.filter((check) => check.status === 'unmeasurable').length, 0),
     },
     policy: {
       minContributionMs: 100,
       maxNormalMs: 350,
+      iFinalF2RiskHz: I_FINAL_F2_RISK_HZ,
+      unknownFormantsNeverFlagged: true,
       forbidTailOnThreeCharWords: true,
       wordInternalBoundaryNeverRecommended: true,
       requiresHumanConfirmation: true,
@@ -538,9 +558,10 @@ async function main() {
   console.log(`摘要 ${options.summary}`)
   console.log(`例外表候选 ${options.exceptions}`)
   console.log(`吞音 ${report.totals.swallowed} · 合并 ${report.totals.merged} · 前端类 ${report.totals.frontend} · 建议变更 ${report.totals.changesSuggested}`)
+  console.log(`/i/ 尾音节 ${report.totals.iFinalChecks} · 弱化风险 ${report.totals.vowelReductionRisks} · 不可测 ${report.totals.vowelReductionUnmeasurable}`)
 
   if (options.verify) {
-    const failures = []
+    const failures = verifyFormantDetector()
     const byWord = new Map(results.map((item) => [item.word, item]))
     const expectedCases = VERIFY_CASES.slice(0, cases.length)
     if (byWord.size !== expectedCases.length) failures.push('验收词未全部产出')
@@ -561,6 +582,11 @@ async function main() {
       // a hard requirement for every feedback case whose proxy metric agrees.
       if (!expected.expectReview && actual.flagged.length) {
         failures.push(`${expected.word}：当前配置仍有 ${actual.flagged.join('/')} 音节（${actual.baseline.values.join('/')}ms），不得判定为已修复`)
+      }
+      for (const check of actual.vowelReduction) {
+        if (check.status === 'risk' && (!check.credible || !(check.f2 < I_FINAL_F2_RISK_HZ))) {
+          failures.push(`${expected.word} ${check.phone}：无声/不可信结果被误报为弱化`)
+        }
       }
       // Full feedback sentences must never be replaced by a truncated token list.
       if (expected.sentence) {
@@ -592,8 +618,11 @@ async function main() {
         failures.push(`${entry.word}：例外表 baselineMs 与实测 ${actual.baseline.values.join('/')} 不符`)
       }
       const boundary = actual.currentMode === 'tail' ? 'append'
-        : actual.currentMode === 'internal' ? 'internal' : 'none'
-      if (entry.currentBoundary !== boundary) {
+        : actual.currentMode === 'lead' ? 'lead'
+          : actual.currentMode === 'internal' ? 'internal' : 'none'
+      // Older confirmed rows used tail for the same word-final boundary.
+      const expectedBoundary = entry.currentBoundary === 'tail' ? 'append' : entry.currentBoundary
+      if (expectedBoundary !== boundary) {
         failures.push(`${entry.word}：例外表边界 ${entry.currentBoundary} 与实测 ${boundary} 不符`)
       }
       const suggestion = entry.algorithmicSuggestion ?? entry.recommendation
@@ -610,6 +639,7 @@ async function main() {
       const reviews = results.filter((item) => item.needsListening)
       console.log(`  ${expectedCases.length}/${expectedCases.length} 通过：${expectedCases.length - reviews.length} 个词确认当前边界为 A/B 最优，${reviews.length} 个词（${reviews.map((item) => item.word).join('、') || '无'}）标记为「代理指标与人工结论冲突，需复听」`)
       console.log('  三字词禁用词尾边界、B 类归因、人工确认标记均齐备')
+      console.log(`  /i/ F2 自检通过：<${I_FINAL_F2_RISK_HZ} 报弱化，高声学正常，无声/噪声不可测且不误报`)
     }
   }
 }
@@ -620,17 +650,27 @@ function renderSummary(report) {
     '',
     `- 生成时间：${report.generatedAt}`,
     `- 词数 ${report.totals.cases} · 吞音 ${report.totals.swallowed} · 合并 ${report.totals.merged} · 前端类 ${report.totals.frontend} · 需复听 ${report.totals.needsListening} · 建议变更 ${report.totals.changesSuggested}`,
+    `- /i/ 尾音节检查 ${report.totals.iFinalChecks} · 弱化风险 ${report.totals.vowelReductionRisks} · 不可测 ${report.totals.vowelReductionUnmeasurable}`,
     '',
     '> 音节贡献度 = `dur(序列) − dur(删去该音素)`。<100ms 视为被吞，>350ms 视为吞并相邻音节。',
     '> **所有建议均需人工听音确认**，脚本不会自动改写覆盖表；≥3 字词禁止自动加词尾边界。',
     '> 「需复听」表示代理指标与人工结论冲突（如应天末音节被边界拉到 453ms），必须听音后决定，不得据分数自动改表。',
     '> 贡献度随上下文变化：边界决策以 `--verify` 的反馈原句为准；通用扫描的 `corpus-window` 仅用于批量筛查。',
+    '> `/i/ 尾音节`仅在前后缀对齐可信且 F1/F2 峰值可信时判定；F2<1700Hz 为弱化风险，无声或不可测记 `unmeasurable`。',
     '',
     '| 词 | 字数 | 类别 | 上下文 | 当前边界 | 各音节贡献 (ms) | 判定 | 推荐 | 原因 |',
     '| --- | ---: | --- | --- | --- | --- | --- | --- | --- |',
   ]
   for (const item of report.cases) {
     lines.push(`| ${item.word} | ${item.charCount} | ${item.class} | ${item.contextSource} | ${item.currentMode} | ${item.baseline.values.join(' / ')} | ${item.baseline.states.join(' / ')} | ${item.recommendation} | ${escapeCell(item.reason)} |`)
+  }
+  lines.push('', '## /i/ 尾音节元音弱化', '')
+  lines.push('| 词 | 变体 | 音节 | 音素 | 语境 | 时间 (ms) | F1 | F2 | 对齐 | 判定 | 原因 |')
+  lines.push('| --- | --- | ---: | --- | --- | --- | ---: | ---: | --- | --- | --- |')
+  for (const item of report.cases) {
+    for (const check of item.vowelReduction) {
+      lines.push(`| ${item.word} | ${check.variant} | ${check.syllableIndex + 1} | ${check.phone} | ${escapeCell(check.sentence ?? check.contextSource)} | ${check.startMs == null ? '—' : `${check.startMs}–${check.endMs}`} | ${check.f1 ?? '—'} | ${check.f2 ?? '—'} | ${check.alignment.confidence} | ${check.status} | ${escapeCell(check.reason)} |`)
+    }
   }
   lines.push('', '## 各边界方案得分（越高越均衡）', '')
   lines.push('| 词 | 无边界 | 词尾引号 | 词内引号 | 当前 |')

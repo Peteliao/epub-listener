@@ -91,6 +91,7 @@ describe('real WASM acoustic audit', () => {
       )
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
       expect(result.stdout).toContain('1/1 通过')
+      expect(result.stdout).toContain('/i/ F2 自检通过')
 
       const report = JSON.parse(await readFile(out, 'utf8')) as {
         cases: Array<{
@@ -99,8 +100,18 @@ describe('real WASM acoustic audit', () => {
           forbiddenTail: boolean
           baseline: { values: number[] }
           variants: Array<{ mode: string }>
+          vowelReduction: Array<{
+            phone: string; word: string; sentence: string; status: string
+            credible: boolean; f2: number | null
+          }>
         }>
-        policy: { forbidTailOnThreeCharWords: boolean; requiresHumanConfirmation: boolean }
+        totals: { iFinalChecks: number; vowelReductionRisks: number }
+        policy: {
+          forbidTailOnThreeCharWords: boolean
+          requiresHumanConfirmation: boolean
+          iFinalF2RiskHz: number
+          unknownFormantsNeverFlagged: boolean
+        }
       }
       expect(report.cases).toHaveLength(1)
       expect(report.cases[0].word).toBe('应立即')
@@ -108,8 +119,15 @@ describe('real WASM acoustic audit', () => {
       expect(report.cases[0].forbiddenTail).toBe(true)
       expect(report.cases[0].baseline.values).toHaveLength(3)
       expect(report.cases[0].variants.map((item) => item.mode)).toContain('tail')
+      expect(report.cases[0].vowelReduction.map((item) => item.phone)).toEqual(['li4', 'ji2'])
+      expect(report.cases[0].vowelReduction.every((item) =>
+        item.word === '应立即' && item.sentence && !(item.status === 'risk' && !item.credible),
+      )).toBe(true)
+      expect(report.totals.iFinalChecks).toBe(2)
       expect(report.policy.forbidTailOnThreeCharWords).toBe(true)
       expect(report.policy.requiresHumanConfirmation).toBe(true)
+      expect(report.policy.iFinalF2RiskHz).toBe(1700)
+      expect(report.policy.unknownFormantsNeverFlagged).toBe(true)
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

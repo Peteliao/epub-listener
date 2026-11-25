@@ -4,11 +4,15 @@ import type { ApprovedOverridesData } from './approvedOverrides.v1'
 import trainedNeutralsRaw from './trainedNeutrals.v1.txt?raw'
 
 // Bump when the rules change so cached per-book overlays are regenerated.
-export const BOOK_LEXICON_VERSION = 7
+export const BOOK_LEXICON_VERSION = 8
 export const MAX_BOOK_OVERLAY_ENTRIES = 2000
 
 const HAN = /\p{Script=Han}/u
-const PINYIN_OPTIONS = { toneType: 'num', v: true } as const
+const PINYIN_OPTIONS = {
+  toneType: 'num',
+  v: true,
+  toneSandhi: { yi: true, bu: true, thirdTone: false },
+} as const
 const MAX_WORD_LENGTH = 6
 const MAX_SENTENCE_LENGTH = 400
 const SANDHI_EXEMPT = new Set(['一', '不'])
@@ -479,6 +483,9 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
   const adverbialDe = new Set<string>()
   const standaloneCache = new Map<string, Phone[]>()
   const polyphonicCache = new Map<string, boolean>()
+  const sandhiPairs = new Map<string, Set<string>>()
+  const sandhiCounts = new Map<string, number>()
+  const coveredSandhiPairs = new Set<string>()
   const stats: BookLexiconStats = {
     chars: 0,
     sentences: 0,
@@ -608,6 +615,24 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
         }
       }
 
+      let hasSandhiPair = false
+      for (let index = 0; index < chars.length - 1; index += 1) {
+        if (!SANDHI_EXEMPT.has(chars[index]) || !HAN.test(chars[index + 1])) continue
+        const word = `${chars[index]}${chars[index + 1]}`
+        if (effective.has(word)) continue
+        hasSandhiPair = true
+        let readings = sandhiPairs.get(word)
+        if (!readings) {
+          readings = new Set<string>()
+          sandhiPairs.set(word, readings)
+        }
+        if (knownWord[index] || knownWord[index + 1]) {
+          coveredSandhiPairs.add(word)
+          readings.clear()
+          candidates.delete(word)
+        }
+      }
+
       const oovSegments: Array<{ word: string; start: number }> = []
       let offset = 0
       for (const word of words) {
@@ -627,7 +652,7 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
         if (covered) continue
         oovSegments.push({ word, start })
       }
-      if (!oovSegments.length) continue
+      if (!oovSegments.length && !hasSandhiPair) continue
 
       let alignment: PinyinItem[]
       try {
@@ -636,6 +661,19 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
         continue
       }
       if (alignment.length !== chars.length) continue
+
+      for (let index = 0; index < chars.length - 1; index += 1) {
+        if (!SANDHI_EXEMPT.has(chars[index]) || !HAN.test(chars[index + 1])) continue
+        const word = `${chars[index]}${chars[index + 1]}`
+        const readings = sandhiPairs.get(word)
+        if (!readings || coveredSandhiPairs.has(word)) continue
+        if (effective.has(word) || discarded.has(word)) continue
+        const first = alignment[index]
+        const second = alignment[index + 1]
+        if (!first?.isZh || !first.pinyin || !second?.isZh || !second.pinyin) continue
+        readings.add(readingsKey([splitPhone(first.pinyin), splitPhone(second.pinyin)]))
+        sandhiCounts.set(word, (sandhiCounts.get(word) ?? 0) + 1)
+      }
 
       for (const { word, start } of oovSegments) {
         stats.oov += 1
@@ -740,7 +778,63 @@ export function generateBookLexicon(input: BookLexiconInput): BookLexiconResult 
           candidates.set(word, { word, reading, count: 1 })
         }
       }
+
     }
+  }
+
+  for (const [word, contexts] of sandhiPairs) {
+    if (!contexts.size || coveredSandhiPairs.has(word)) continue
+    if (effective.has(word) || discarded.has(word)) continue
+    if (approved?.rejectedWords.includes(word)) {
+      reject(word)
+      continue
+    }
+    if (contexts.size !== 1) {
+      discardedReadings.add(word)
+      candidates.delete(word)
+      reject(word)
+      continue
+    }
+    const chars = Array.from(word)
+    const engine: Phone[] = []
+    for (const char of chars) {
+      const reading = effective.get(char)
+      const phone = reading ? phonesOf(reading)[0] : null
+      if (!phone) break
+      engine.push(phone)
+    }
+    if (engine.length !== chars.length) continue
+    const first = engine[0]!
+    const second = engine[1]!
+    const fallbackReading = readingsKey(engine)
+    if (chars[0] === '一' && first.base === 'yi') {
+      first.tone = second.tone === 4 ? 2 : 4
+    } else if (chars[0] === '不' && first.base === 'bu') {
+      first.tone = second.tone === 4 ? 2 : 4
+    } else {
+      continue
+    }
+    if (second.tone === null) continue
+    const reading = readingsKey(engine)
+    const [context] = contexts
+    if (context !== reading || reading === fallbackReading) continue
+    const existing = candidates.get(word)
+    if (existing) {
+      if (existing.reading !== reading) {
+        candidates.delete(word)
+        reject(word)
+      }
+      continue
+    }
+    if (engine.some((phone) => !tokens.has(phoneText(phone)))) {
+      reject(word)
+      continue
+    }
+    candidates.set(word, {
+      word,
+      reading,
+      count: sandhiCounts.get(word) ?? 0,
+    })
   }
 
   const sorted = Array.from(candidates.values()).sort((left, right) => {
