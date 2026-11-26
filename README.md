@@ -161,6 +161,8 @@ tests/           Vitest 测试与固定语料
 | `npm run audit:impact -- --overlay=<候选> --corpus=<book>` | 改动前后全书影响面 diff |
 | `npm run audit:acoustics -- --corpus=<book>` | 真实 WASM 逐音节时长与边界建议 |
 | `npm run audit:omission -- --verify` | 用完整反馈原句重建 token，验证每个音节可听 |
+| `npm run acoustic-cases:verify` | 全部 P2 案例的完整原句、生产文本链、实际组块与 token 结构门禁 |
+| `npm run audit:acoustic-cases -- --case=<id> --corpus=<book>` | 原生 token 校验后测量六种方案，输出 WAV、代理排序与待试听清单 |
 | `npm run audit:word-family -- --verify` | 词族逐词可听性回归 |
 | `npm run audit:envelope -- --case=<id>` | 整句包络测量（advisory） |
 | `npm run oov:recall` | 抽样列出探测器未命中的 OOV，供人工复听 |
@@ -171,6 +173,19 @@ tests/           Vitest 测试与固定语料
 | `npm run naturalness:score -- --rater=姓名` | 直接用冻结的 C2/C4 WAV 生成本地评分页与 JSON 评分表 |
 
 这些脚本全部是开发期工具：不进入应用包，不需要后端；整书语料默认只在本机使用。自然度评分命令只生成和校验个人评分表，不替代真人试听，也不据此自动改动生产参数。
+
+### P2 统一声学案例流程
+
+`audit-acoustic-cases.mjs` 将既有消融、包络、F2 和未训练轻声检查收敛到同一条可复现流程：保留完整反馈原句，重跑生产文本链并定位 Worker 实际合成的 U+2060 组块，先验证 token 覆盖，再用独立子进程核对原生 Matcha token；两者不一致就立即停止，不用镜像结果冒充测量。
+
+原生 token 一致后，逐语境比较**当前方案、词首边界、词尾边界、双端边界、真实语句重置、分段 PCM**，保存六份证据 WAV。三字及以上词尾边界只作诊断，不进入候选排序；贡献时长、包络、F2 与轻声结果只决定复听顺序，`preferredVariant` 和评分始终保持空白，直到用户亲耳试听。
+
+```bash
+npm run acoustic-cases:verify
+npm run audit:acoustic-cases -- --case=om-0008 --corpus=<book.epub> --family-limit=20
+```
+
+字族按同字、同词内偏移、同音素扩展，异读词排除。整书回归对全部匹配句校验目标音素，实测抽样再核对原生 token；生产链的 U+200B 词内保护边界在匹配时忽略、定位时保留。原生托管数字/字母只验证汉字覆盖并列入 `measurementSkipped`，不伪造完整 token 或声学测量。只有显式传入 `--corpus` 才运行，否则报告明确写 `not-run`。默认产物位于 `scripts/out/acoustic-cases*`，均为本地开发文件，不进入应用包或提交。
 
 ### 评测原则
 
@@ -209,7 +224,7 @@ tests/           Vitest 测试与固定语料
 
 ## 测试与部署
 
-- 测试：`npm test`，当前 **93 个测试文件 / 863 项通过**
+- 测试：`npm test`，当前 **94 个测试文件 / 883 项通过**
 - 读音门禁：`npm run audit:all`（新鲜 checkout 可运行，不依赖全书语料；声学冒烟可用 `--strict` 设为必需）
 - 构建：`npm run build`（`vue-tsc --noEmit` + vite）
 - CI：推送到 `main` 后，[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 会依次执行 `npm ci`、`npm test`、`npm run audit:all`、`npm run build`，然后发布到 GitHub Pages

@@ -47,6 +47,28 @@ describe('C2 标点 token 协议（不加载 WASM）', () => {
     ])
   })
 
+  it('原生 OOV 标点和符号按 Unicode 类别跳过且保留源边界', async () => {
+    const n = await naturalness()
+    const entries = new Map([['甲', 'jia3'], ['乙', 'yi3'], ['丙', 'bing3']])
+    const stream = n.buildTokenStream('甲（乙）◆丙。', entries, new Set(['jia3', 'yi3', 'bing3', '.']))
+    expect(stream.tokens).toEqual(['jia3', 'yi3', 'bing3', '.'])
+    expect(stream.omitted).toEqual([
+      { text: '（', charOffset: 1, reason: 'runtime-oov-skipped' },
+      { text: '）', charOffset: 3, reason: 'runtime-oov-skipped' },
+      { text: '◆', charOffset: 4, reason: 'runtime-oov-skipped' },
+    ])
+  })
+
+  it('原生托管数字只记录无 token 区间，不伪造音素', async () => {
+    const n = await naturalness()
+    const entries = new Map([['甲', 'jia3']])
+    const inventory = new Set(['jia3', '.'])
+    expect(() => n.buildTokenStream('甲1。', entries, inventory)).toThrow('拒绝静默丢弃')
+    const stream = n.buildTokenStream('甲1。', entries, inventory, { allowNativeManagedText: true })
+    expect(stream.tokens).toEqual(['jia3', '.'])
+    expect(stream.omitted).toEqual([{ text: '1', charOffset: 1, reason: 'native-managed-text' }])
+  })
+
   it('生产 normalize 把 … 变成 ……，token 实验明确保留六个 .', async () => {
     const n = await naturalness()
     const r = await reading()

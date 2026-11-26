@@ -38,6 +38,8 @@
     "audit:untrained-neutrals": "node scripts/audit-untrained-neutrals.mjs",
     "audit:untrained-neutrals:verify": "node scripts/audit-untrained-neutrals.mjs --verify",
     "audit:omission": "node scripts/audit-omission.mjs",
+    "audit:acoustic-cases": "node scripts/audit-acoustic-cases.mjs",
+    "acoustic-cases:verify": "node scripts/audit-acoustic-cases.mjs --verify",
     "audit:envelope": "node scripts/audit-envelope.mjs",
     "audit:external-data": "node scripts/audit-external-data.mjs",
     "oov:recall": "node scripts/oov-recall.mjs",

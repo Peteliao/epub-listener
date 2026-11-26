@@ -30,7 +30,9 @@ export const RUNTIME_PUNCTUATION = Object.freeze({
 // NormalizeText changes ； to ASCII ;, then the sentence splitter consumes it.
 // The real log's final IDs contain neither `;` nor a comma at that boundary.
 export const RUNTIME_REPLACEMENT = Object.freeze({ ...RUNTIME_PUNCTUATION, '；': ';', ';': ';' })
-export const OOV_PUNCTUATION = Object.freeze(['—', '“', '”', '‘', '’'])
+export const OOV_PUNCTUATION = /[\p{P}\p{S}\p{Z}\p{C}]/u
+const NATIVE_MANAGED_TEXT = /[\p{Letter}\p{Number}]/u
+const HAN = /\p{Script=Han}/u
 export const PCM_PAUSE_POLICY = Object.freeze({
   '，': 160,
   '、': 100,
@@ -104,7 +106,7 @@ function longestMatchSpans(text, entries) {
  * become comma, while full-width and ASCII semicolons emit no token.
  * Every emitted token is checked against the real tokens.txt inventory.
  */
-export function buildTokenStream(text, entries, tokenInventory) {
+export function buildTokenStream(text, entries, tokenInventory, options = {}) {
   const inventory = tokenInventory instanceof Set ? tokenInventory : new Set(tokenInventory)
   const tokens = []
   const ranges = []
@@ -123,8 +125,10 @@ export function buildTokenStream(text, entries, tokenInventory) {
       omitted.push({ text: char, charOffset: span.start, reason: 'word-boundary-no-token' })
     } else if (Object.hasOwn(RUNTIME_PUNCTUATION, char)) {
       tokens.push(RUNTIME_PUNCTUATION[char])
-    } else if (OOV_PUNCTUATION.includes(char)) {
+    } else if (OOV_PUNCTUATION.test(char)) {
       omitted.push({ text: char, charOffset: span.start, reason: 'runtime-oov-skipped' })
+    } else if (options.allowNativeManagedText && NATIVE_MANAGED_TEXT.test(char) && !HAN.test(char)) {
+      omitted.push({ text: char, charOffset: span.start, reason: 'native-managed-text' })
     } else if (!/\s/u.test(char)) {
       throw new Error(`无词典或标点规则，拒绝静默丢弃：${JSON.stringify(char)} @ ${span.start}`)
     }
