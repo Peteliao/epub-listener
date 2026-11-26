@@ -164,7 +164,7 @@ describe('P2 acoustic case planning', () => {
     context.nativeComparison = mismatch
     const manifest = {
       protocol: helpers.ACOUSTIC_CASE_PROTOCOL, mode: 'measure', listeningAccuracy: null,
-      cases: [plan],
+      tokenInventory: [...assets.tokens], cases: [plan],
     }
     expect(helpers.validateAcousticCaseManifest(manifest).join(' ')).toContain('原生 token')
   }, 20_000)
@@ -189,7 +189,7 @@ describe('P2 acoustic case planning', () => {
     }
     const errors = helpers.validateAcousticCaseManifest({
       protocol: helpers.ACOUSTIC_CASE_PROTOCOL, mode: 'measure', listeningAccuracy: null,
-      cases: [plan],
+      tokenInventory: [...assets.tokens], cases: [plan],
     })
     expect(errors.join(' ')).toContain('可信的原生 token')
     expect(errors.join(' ')).toContain('utterance-reset 缺少有效声学测量')
@@ -207,9 +207,9 @@ describe('P2 acoustic case planning', () => {
     const context = {
       sentence: '阿。',
       actualGroup: { text: '阿。' },
-      tokenStream: { tokens, sha256: helpers.sha256(JSON.stringify(tokens)), inventoryValid: true },
+      tokenStream: { tokens, sha256: helpers.sha256(JSON.stringify(tokens)), inventoryValid: true, nativeManaged: [] },
       fullSentenceCoverage: { ok: true },
-      target: { count: 1 },
+      target: { word: '阿', count: 1, tokenStart: 0, tokenEnd: 1, phones: ['a1'], offset: 0, phone: 'a1' },
       variants,
       nativeComparison: {
         captured: true, ok: true, status: 'match', expected: tokens, actual: tokens, sentences: [tokens],
@@ -219,21 +219,55 @@ describe('P2 acoustic case planning', () => {
       protocol: helpers.ACOUSTIC_CASE_PROTOCOL,
       mode: 'measure-typo',
       listeningAccuracy: null,
+      tokenInventory: ['a1'],
       cases: [{ id: 'forged', contexts: [context] }],
     }
     expect(helpers.validateAcousticCaseManifest(manifest)).toContain('模式无效')
     manifest.mode = 'measure'
     variants[0].comparable = false
     const reset = variants.find((variant: any) => variant.id === 'utterance-reset')
+    reset.resetText = '阿。'
     reset.comparable = false
     reset.reason = ''
     expect(helpers.validateAcousticCaseManifest(manifest)).toEqual(expect.arrayContaining([
-      'forged：current 不可比较状态无效',
-      'forged：utterance-reset 不可比较状态无效',
+      'forged：current 可比较状态与计划不一致',
+      'forged：utterance-reset 不可比较原因无效',
     ]))
-    reset.reason = '目标已在组块开头'
-    expect(helpers.validateAcousticCaseManifest(manifest)).not.toContain('forged：utterance-reset 不可比较状态无效')
+    reset.reason = '目标已在组块开头，当前方案已包含等价语句重置'
+    expect(helpers.validateAcousticCaseManifest(manifest)).not.toContain('forged：utterance-reset 不可比较原因无效')
   })
+
+  it('binds measure manifests to nonempty targets, token inventory and planned variants', async () => {
+    const { assets, frontend, overlayText, records, helpers } = await setup()
+    const item = records.find((entry: any) => entry.id === 'om-0007')
+    const plan = await helpers.planAcousticCase(item, { assets, frontend, overlayText })
+    const manifest = {
+      protocol: helpers.ACOUSTIC_CASE_PROTOCOL, mode: 'structural-verify', listeningAccuracy: null,
+      tokenInventory: [...assets.tokens], cases: [plan],
+    }
+    expect(helpers.validateAcousticCaseManifest(manifest)).toEqual([])
+    expect(helpers.validateAcousticCaseManifest({ ...manifest, cases: [] })).toContain('cases 不能为空')
+
+    const zeroTarget = structuredClone(manifest)
+    zeroTarget.cases[0].contexts[0].target.count = 0
+    expect(helpers.validateAcousticCaseManifest(zeroTarget).join(' ')).toContain('目标音节数无效')
+
+    const unknownToken = structuredClone(manifest)
+    const unknownContext = unknownToken.cases[0].contexts[0]
+    unknownContext.tokenStream.tokens = ['not-a-token']
+    unknownContext.tokenStream.sha256 = helpers.sha256(JSON.stringify(unknownContext.tokenStream.tokens))
+    expect(helpers.validateAcousticCaseManifest(unknownToken).join(' ')).toContain('token 完整性未通过')
+
+    const alteredVariant = structuredClone(manifest)
+    alteredVariant.cases[0].contexts[0].variants[0].tokens.push('"')
+    expect(helpers.validateAcousticCaseManifest(alteredVariant).join(' ')).toContain('current 未绑定当前 token 流')
+
+    const forgedReset = structuredClone(manifest)
+    const reset = forgedReset.cases[0].contexts[0].variants.find((variant: any) => variant.id === 'utterance-reset')
+    reset.comparable = false
+    reset.reason = 'x'
+    expect(helpers.validateAcousticCaseManifest(forgedReset).join(' ')).toContain('utterance-reset 可比较状态与计划不一致')
+  }, 20_000)
 
   it('stops before synthesis when native token capture fails', async () => {
     const { assets, frontend, overlayText, records, helpers } = await setup()
@@ -249,6 +283,22 @@ describe('P2 acoustic case planning', () => {
     expect(synth.generate).not.toHaveBeenCalled()
     expect(synth.contributions).not.toHaveBeenCalled()
     expect(synth.save).not.toHaveBeenCalled()
+  }, 20_000)
+
+  it('rejects native-managed text before probing or measuring a main case', async () => {
+    const { assets, frontend, overlayText, records, helpers } = await setup()
+    const { measureContext } = await import('../scripts/audit-acoustic-cases.mjs') as any
+    const item = records.find((entry: any) => entry.id === 'om-0007')
+    const plan = await helpers.planAcousticCase(item, { assets, frontend, overlayText })
+    item.assets = assets
+    plan.contexts[0].tokenStream.nativeManaged = [{ text: 'hello', charOffset: 0, reason: 'native-managed-text' }]
+    const nativeProbe = vi.fn()
+    const synth = { generate: vi.fn(), contributions: vi.fn(), save: vi.fn() }
+    await expect(measureContext(
+      synth, item, plan.contexts[0], 0, { noAudio: true, lexiconPath: 'unused' }, nativeProbe,
+    )).rejects.toThrow('无法进行完整声学测量')
+    expect(nativeProbe).not.toHaveBeenCalled()
+    expect(synth.generate).not.toHaveBeenCalled()
   }, 20_000)
 
   it('ranks only comparable measured variants and never claims listening accuracy', async () => {
@@ -327,6 +377,39 @@ describe('P2 acoustic case CLI', () => {
     expect(result.structuralFailures.some((failure: string) =>
       failure.includes('里立刻') && failure.includes('目标音素漂移'))).toBe(true)
   }, 20_000)
+
+  it('discovers normalized family words without splitting a long sentence at 400 characters', async () => {
+    const { assets, frontend, overlayText, records, helpers } = await setup()
+    const { familyRegression } = await import('../scripts/audit-acoustic-cases.mjs') as any
+    const item = records.find((entry: any) => entry.id === 'om-0007')
+    Object.assign(item, await helpers.planAcousticCase(item, { assets, frontend, overlayText }), {
+      assets, frontend, overlayText,
+    })
+    const result = await familyRegression(item, { familyLimit: 1, noAudio: true, synth: null }, [
+      '立\u200b刻。', '立 刻。', `${'甲'.repeat(399)}立刻${'乙'.repeat(20)}。`,
+    ].join('\n'))
+    expect(result.status).toBe('structure-passed')
+    expect(result.rawMatchedSentences).toBe(3)
+    expect(result.matchedSentences).toBe(3)
+    expect(result.structuralFailures).toEqual([])
+  }, 20_000)
+
+  it('rejects an explicitly empty corpus instead of reporting not-run', async () => {
+    const { familyRegression } = await import('../scripts/audit-acoustic-cases.mjs') as any
+    const result = await familyRegression({}, { familyLimit: 1, noAudio: true, synth: null }, '')
+    expect(result.status).toBe('failed')
+    expect(result.reason).toBe('--corpus 为空')
+    const dir = await mkdtemp(join(tmpdir(), 'shusheng-acoustic-empty-'))
+    try {
+      const cli = spawnSync(process.execPath, [
+        'scripts/audit-acoustic-cases.mjs', '--verify', '--corpus=',
+      ], { cwd: root, encoding: 'utf8', timeout: 30_000 })
+      expect(cli.status).not.toBe(0)
+      expect(cli.stderr).toContain('--corpus 不能为空')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 
   it('keeps native-managed numbers and protected word boundaries as structural evidence', async () => {
     const { assets, frontend, overlayText, records, helpers } = await setup()

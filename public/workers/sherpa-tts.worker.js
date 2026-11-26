@@ -62,6 +62,7 @@ const UTTERANCE_RESET = '\u2060'
 const UTTERANCE_RESET_GAP_MS = 120
 const WORD_JOINER = '\u200b'
 const MATCHA_FRONTEND_VERSION = 'matcha-g2p-v1'
+const MATCHA_NATIVE_FRONTEND = 'native'
 const MAX_TOKENS_PER_REQUEST = 8192
 
 // These are the punctuation symbols the Baker frontend actually emits. In
@@ -308,8 +309,8 @@ async function init(data) {
     if (lang === 'en') slot.oovWords = buildOovWords(fs, data, slot.dir)
     if (lang === 'zh' && slot.modelType === 'matcha') {
       // Read back what writeModelFiles actually put in MEMFS, including the
-      // lexicon overlay. The optional shadow frontend must never diverge from
-      // the native instance's effective lexicon/token inventory.
+      // lexicon overlay. The default frontend must never diverge from the
+      // native instance's effective lexicon/token inventory.
       slot.frontend = buildMatchaFrontend(fs, data, slot.dir)
     }
 
@@ -611,13 +612,13 @@ function buildMatchaFrontend(fs, data, dir) {
     }
     return createMatchaFrontend(lexiconText, tokensText)
   } catch {
-    // The frontend is opt-in; a missing token inventory must not prevent the
-    // existing native model from initializing.
+    // A missing token inventory must not prevent the native model from
+    // initializing; text requests report a conservative native fallback.
     return null
   }
 }
 
-/** Pure, deliberately small Matcha shadow frontend (no jieba/FST/number rules). */
+/** Pure, deliberately small Matcha application frontend (no jieba/FST/number rules). */
 function createMatchaFrontend(lexiconText, tokensText) {
   const tokens = new Set()
   for (const line of String(tokensText).replace(/^\uFEFF/, '').split(/\r?\n/)) {
@@ -735,7 +736,7 @@ function matchaTextToTokens(text, frontend, options = {}) {
   const failure = appendRange(rangeStart, chars.length)
   if (failure) return failure
   if (coverageOnly) return { supported: true, tokens: [] }
-  return tokens.length > 0
+  return tokens.length > 0 || options.allowEmpty === true
     ? { supported: true, tokens }
     : unsupported('empty', 0)
 }
@@ -874,9 +875,11 @@ async function synthesize(data) {
         ? spellOovWords(data.text, slot.oovWords)
         : data.text
 
-    // Opt-in only. The default and every fallback below retain the original
-    // native text path, including its U+2060 split/120ms join behavior.
+    // Chinese Matcha defaults to the application's complete token frontend.
+    // Explicit native mode is retained for controlled A/B; unsupported numbers
+    // or Latin fall back as one whole request, never as a partial token stream.
     const canUseMatchaFrontend = lang === 'zh' && slot.modelType === 'matcha'
+    const requestedFrontend = data.frontendVersion
     let frontend = 'native'
     let tokenCount = null
     let directTokens = null
@@ -928,14 +931,22 @@ async function synthesize(data) {
         })
         return
       }
-    } else if (canUseMatchaFrontend && data.frontendVersion !== undefined) {
+    } else if (canUseMatchaFrontend && requestedFrontend === MATCHA_NATIVE_FRONTEND) {
+      frontend = MATCHA_NATIVE_FRONTEND
+    } else if (
+      canUseMatchaFrontend &&
+      (requestedFrontend === undefined || requestedFrontend === MATCHA_FRONTEND_VERSION)
+    ) {
       frontend = 'native-fallback'
-      if (data.frontendVersion === MATCHA_FRONTEND_VERSION && slot.frontend) {
+      if (slot.frontend) {
         const resetParts = utteranceParts(text, true)
         const inputs = resetParts || [text]
         // Convert every part before generating any audio. One unsupported part
-        // invalidates the whole shadow request; no partial/fused fallback.
-        const converted = inputs.map((input) => matchaTextToTokens(input, slot.frontend))
+        // invalidates the whole request; no partial/fused fallback. Empty token
+        // parts stay explicit so punctuation-only resets retain the 120ms gap.
+        const converted = inputs.map((input) => matchaTextToTokens(input, slot.frontend, {
+          allowEmpty: Boolean(resetParts),
+        }))
         const count = converted.reduce(
           (sum, part) => sum + (part.supported ? part.tokens.length : 0),
           0,
@@ -950,6 +961,8 @@ async function synthesize(data) {
           tokenCount = count
         }
       }
+    } else if (canUseMatchaFrontend && requestedFrontend !== undefined) {
+      frontend = 'native-fallback'
     }
 
     if (!directTokens) {
@@ -959,6 +972,9 @@ async function synthesize(data) {
 
     const generate = (input, tokens) => {
       if (tokens) {
+        if (tokens.length === 0) {
+          return { samples: new Float32Array(0), sampleRate: slot.sampleRate }
+        }
         if (typeof slot.tts.generateWithConfig !== 'function') {
           throw new Error('当前离线音色运行时不支持 tokens 直输。')
         }

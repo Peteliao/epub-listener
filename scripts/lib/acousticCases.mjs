@@ -175,6 +175,7 @@ function edgeVariant(kind, stream) {
     id: kind,
     label: { lead: '词首边界', tail: '词尾边界', both: '词首 + 词尾边界' }[kind],
     kind: 'boundary',
+    comparable: true,
     tokens,
     start,
     count: stream.count,
@@ -194,8 +195,12 @@ function resetVariant(text, word) {
     label: '真实语句重置（Worker 独立合成 + 120ms 拼接）',
     kind: 'utterance-reset',
     resetText: index < 0 ? text : `${before}${UTTERANCE_RESET}${after}`,
-    comparable: Boolean(index >= 0 && before.trim()),
-    reason: index < 0 ? '无法定位目标词' : before.trim() ? null : '目标已在组块开头，当前方案已包含等价语句重置',
+    comparable: Boolean(index >= 0 && before.replace(/[\p{C}\p{Z}]/gu, '')),
+    reason: index < 0
+      ? '无法定位目标词'
+      : before.replace(/[\p{C}\p{Z}]/gu, '')
+        ? null
+        : '目标已在组块开头，当前方案已包含等价语句重置',
   }
 }
 
@@ -274,14 +279,21 @@ export async function planAcousticCase(c, { assets, frontend, overlayText }) {
         phones: stream.phones,
       }
       const segmented = segmentedVariant(text, c.word, assets)
+      const reset = resetVariant(text, c.word)
+      const resetPlan = planUtteranceReset(reset.resetText, c.word, assets)
+      reset.expectedTokens = resetPlan.target?.tokens ?? []
+      reset.expectedStart = resetPlan.target?.range?.start ?? null
+      reset.expectedCount = resetPlan.target?.count ?? 0
+      reset.expectedPhones = resetPlan.target?.phones ?? []
       const variants = [
         {
           id: 'current', label: '当前生产方案', kind: 'current',
-          tokens: stream.tokens, start: range.start, count: stream.count,
+          comparable: true,
+          tokens: [...stream.tokens], start: range.start, count: stream.count,
           targetPhones: stream.phones, forbidden: null,
         },
         edgeVariant('lead', stream), edgeVariant('tail', stream), edgeVariant('both', stream),
-        resetVariant(text, c.word), segmented,
+        reset, segmented,
       ]
       contexts.push({
         source, sentence,
@@ -302,6 +314,7 @@ export async function planAcousticCase(c, { assets, frontend, overlayText }) {
           sha256: sha256(JSON.stringify(stream.tokens)),
           inventoryValid: true,
           coverage: stream.coverage,
+          nativeManaged: stream.nativeManaged,
         },
         fullSentenceCoverage: full.coverage,
         neutralDiagnostics: neutralDiagnostics(stream.tokens, assets.neutrals),
@@ -401,11 +414,100 @@ function nativeAgreementValid(context) {
     && JSON.stringify(comparison.actual) === JSON.stringify(comparison.sentences.flat())
 }
 
+function sameTokens(left, right) {
+  return Array.isArray(left) && Array.isArray(right) && JSON.stringify(left) === JSON.stringify(right)
+}
+
+function expectedEdgeTokens(kind, tokens, start, count) {
+  const base = stripWordBoundaries(tokens, start, count)
+  if (kind === 'lead' || kind === 'both') base.splice(start, 0, '"')
+  if (kind === 'tail' || kind === 'both') base.splice(start + count + (kind === 'both' ? 1 : 0), 0, '"')
+  return base
+}
+
+function expectedVariant(variant, context) {
+  const tokens = context.tokenStream?.tokens
+  const target = context.target
+  if (!Array.isArray(tokens) || !target) return null
+  if (['current', 'lead', 'tail', 'both'].includes(variant.id)) {
+    return {
+      comparable: true,
+      tokens: variant.id === 'current' ? tokens : expectedEdgeTokens(variant.id, tokens, target.tokenStart, target.count),
+      start: target.tokenStart,
+      count: target.count,
+      phones: target.phones,
+    }
+  }
+  if (variant.id === 'utterance-reset') {
+    const sourceText = context.actualGroup?.text ?? ''
+    const index = sourceText.indexOf(target.word)
+    const prefix = index < 0 ? '' : sourceText.slice(0, index)
+    const comparable = Boolean(index >= 0 && prefix.replace(/[\p{C}\p{Z}]/gu, ''))
+    const resetText = index < 0 ? sourceText : `${prefix}${UTTERANCE_RESET}${sourceText.slice(index)}`
+    const resetPlan = context.assets
+      ? planUtteranceReset(resetText, target.word, context.assets)
+      : null
+    return {
+      comparable,
+      reason: comparable ? null : index < 0 ? '无法定位目标词' : '目标已在组块开头，当前方案已包含等价语句重置',
+      resetText,
+      tokens: resetPlan?.target?.tokens ?? variant.expectedTokens,
+      start: resetPlan?.target?.range?.start ?? variant.expectedStart,
+      count: resetPlan?.target?.count ?? variant.expectedCount,
+      phones: resetPlan?.target?.phones ?? variant.expectedPhones,
+    }
+  }
+  if (variant.id === 'segmented-pcm') {
+    const segments = Array.isArray(variant.segments) ? variant.segments : []
+    const index = variant.targetSegmentIndex
+    const segment = Number.isInteger(index) && index >= 0 ? segments[index] : null
+    const comparable = Boolean(segment?.ranges?.some((range) => range.word === target.word))
+    return {
+      comparable,
+      reason: comparable ? null : '目标词不在有效分段中',
+      tokens: segment?.tokens,
+      start: segment?.range?.start,
+      count: segment?.count,
+      phones: segment?.phones,
+    }
+  }
+  return null
+}
+
+function validateTarget(context, inventory, errors, caseId) {
+  const target = context.target
+  const tokens = context.tokenStream?.tokens
+  if (!Number.isInteger(target?.count) || target.count <= 0) {
+    errors.push(`${caseId}：目标音节数无效`)
+    return
+  }
+  if (!Number.isInteger(target.tokenStart) || target.tokenStart < 0
+    || !Number.isInteger(target.tokenEnd) || target.tokenEnd <= target.tokenStart
+    || target.tokenEnd > (tokens?.length ?? 0)) {
+    errors.push(`${caseId}：目标 token 范围无效`)
+    return
+  }
+  if (!Array.isArray(target.phones) || target.phones.length !== target.count
+    || !target.phones.every((phone) => inventory.has(phone))) {
+    errors.push(`${caseId}：目标音素清单无效`)
+    return
+  }
+  const actual = tokens.slice(target.tokenStart, target.tokenEnd).filter((token) => token !== '"')
+  if (!sameTokens(actual, target.phones)) errors.push(`${caseId}：目标音素与 token 范围不一致`)
+  if (!Number.isInteger(target.offset) || target.offset < 0 || target.offset >= target.count
+    || target.phones[target.offset] !== target.phone) {
+    errors.push(`${caseId}：目标字偏移或音素无效`)
+  }
+}
+
 export function validateAcousticCaseManifest(manifest) {
   const errors = []
   if (manifest?.protocol !== ACOUSTIC_CASE_PROTOCOL) errors.push('协议不匹配')
   if (!['structural-verify', 'measure'].includes(manifest?.mode)) errors.push('模式无效')
   if (!Array.isArray(manifest?.cases)) return [...errors, 'cases 不是数组']
+  if (!manifest.cases.length) errors.push('cases 不能为空')
+  const inventory = new Set(Array.isArray(manifest.tokenInventory) ? manifest.tokenInventory : [])
+  if (!inventory.size) errors.push('缺少有效 token 清单')
   const ids = new Set()
   for (const item of manifest.cases) {
     if (ids.has(item.id)) errors.push(`重复案例 ${item.id}`)
@@ -417,35 +519,69 @@ export function validateAcousticCaseManifest(manifest) {
       if (context.tokenStream?.inventoryValid !== true
         || !Array.isArray(tokens)
         || !tokens.length
+        || !tokens.every((token) => inventory.has(token))
         || context.tokenStream.sha256 !== sha256(JSON.stringify(tokens))
         || context.fullSentenceCoverage?.ok !== true) {
         errors.push(`${item.id}：token 完整性未通过`)
       }
+      if (!Array.isArray(context.tokenStream?.nativeManaged)) errors.push(`${item.id}：缺少原生托管文本清单`)
+      validateTarget(context, inventory, errors, item.id)
       const variants = Array.isArray(context.variants) ? context.variants : []
       if (variants.map((variant) => variant.id).join(',') !== ACOUSTIC_CASE_VARIANTS.join(',')) {
         errors.push(`${item.id}：六种比较方案不完整`)
       }
       if (manifest.mode === 'measure') {
+        if (context.tokenStream?.nativeManaged?.length) errors.push(`${item.id}：原生托管文本不得进入完整声学测量`)
         if (!nativeAgreementValid(context)) errors.push(`${item.id}：测量模式缺少可信的原生 token 一致性证据`)
-        for (const variant of variants) {
-          const required = ['current', 'lead', 'tail', 'both'].includes(variant.id)
-          if (variant.comparable === false) {
-            if (required || typeof variant.reason !== 'string' || !variant.reason.trim()) {
-              errors.push(`${item.id}：${variant.id} 不可比较状态无效`)
-            }
-            continue
+        const nativeTokens = [
+          ...(context.nativeComparison?.expected ?? []), ...(context.nativeComparison?.actual ?? []),
+          ...(context.nativeComparison?.sentences ?? []).flat(),
+        ]
+        if (nativeTokens.some((token) => !inventory.has(token))) errors.push(`${item.id}：原生 token 不在清单中`)
+      } else if (context.nativeComparison && !nativeAgreementValid(context)) {
+        errors.push(`${item.id}：原生 token 不匹配`)
+      }
+      for (const variant of variants) {
+        const expected = expectedVariant(variant, context)
+        if (!expected) {
+          errors.push(`${item.id}：${variant.id} 无法绑定计划 token 流`)
+          continue
+        }
+        if (variant.comparable !== expected.comparable) errors.push(`${item.id}：${variant.id} 可比较状态与计划不一致`)
+        if (!expected.comparable) {
+          if (variant.reason !== expected.reason) errors.push(`${item.id}：${variant.id} 不可比较原因无效`)
+          continue
+        }
+        if (['current', 'lead', 'tail', 'both'].includes(variant.id)
+          && (!sameTokens(variant.tokens, expected.tokens)
+            || variant.start !== expected.start
+            || variant.count !== expected.count
+            || !sameTokens(variant.targetPhones, expected.phones))) {
+          errors.push(`${item.id}：${variant.id} 未绑定当前 token 流`)
+        }
+        if (variant.id === 'utterance-reset'
+          && (variant.resetText !== expected.resetText
+            || !sameTokens(variant.expectedTokens, expected.tokens)
+            || variant.expectedStart !== expected.start
+            || variant.expectedCount !== expected.count
+            || !sameTokens(variant.expectedPhones, expected.phones))) {
+          errors.push(`${item.id}：utterance-reset 未绑定实际组块计划`)
+        }
+        if (manifest.mode === 'measure') {
+          if (!sameTokens(variant.effectiveTokens, expected.tokens)
+            || variant.effectiveStart !== expected.start
+            || variant.effectiveCount !== expected.count) {
+            errors.push(`${item.id}：${variant.id} 测量 token 流与计划不一致`)
           }
           const values = variant.measurement?.values
           if (!Array.isArray(values)
-            || values.length !== context.target?.count
+            || values.length !== expected.count
             || !values.every((value) => Number.isFinite(value))
             || !Number.isFinite(variant.measurement?.score)
             || !Array.isArray(variant.measurement?.states)) {
             errors.push(`${item.id}：${variant.id} 缺少有效声学测量`)
           }
         }
-      } else if (context.nativeComparison && !nativeAgreementValid(context)) {
-        errors.push(`${item.id}：原生 token 不匹配`)
       }
     }
   }

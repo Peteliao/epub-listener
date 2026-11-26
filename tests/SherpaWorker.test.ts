@@ -258,7 +258,7 @@ function coverage(text: string): FrontendResult {
   ) as FrontendResult
 }
 
-describe('Matcha shadow frontend golden tokens', () => {
+describe('Matcha application frontend golden tokens', () => {
   it('uses the longest lexicon match', () => {
     expect(frontend('学会计')).toEqual({ supported: true, tokens: ['xue2', 'hui4', 'ji4'] })
     expect(frontend('重庆银行')).toEqual({
@@ -438,22 +438,24 @@ describe('Sherpa worker VITS packs', () => {
 })
 
 describe('Sherpa worker Matcha frontend', () => {
-  it('keeps the default text path byte-for-byte and reports native diagnostics', async () => {
+  it('defaults supported text to complete G2P tokens and reports the frontend', async () => {
     const worker = runtime()
     await ready(worker)
     const text = '学\u200b会计，—'
-    worker.send(synth('native', text))
+    worker.send(synth('default-g2p', text))
     await worker.drain()
 
     expect(worker.generateWithConfig).toHaveBeenCalledTimes(1)
-    expect(worker.generateWithConfig.mock.calls[0]![0]).toBe(text)
-    expect(worker.generateWithConfig.mock.calls[0]![1]).not.toHaveProperty('tokens')
-    expect(result(worker, 'native')).toMatchObject({
-      frontend: 'native',
-      tokenCount: null,
+    expect(worker.generateWithConfig.mock.calls[0]).toEqual([
+      '',
+      expect.objectContaining({ tokens: [['xue2', 'kuai4', 'ji4', ',']] }),
+    ])
+    expect(result(worker, 'default-g2p')).toMatchObject({
+      frontend: 'matcha-g2p-v1',
+      tokenCount: 4,
       sampleRate: 22050,
     })
-    expect(result(worker, 'native')).not.toHaveProperty('tokens')
+    expect(result(worker, 'default-g2p')).not.toHaveProperty('tokens')
   })
 
   it.each([undefined, 'matcha-g2p-v1'])(
@@ -475,14 +477,26 @@ describe('Sherpa worker Matcha frontend', () => {
     },
   )
 
-  it('keeps native number handling outside the Han coverage guard', async () => {
+  it('falls back the whole request to native number handling', async () => {
     const worker = runtime()
     await ready(worker)
     worker.send(synth('native-number', '你好2，v1.2.3。'))
     await worker.drain()
 
     expect(worker.generateWithConfig.mock.calls[0]![0]).toBe('你好2，v1.2.3。')
-    expect(result(worker, 'native-number')).toMatchObject({ frontend: 'native' })
+    expect(worker.generateWithConfig.mock.calls[0]![1]).not.toHaveProperty('tokens')
+    expect(result(worker, 'native-number')).toMatchObject({ frontend: 'native-fallback' })
+  })
+
+  it('keeps an explicit native mode for controlled comparison', async () => {
+    const worker = runtime()
+    await ready(worker)
+    worker.send(synth('native-mode', '你好2，v1.2.3。', { frontendVersion: 'native' }))
+    await worker.drain()
+
+    expect(worker.generateWithConfig.mock.calls[0]![0]).toBe('你好2，v1.2.3。')
+    expect(worker.generateWithConfig.mock.calls[0]![1]).not.toHaveProperty('tokens')
+    expect(result(worker, 'native-mode')).toMatchObject({ frontend: 'native', tokenCount: null })
   })
 
   it('reports an invalid effective lexicon entry instead of synthesizing around it', async () => {
@@ -504,7 +518,7 @@ describe('Sherpa worker Matcha frontend', () => {
   it('keeps native U+2060 splitting and the 120ms PCM join', async () => {
     const worker = runtime()
     await ready(worker)
-    worker.send(synth('native-parts', '你好\u2060重庆'))
+    worker.send(synth('native-parts', '你好\u2060重庆', { frontendVersion: 'native' }))
     await worker.drain()
 
     expect(worker.generateWithConfig.mock.calls.map(([input, config]) => [input, config.tokens])).toEqual([
@@ -514,7 +528,7 @@ describe('Sherpa worker Matcha frontend', () => {
     expect(new Float32Array(result(worker, 'native-parts').samples as ArrayBuffer)).toHaveLength(2 + 2646 + 2)
   })
 
-  it('sends shadow G2P as empty text plus a complete token sequence', async () => {
+  it('sends the application G2P as empty text plus a complete token sequence', async () => {
     const worker = runtime()
     await ready(worker)
     worker.send(synth('g2p', '你好，重庆！', { frontendVersion: 'matcha-g2p-v1' }))
@@ -556,23 +570,40 @@ describe('Sherpa worker Matcha frontend', () => {
     expect(new Float32Array(result(worker, 'g2p-parts').samples as ArrayBuffer)).toHaveLength(2 + 2646 + 2)
   })
 
-  it('falls back the entire request to native text when any part is unsupported', async () => {
+  it('keeps punctuation-only reset parts as zero-sample PCM with the 120ms join', async () => {
     const worker = runtime()
     await ready(worker)
-    worker.send(synth('fallback', '你好\u2060 2', { frontendVersion: 'matcha-g2p-v1' }))
+    worker.send(synth('empty-reset-part', '“\u2060你好”'))
     await worker.drain()
 
-    // No first-part token synthesis may happen before the second part fails.
-    expect(worker.generateWithConfig.mock.calls.map(([input, config]) => [input, config.tokens])).toEqual([
-      ['你好', undefined],
-      ['2', undefined],
-    ])
-    expect(result(worker, 'fallback')).toMatchObject({
-      frontend: 'native-fallback',
-      tokenCount: null,
+    expect(worker.generateWithConfig).toHaveBeenCalledTimes(1)
+    expect(worker.generateWithConfig.mock.calls[0]![1].tokens).toEqual([['ni3', 'hao3']])
+    expect(result(worker, 'empty-reset-part')).toMatchObject({
+      frontend: 'matcha-g2p-v1', tokenCount: 2,
     })
-    expect(new Float32Array(result(worker, 'fallback').samples as ArrayBuffer)).toHaveLength(2 + 2646 + 2)
+    expect(new Float32Array(result(worker, 'empty-reset-part').samples as ArrayBuffer)).toHaveLength(2646 + 2)
   })
+
+  it.each([undefined, 'matcha-g2p-v1'])(
+    'falls back the entire request to native text when any part is unsupported: %s',
+    async (frontendVersion) => {
+      const worker = runtime()
+      await ready(worker)
+      worker.send(synth('fallback', '你好\u2060 2', { frontendVersion }))
+      await worker.drain()
+
+      // No first-part token synthesis may happen before the second part fails.
+      expect(worker.generateWithConfig.mock.calls.map(([input, config]) => [input, config.tokens])).toEqual([
+        ['你好', undefined],
+        ['2', undefined],
+      ])
+      expect(result(worker, 'fallback')).toMatchObject({
+        frontend: 'native-fallback',
+        tokenCount: null,
+      })
+      expect(new Float32Array(result(worker, 'fallback').samples as ArrayBuffer)).toHaveLength(2 + 2646 + 2)
+    },
+  )
 
   it('uses native fallback for an unknown frontend version', async () => {
     const worker = runtime()
@@ -597,7 +628,7 @@ describe('Sherpa worker Matcha frontend', () => {
     expect(patched).toContain('重庆 chong2 qing4')
 
     worker.generateWithConfig.mockClear()
-    worker.send(synth('overlay', '重庆', { frontendVersion: 'matcha-g2p-v1' }))
+    worker.send(synth('overlay', '重庆'))
     await worker.drain()
     expect(worker.generateWithConfig.mock.calls[0]![1].tokens).toEqual([['chong2', 'qing4']])
   })
@@ -605,7 +636,7 @@ describe('Sherpa worker Matcha frontend', () => {
   it('honors U+200B whole-word protection in the worker frontend', async () => {
     const worker = runtime()
     await ready(worker)
-    worker.send(synth('boundary', '学\u200b会计', { frontendVersion: 'matcha-g2p-v1' }))
+    worker.send(synth('boundary', '学\u200b会计'))
     await worker.drain()
     expect(worker.generateWithConfig.mock.calls[0]![1].tokens).toEqual([['xue2', 'kuai4', 'ji4']])
   })
@@ -672,7 +703,7 @@ describe('Sherpa worker Matcha frontend', () => {
   it.each([
     { label: 'non-Matcha', lang: 'zh' as const, modelType: 'vits' },
     { label: 'English Matcha', lang: 'en' as const, modelType: 'matcha' },
-  ])('ignores frontend opt-in for $label', async ({ lang, modelType }) => {
+  ])('ignores Matcha frontend selection for $label', async ({ lang, modelType }) => {
     const worker = runtime({ lang, modelType })
     await ready(worker)
     worker.send(synth('ignored-frontend', '你好', { lang, frontendVersion: 'matcha-g2p-v1' }))
@@ -690,7 +721,7 @@ describe('Sherpa worker Matcha frontend', () => {
   it('falls back rather than emitting an over-limit generated token sequence', async () => {
     const worker = runtime()
     await ready(worker)
-    worker.send(synth('too-many', '你'.repeat(8193), { frontendVersion: 'matcha-g2p-v1' }))
+    worker.send(synth('too-many', '你'.repeat(8193)))
     await worker.drain()
 
     expect(worker.generateWithConfig).toHaveBeenCalledTimes(1)

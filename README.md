@@ -162,6 +162,8 @@ tests/           Vitest 测试与固定语料
 | `npm run audit:acoustics -- --corpus=<book>` | 真实 WASM 逐音节时长与边界建议 |
 | `npm run audit:omission -- --verify` | 用完整反馈原句重建 token，验证每个音节可听 |
 | `npm run acoustic-cases:verify` | 全部 P2 案例的完整原句、生产文本链、实际组块与 token 结构门禁 |
+| `npm run frontend:verify` | Matcha 默认 G2P 与冻结原生 token 快照的一致性门禁 |
+| `npm run audit:matcha-frontend` | 用真实 WASM 重新探针原生 token，核对数字、日期、变调、标点与零宽边界 |
 | `npm run audit:acoustic-cases -- --case=<id> --corpus=<book>` | 原生 token 校验后测量六种方案，输出 WAV、代理排序与待试听清单 |
 | `npm run audit:word-family -- --verify` | 词族逐词可听性回归 |
 | `npm run audit:envelope -- --case=<id>` | 整句包络测量（advisory） |
@@ -186,6 +188,17 @@ npm run audit:acoustic-cases -- --case=om-0008 --corpus=<book.epub> --family-lim
 ```
 
 字族按同字、同词内偏移、同音素扩展，异读词排除。整书回归对全部匹配句校验目标音素，实测抽样再核对原生 token；生产链的 U+200B 词内保护边界在匹配时忽略、定位时保留。原生托管数字/字母只验证汉字覆盖并列入 `measurementSkipped`，不伪造完整 token 或声学测量。只有显式传入 `--corpus` 才运行，否则报告明确写 `not-run`。默认产物位于 `scripts/out/acoustic-cases*`，均为本地开发文件，不进入应用包或提交。
+
+### P3 Matcha 默认 G2P 前端
+
+中文 Matcha 默认走应用层 G2P 与 token 直输：每个汉字都必须在运行时词典或人工覆盖表中有明确读音，标点、停顿与 U+200B/U+2060 边界不再交给原生前端静默取舍。覆盖不完整的请求会明确停止，不会悄悄漏字；阿拉伯数字、小数、日期和拉丁片段仍保留给原生前端，但会作为**整句托管回退**记录，不能冒充完整 token 测量。
+
+```bash
+npm run frontend:verify
+npm run audit:matcha-frontend
+```
+
+12 个冻结案例覆盖中文与阿拉伯日期、小数、`一/不` 变调、标点、引号、词内保护、语句重置、数字/拉丁回退和未覆盖汉字。快速门禁只对照真实 WASM 保存的原生 token 快照；`--native` 会用临时运行时词典重新探针，避免开发期覆盖表变化污染冻结证据。阅读设置的「Matcha 音素直输前端」可切到「原生对照」做 A/B，仅中文生效，不改变模型、量化、采样率或音质参数。
 
 ### 评测原则
 
@@ -224,7 +237,7 @@ npm run audit:acoustic-cases -- --case=om-0008 --corpus=<book.epub> --family-lim
 
 ## 测试与部署
 
-- 测试：`npm test`，当前 **94 个测试文件 / 883 项通过**
+- 测试：`npm test`，当前 **95 个测试文件 / 896 项通过**
 - 读音门禁：`npm run audit:all`（新鲜 checkout 可运行，不依赖全书语料；声学冒烟可用 `--strict` 设为必需）
 - 构建：`npm run build`（`vue-tsc --noEmit` + vite）
 - CI：推送到 `main` 后，[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 会依次执行 `npm ci`、`npm test`、`npm run audit:all`、`npm run build`，然后发布到 GitHub Pages

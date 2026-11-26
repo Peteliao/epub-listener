@@ -1268,18 +1268,18 @@ function removeEnglishPack(): void {
         </div>
         <div class="lab-block" v-if="settings.engine === 'sherpa'">
           <div class="lab-head">
-            <span>音素直输前端 · D1 影子实验</span>
-            <span class="lab-value">{{ settings.labPhonemeFrontend ? '本地 G2P' : '模型前端' }}</span>
+            <span>Matcha 音素直输前端</span>
+            <span class="lab-value">{{ settings.labNativeFrontend ? '原生对照' : '本地 G2P' }}</span>
           </div>
           <p class="setting__note">
-            默认关闭。开启后用本地词典生成 tokens；不支持的词自动回退模型前端，英文与其他音色不受影响。
+            默认使用本地词典生成完整 tokens；原生模式仅用于对照。未覆盖中文会停止，数字或拉丁片段整句回退。
           </p>
           <button
             type="button"
             class="pack-link"
-            @click="emit('patch', { labPhonemeFrontend: !settings.labPhonemeFrontend })"
+            @click="emit('patch', { labNativeFrontend: !settings.labNativeFrontend })"
           >
-            {{ settings.labPhonemeFrontend ? '关闭音素直输' : '开启音素直输' }}
+            {{ settings.labNativeFrontend ? '恢复音素直输' : '切到原生前端' }}
           </button>
         </div>
       </template>

@@ -61,15 +61,15 @@ function unit(start: number, text: string) {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
 describe('ReaderController bilingual playback', () => {
-  it('passes the shadow frontend only to Chinese synthesis requests', () => {
+  it('defaults Chinese synthesis to G2P and reserves native for explicit comparison', () => {
     const reader = fixture()
-    reader.settings.labPhonemeFrontend = true
     expect(reader.aiRequest({ lang: 'zh', text: '中文' })).toMatchObject({
       frontendVersion: 'matcha-g2p-v1',
     })
     expect(reader.aiRequest({ lang: 'en', text: 'English' }).frontendVersion).toBeUndefined()
-    reader.settings.labPhonemeFrontend = false
-    expect(reader.aiRequest({ lang: 'zh', text: '中文' }).frontendVersion).toBeUndefined()
+    reader.settings.labNativeFrontend = true
+    expect(reader.aiRequest({ lang: 'zh', text: '中文' }).frontendVersion).toBe('native')
+    expect(reader.aiRequest({ lang: 'en', text: 'English' }).frontendVersion).toBeUndefined()
   })
 
   it('prefetches the next language before later same-language chunks across units', () => {

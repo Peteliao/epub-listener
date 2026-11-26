@@ -8,7 +8,7 @@ import {
   preparePronunciationText,
 } from './pronunciationGuard'
 
-export type MatchaFrontendVersion = 'matcha-g2p-v1'
+export type MatchaFrontendVersion = 'matcha-g2p-v1' | 'native'
 
 export interface SherpaSynthesisOptions {
   text: string
@@ -16,7 +16,7 @@ export interface SherpaSynthesisOptions {
   lang?: AiPackLang
   volume?: number
   silenceScale?: number
-  /** Opt-in shadow frontend; absent keeps the model's native text frontend. */
+  /** Chinese Matcha defaults to G2P; native is an explicit comparison mode. */
   frontendVersion?: MatchaFrontendVersion
   /** Complete token sequence for controlled acoustic experiments. */
   tokens?: readonly string[]
@@ -235,7 +235,9 @@ function synthesisKey(
   frontendVersion?: MatchaFrontendVersion,
   tokens?: readonly string[],
 ): string {
-  const frontend = tokens ? `tokens:${JSON.stringify(tokens)}` : frontendVersion ?? 'native'
+  const frontend = tokens
+    ? `tokens:${JSON.stringify(tokens)}`
+    : frontendVersion ?? (engine === 'sherpa' && lang === 'zh' ? 'matcha-g2p-v1' : 'native')
   return `${engine}|${lang}|${speakerId}|${rate.toFixed(2)}|${silenceScale.toFixed(
     2,
   )}|${volume.toFixed(2)}|${frontend}|${text}`
@@ -865,7 +867,9 @@ export class SherpaDriver {
     const silenceScale = options.silenceScale ?? 1
     const volume = options.volume ?? 1
     const tokens = normalizeTokens(options.tokens)
-    const frontendVersion = options.tokens ? undefined : options.frontendVersion
+    const frontendVersion = tokens || lang !== 'zh' || engine !== 'sherpa'
+      ? undefined
+      : options.frontendVersion ?? 'matcha-g2p-v1'
     return {
       key: synthesisKey(
         engine,

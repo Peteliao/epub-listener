@@ -38,8 +38,11 @@ function parseArgs(argv) {
     else if (arg.startsWith('--limit=')) options.limit = positive(arg.slice(8), 1)
     else if (arg.startsWith('--context-limit=')) options.contextLimit = positive(arg.slice(16), 0)
     else if (arg.startsWith('--family-limit=')) options.familyLimit = positive(arg.slice(15), 20)
-    else if (arg.startsWith('--corpus=')) options.corpus = resolve(ROOT, arg.slice(9))
-    else if (arg === '--no-audio') options.noAudio = true
+    else if (arg.startsWith('--corpus=')) {
+      const corpus = arg.slice(9)
+      if (!corpus.trim()) throw new Error('--corpus 不能为空')
+      options.corpus = resolve(ROOT, corpus)
+    } else if (arg === '--no-audio') options.noAudio = true
     else if (arg.startsWith('--out=')) options.out = resolve(ROOT, arg.slice(6))
     else if (arg.startsWith('--summary=')) options.summary = resolve(ROOT, arg.slice(10))
     else if (arg.startsWith('--listening=')) options.listening = resolve(ROOT, arg.slice(12))
@@ -148,7 +151,14 @@ async function measureVariant(synth, context, variant, cache) {
     const values = synth.contributions(tokens, targetIndices(tokens, start, count))
     cache.set(key, summarizeContributions(values))
   }
-  return { ...variant, comparable: variant.comparable !== false, measurement: cache.get(key) }
+  return {
+    ...variant,
+    comparable: variant.comparable !== false,
+    effectiveTokens: tokens,
+    effectiveStart: start,
+    effectiveCount: count,
+    measurement: cache.get(key),
+  }
 }
 
 async function renderVariant(synth, context, variant, nativeAudio, file) {
@@ -205,6 +215,10 @@ async function renderVariant(synth, context, variant, nativeAudio, file) {
 
 export async function measureContext(synth, item, context, contextIndex, options, nativeProbe = probeNativeTokens) {
   context.assets = { effective: item.assets.effective, tokens: item.assets.tokens }
+  const nativeManaged = context.tokenStream?.nativeManaged ?? []
+  if (nativeManaged.length) {
+    throw new Error(`${item.id} ${context.sentence}：含原生托管文本 ${nativeManaged.map((entry) => JSON.stringify(entry.text)).join('')}，无法进行完整声学测量`)
+  }
   const native = await nativeProbe(context.actualGroup.text, options.lexiconPath)
   context.nativeComparison = { ...compareNativeTokens(context, native), nativeDurationMs: native.durationMs }
   if (!context.nativeComparison.ok) {
@@ -267,14 +281,25 @@ function stripWordBoundaryView(text) {
 }
 
 export async function familyRegression(item, options, corpusText) {
-  if (!corpusText) return { status: 'not-run', reason: '未提供 --corpus' }
+  if (corpusText === null || corpusText === undefined) return { status: 'not-run', reason: '未提供 --corpus' }
+  if (typeof corpusText !== 'string' || !corpusText.trim()) {
+    return {
+      status: 'failed', reason: '--corpus 为空', rawMatchedSentences: 0, excludedSentences: 0,
+      matchedSentences: 0, measuredSentences: 0, nativeManagedSentences: 0,
+      measurementSkipped: [], truncated: false, structuralFailures: ['--corpus 为空'], rows: [],
+    }
+  }
   const words = item.family.words.map((entry) => entry.word)
   const exclusions = planFamilyExclusions(item, item.assets)
-  const candidates = splitSentences(corpusText)
-  const rawMatched = candidates.filter((sentence) => words.some((word) => sentence.includes(word)))
-  const scoped = candidates.map((sentence) => ({
+  const candidates = splitSentences(corpusText, Number.POSITIVE_INFINITY).map((sentence) => ({
     sentence,
-    occurrences: findFamilyOccurrences(sentence, words, exclusions),
+    normalizedText: item.frontend.normalizeSpeechText(sentence),
+  }))
+  const rawMatched = candidates.filter(({ normalizedText }) =>
+    words.some((word) => normalizedText.includes(word)))
+  const scoped = candidates.map(({ sentence, normalizedText }) => ({
+    sentence,
+    occurrences: findFamilyOccurrences(normalizedText, words, exclusions),
   })).filter((entry) => entry.occurrences.length > 0)
   const structuralRows = []
   const failures = []
@@ -392,6 +417,7 @@ async function main() {
     provenance: currentProvenance(),
     frontendVersion: frontend.version,
     synthConfig: { minWordsInSentence: APP_MIN_WORDS_IN_SENTENCE },
+    tokenInventory: [...assets.tokens].sort(),
     variants: ACOUSTIC_CASE_VARIANTS,
     cases: planned.map((item) => ({ ...item, assets: undefined, frontend: undefined })),
     policy: {

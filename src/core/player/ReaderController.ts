@@ -1496,9 +1496,11 @@ export class ReaderController {
       volume: chunk.lang === 'en' ? this.settings.englishVolume : 1,
       silenceScale: this.settings.labSilenceScale,
       frontendVersion:
-        this.settings.labPhonemeFrontend && chunk.lang !== 'en'
-          ? 'matcha-g2p-v1'
-          : undefined,
+        chunk.lang === 'en'
+          ? undefined
+          : this.settings.labNativeFrontend
+            ? 'native'
+            : 'matcha-g2p-v1',
     }
   }
 

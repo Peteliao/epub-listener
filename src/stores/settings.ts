@@ -155,10 +155,12 @@ function sanitize(raw: unknown): ReaderSettings {
       ? Math.min(1.5, Math.max(0.5, Math.round(source.labSilenceScale * 100) / 100))
       : DEFAULT_SETTINGS.labSilenceScale
 
-  const labPhonemeFrontend =
-    typeof source.labPhonemeFrontend === 'boolean'
-      ? source.labPhonemeFrontend
-      : DEFAULT_SETTINGS.labPhonemeFrontend
+  // The old opt-in selected what is now the default. Only an explicit new
+  // native flag opts out, so existing true/false blobs both migrate to G2P.
+  const labNativeFrontend =
+    typeof source.labNativeFrontend === 'boolean'
+      ? source.labNativeFrontend
+      : DEFAULT_SETTINGS.labNativeFrontend
 
   return {
     theme,
@@ -181,7 +183,7 @@ function sanitize(raw: unknown): ReaderSettings {
     pausePreset,
     labNoiseScale,
     labSilenceScale,
-    labPhonemeFrontend,
+    labNativeFrontend,
   }
 }
 

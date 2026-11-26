@@ -233,14 +233,15 @@ async function smoke(cdp, {
   packName = '山岚',
   voiceId = 'shanlan',
   voiceLabel = '山岚',
-  phonemeFrontend = false,
+  nativeFrontend = false,
+  expectedFrontend = nativeFrontend ? 'native' : 'matcha-g2p-v1',
 } = {}) {
   await cdp.send('Log.enable')
   await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
     source:
       `try { localStorage.setItem('shusheng.settings.v1', JSON.stringify({` +
       `engine:'sherpa', aiVoiceId:'${voiceId}', groupSentences:true,` +
-      `labSilenceScale:1, labPhonemeFrontend:false,` +
+      `labSilenceScale:1, labNativeFrontend:${nativeFrontend},` +
       ` pausePreset:'standard', rate:1})) } catch (e) {}`,
   })
   await cdp.send('Page.navigate', { url: `${ORIGIN}/?lab=1` })
@@ -312,18 +313,29 @@ async function smoke(cdp, {
   await cdp.evaluate(
     `Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === '展开')?.click()`,
   )
-  if (phonemeFrontend) {
-    await cdp.evaluate(
-      `Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('开启音素直输'))?.click()`,
-    )
-  }
   await cdp.evaluate(`document.querySelector('.play-btn').click()`)
-  await waitForExpression(
-    cdp,
-    `/^(native|matcha-g2p-v1)/.test(Array.from(document.querySelectorAll('.diag-row')).find(row => row.querySelector('.diag-row__label')?.textContent === '最近合成前端')?.querySelector('.diag-row__value')?.textContent ?? '')`,
-    '真实离线合成诊断',
-    180_000,
-  )
+  try {
+    await waitForExpression(
+      cdp,
+      `(() => { const value = Array.from(document.querySelectorAll('.diag-row')).find(row => row.querySelector('.diag-row__label')?.textContent === '最近合成前端')?.querySelector('.diag-row__value')?.textContent; return value === ${JSON.stringify(expectedFrontend)} || value?.startsWith(${JSON.stringify(`${expectedFrontend} ·`)}) })()`,
+      '真实离线合成诊断',
+      180_000,
+    )
+  } catch (error) {
+    const diagnostic = await cdp.evaluate(`(() => ({
+      play: document.querySelector('.play-btn')?.getAttribute('aria-label') ?? null,
+      rows: Array.from(document.querySelectorAll('.diag-row')).map((row) =>
+        [row.querySelector('.diag-row__label')?.textContent, row.querySelector('.diag-row__value')?.textContent]),
+      body: document.body.innerText.slice(-1600),
+    }))()`)
+    const pageErrors = cdp.events
+      .filter((event) => event.method === 'Runtime.exceptionThrown')
+      .map((event) => event.params?.exceptionDetails?.text ?? 'unknown')
+    const consoleErrors = cdp.events
+      .filter((event) => event.method === 'Runtime.consoleAPICalled' && event.params?.type === 'error')
+      .map((event) => event.params?.args?.map((arg) => arg.value ?? arg.description ?? '').join(' '))
+    throw new Error(`${error.message}\n${JSON.stringify({ diagnostic, pageErrors, consoleErrors }, null, 2)}`)
+  }
   await sleep(2_000)
   const state = await cdp.evaluate(`(() => {
     const play = document.querySelector('.play-btn')
@@ -363,10 +375,10 @@ async function smoke(cdp, {
   if (!state.highlighted) throw new Error('朗读开始后没有正文高亮')
   if (state.engine !== '离线 AI') throw new Error(`实际朗读引擎异常：${state.engine}`)
   if (state.voice !== voiceLabel) throw new Error(`音色切换异常：${state.voice}`)
-  if (phonemeFrontend && !/matcha-g2p-v1|native-fallback/.test(state.frontend ?? '')) {
-    throw new Error(`D1 前端诊断缺失：${state.frontend}`)
+  if (state.frontend !== expectedFrontend && !state.frontend?.startsWith(`${expectedFrontend} ·`)) {
+    throw new Error(`前端诊断异常：期望 ${expectedFrontend}，实际 ${state.frontend}`)
   }
-  if (phonemeFrontend) console.log(`D1 实际前端：${state.frontend}`)
+  console.log(`实际前端：${state.frontend}`)
 
   await cdp.evaluate(`document.querySelector('.play-btn').click()`)
   await waitForExpression(
@@ -407,7 +419,11 @@ async function main() {
       return
     }
     if (process.argv.includes('--phoneme-smoke')) {
-      await smoke(cdp, { phonemeFrontend: true })
+      await smoke(cdp)
+      return
+    }
+    if (process.argv.includes('--native-smoke')) {
+      await smoke(cdp, { nativeFrontend: true })
       return
     }
     if (process.argv.includes('--melo-smoke')) {
@@ -415,6 +431,7 @@ async function main() {
         packName: 'Melo 中英女声',
         voiceId: 'melo-zh',
         voiceLabel: 'Melo 女声',
+        expectedFrontend: 'native',
       })
       return
     }

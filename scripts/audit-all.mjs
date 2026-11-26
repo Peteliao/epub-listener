@@ -40,7 +40,7 @@ pronunciation-health.mjs 汇总。新鲜 checkout 也能运行（不依赖全书
   --out=路径  结果文件
 
 门禁：黄金集与快照 / 覆盖表格式 / 规则编译 / P0 扫描召回 / 反馈闭环 /
-P3 自迭代召回 / 反馈原句可听性回归 / P2 声学案例结构 / 词族逐词可听性 / 整句包络（advisory）/
+P3 自迭代召回 / 反馈原句可听性回归 / P2 声学案例结构 / Matcha 前端一致性 / 词族逐词可听性 / 整句包络（advisory）/
 外部语料对照（advisory）/ OOV 召回抽样（advisory）/ 历史基线全量重放 / 影响面 diff（仅当有候选覆盖行）/
 声学冒烟 / 健康度。
 
@@ -139,6 +139,15 @@ async function main() {
         'scripts/audit-acoustic-cases.mjs', '--verify',
         '--out=scripts/out/acoustic-cases-verify.json',
         '--summary=scripts/out/acoustic-cases-verify.md',
+      ],
+      required: true,
+    },
+    {
+      name: 'Matcha 前端一致性',
+      args: [
+        'scripts/audit-matcha-frontend.mjs', '--verify',
+        '--out=scripts/out/matcha-frontend-parity.json',
+        '--summary=scripts/out/matcha-frontend-parity.md',
       ],
       required: true,
     },
