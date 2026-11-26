@@ -6,6 +6,7 @@ import {
   preparePronunciationText,
   protectPronunciations,
   PROTECTED_WORDS,
+  SEAMLESS_UTTERANCE_RESET,
   UTTERANCE_RESET,
   UTTERANCE_RESET_WORDS,
   WORD_BOUNDARY,
@@ -72,6 +73,8 @@ describe('运行时文本镜像与真实 guard 逐字一致', () => {
       wf.FEEDBACK_SENTENCE,
       wf.BOOK_BLOCK,
       wf.DIPAN_SENTENCE,
+      '她涂上薄薄的酱汁，对折，再以咖啡色纸包起来，说声‘好了”，把饼递给笹垣。',
+      '“谢天谢地，得救了。”草薙直起身子，拍打了两下腰际。',
     ]
     for (const sentence of sentences) {
       expect(wf.protectPronunciations(sentence, lists.protectedWords), sentence)
@@ -81,6 +84,7 @@ describe('运行时文本镜像与真实 guard 逐字一致', () => {
     }
     expect(lists.protectedWords).toEqual([...PROTECTED_WORDS])
     expect(lists.resetWords).toEqual([...UTTERANCE_RESET_WORDS])
+    expect(lists.seamlessResets).toEqual([{ word: '谢天谢地', after: 2 }])
   })
 
   it('3 字「X地盘」同时登记保护与重置，否则 U+2060 会被跳过', async () => {
@@ -95,6 +99,16 @@ describe('运行时文本镜像与真实 guard 逐字一致', () => {
       expect(wf.utteranceParts(prepared)).toHaveLength(2)
       expect(wf.appSegments(sentence, word, lists)[0].text).toContain(word)
     }
+  })
+
+  it('谢天谢地的无缝拼接在生产 guard 与审计镜像中逐字一致', async () => {
+    const wf = await loadWordFamily()
+    const lists = wf.loadWordLists()
+    const sentence = '“谢天谢地，得救了。”'
+    const prepared = preparePronunciationText(sentence)
+    expect(prepared).toBe(`“谢天${SEAMLESS_UTTERANCE_RESET}谢地，得救了。”`)
+    expect(wf.prepareRuntimeText(sentence, lists)).toBe(prepared)
+    expect(wf.utteranceSegments(prepared).map((part: any) => part.joinBefore)).toEqual([null, 'seamless'])
   })
 
   it('便宜族不进重置词表，反馈原句只插 U+200B', async () => {

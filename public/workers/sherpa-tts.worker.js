@@ -51,15 +51,12 @@ const slots = {
   en: createSlot('en'),
 }
 
-// Long-sentence prosody can squash a phrase-initial syllable even when the
-// lexicon reading is correct (地盘's 地 heard as `de`). A zero-width word
-// boundary only restarts the longest-match lookup; the listener-confirmed fix
-// is a REAL utterance reset: synthesise the text in two parts and join the PCM.
-// pronunciationGuard.ts inserts this sentinel before U+200B for the words in
-// utteranceResets.v1.txt. Only Matcha packs act on it; other engines strip it
-// as an OOV character, leaving their audio unchanged.
+// U+2060 starts a fresh utterance with a 120ms pause; U+2061 is a registered
+// word-internal fusion seam joined with a 20ms equal-power crossfade.
 const UTTERANCE_RESET = '\u2060'
+const SEAMLESS_UTTERANCE_RESET = '\u2061'
 const UTTERANCE_RESET_GAP_MS = 120
+const SEAMLESS_FADE_MS = 20
 const WORD_JOINER = '\u200b'
 const MATCHA_FRONTEND_VERSION = 'matcha-g2p-v1'
 const MATCHA_NATIVE_FRONTEND = 'native'
@@ -85,6 +82,24 @@ function utteranceParts(text, enabled) {
   return parts.length > 1 ? parts : null
 }
 
+function utteranceSegments(text, enabled) {
+  if (!enabled || (!text.includes(UTTERANCE_RESET) && !text.includes(SEAMLESS_UTTERANCE_RESET))) return null
+  const segments = []
+  let start = 0
+  let joinBefore = null
+  for (let index = 0; index < text.length; index += 1) {
+    const sentinel = text[index]
+    if (sentinel !== UTTERANCE_RESET && sentinel !== SEAMLESS_UTTERANCE_RESET) continue
+    const part = text.slice(start, index).trim()
+    if (part) segments.push({ text: part, joinBefore: segments.length ? joinBefore : null })
+    joinBefore = sentinel === UTTERANCE_RESET ? 'gap' : 'seamless'
+    start = index + 1
+  }
+  const part = text.slice(start).trim()
+  if (part) segments.push({ text: part, joinBefore: segments.length ? joinBefore : null })
+  return segments.length > 1 ? segments : null
+}
+
 function joinUtteranceAudio(results, sampleRate, gapMs) {
   const gap = Math.max(0, Math.round((sampleRate * gapMs) / 1000))
   const total = results.reduce((sum, item) => sum + item.samples.length, 0)
@@ -96,6 +111,85 @@ function joinUtteranceAudio(results, sampleRate, gapMs) {
     offset += item.samples.length + gap
   }
   return { samples, sampleRate }
+}
+
+function trimForSeamlessJoin(samples, sampleRate) {
+  const frame = Math.max(1, Math.round(sampleRate * 0.01))
+  const count = Math.floor(samples.length / frame)
+  const rms = new Float32Array(count)
+  let peak = 0
+  for (let index = 0; index < count; index += 1) {
+    let sum = 0
+    const offset = index * frame
+    for (let i = 0; i < frame; i += 1) sum += samples[offset + i] ** 2
+    const value = Math.sqrt(sum / frame)
+    rms[index] = value
+    if (value > peak) peak = value
+  }
+  if (!count || peak < 1e-6) return samples
+  const floor = peak * 0.02
+  let first = -1
+  let last = -1
+  for (let index = 0; index < count; index += 1) {
+    if (rms[index] < floor) continue
+    if (first < 0) first = index
+    last = index
+  }
+  if (first < 0) return samples
+  const margin = Math.round(sampleRate * 0.02)
+  const from = Math.max(0, first * frame - margin)
+  const to = Math.min(samples.length, (last + 1) * frame + margin)
+  return samples.subarray(from, to)
+}
+
+function joinSeamlessUtteranceAudio(results, sampleRate, fadeMs = SEAMLESS_FADE_MS) {
+  const prepared = results.map((item) => trimForSeamlessJoin(item.samples, sampleRate))
+    .filter((samples) => samples.length > 0)
+  if (!prepared.length) return { samples: new Float32Array(0), sampleRate }
+  if (prepared.length === 1) return { samples: prepared[0], sampleRate }
+  const fade = Math.min(
+    Math.max(0, Math.round(sampleRate * fadeMs / 1000)),
+    Math.floor(Math.min(...prepared.map((samples) => samples.length)) / 2),
+  )
+  const total = prepared.reduce((sum, samples) => sum + samples.length, 0)
+    - fade * (prepared.length - 1)
+  const samples = new Float32Array(total)
+  let offset = 0
+  prepared.forEach((part, index) => {
+    if (index === 0) {
+      samples.set(part, 0)
+      offset = part.length
+      return
+    }
+    const overlapStart = offset - fade
+    for (let i = 0; i < fade; i += 1) {
+      const t = fade <= 1 ? 1 : i / (fade - 1)
+      samples[overlapStart + i] = samples[overlapStart + i] * Math.cos(t * Math.PI / 2)
+        + part[i] * Math.sin(t * Math.PI / 2)
+    }
+    samples.set(part.subarray(fade), offset)
+    offset += part.length - fade
+  })
+  return { samples, sampleRate }
+}
+
+function joinSegmentedAudio(results, sampleRate, segments) {
+  const seamlessOnly = segments.every((segment) => segment.joinBefore !== 'gap')
+  const groups = []
+  let current = [results[0]]
+  for (let index = 1; index < results.length; index += 1) {
+    if (segments[index].joinBefore === 'seamless') current.push(results[index])
+    else {
+      groups.push(current)
+      current = [results[index]]
+    }
+  }
+  groups.push(current)
+  if (seamlessOnly) return joinSeamlessUtteranceAudio(groups.flat(), sampleRate)
+  const joined = groups.map((group) => group.length === 1
+    ? group[0]
+    : joinSeamlessUtteranceAudio(group, sampleRate))
+  return joinUtteranceAudio(joined, sampleRate, UTTERANCE_RESET_GAP_MS)
 }
 
 // The published runtime is built for Node and unconditionally imports
@@ -728,7 +822,7 @@ function matchaTextToTokens(text, frontend, options = {}) {
 
   let rangeStart = 0
   for (let index = 0; index < chars.length; index += 1) {
-    if (chars[index] !== WORD_JOINER && chars[index] !== UTTERANCE_RESET) continue
+    if (chars[index] !== WORD_JOINER && chars[index] !== UTTERANCE_RESET && chars[index] !== SEAMLESS_UTTERANCE_RESET) continue
     const failure = appendRange(rangeStart, index)
     if (failure) return failure
     rangeStart = index + 1
@@ -884,6 +978,7 @@ async function synthesize(data) {
     let tokenCount = null
     let directTokens = null
     let parts = null
+    let resetSegments = null
 
     if (data.tokens === undefined && canUseMatchaFrontend && slot.frontend) {
       const coverage = matchaTextToTokens(text, slot.frontend, { coverageOnly: true })
@@ -939,13 +1034,13 @@ async function synthesize(data) {
     ) {
       frontend = 'native-fallback'
       if (slot.frontend) {
-        const resetParts = utteranceParts(text, true)
-        const inputs = resetParts || [text]
+        resetSegments = utteranceSegments(text, true)
+        const inputs = resetSegments ? resetSegments.map((segment) => segment.text) : [text]
         // Convert every part before generating any audio. One unsupported part
         // invalidates the whole request; no partial/fused fallback. Empty token
         // parts stay explicit so punctuation-only resets retain the 120ms gap.
         const converted = inputs.map((input) => matchaTextToTokens(input, slot.frontend, {
-          allowEmpty: Boolean(resetParts),
+          allowEmpty: Boolean(resetSegments),
         }))
         const count = converted.reduce(
           (sum, part) => sum + (part.supported ? part.tokens.length : 0),
@@ -956,7 +1051,7 @@ async function synthesize(data) {
           count > 0 && count <= MAX_TOKENS_PER_REQUEST
         ) {
           directTokens = converted[0].tokens
-          parts = resetParts ? converted : null
+          parts = resetSegments ? converted : null
           frontend = MATCHA_FRONTEND_VERSION
           tokenCount = count
         }
@@ -966,8 +1061,9 @@ async function synthesize(data) {
     }
 
     if (!directTokens) {
-      parts = utteranceParts(text, lang === 'zh' && slot.modelType === 'matcha')
-      if (!parts) text = text.replaceAll(UTTERANCE_RESET, '')
+      resetSegments = utteranceSegments(text, lang === 'zh' && slot.modelType === 'matcha')
+      parts = resetSegments ? resetSegments.map((segment) => segment.text) : null
+      if (!parts) text = text.replaceAll(UTTERANCE_RESET, '').replaceAll(SEAMLESS_UTTERANCE_RESET, '')
     }
 
     const generate = (input, tokens) => {
@@ -991,11 +1087,7 @@ async function synthesize(data) {
       ? parts.map((part) => generate(part.tokens ? '' : part, part.tokens))
       : null
     const result = rendered
-      ? joinUtteranceAudio(
-        rendered,
-        rendered[0].sampleRate || slot.sampleRate,
-        UTTERANCE_RESET_GAP_MS,
-      )
+      ? joinSegmentedAudio(rendered, rendered[0].sampleRate || slot.sampleRate, resetSegments)
       : generate(directTokens ? '' : text, directTokens || undefined)
     if (!result || !result.samples || result.samples.length === 0) {
       throw new Error('The model returned an empty audio buffer.')

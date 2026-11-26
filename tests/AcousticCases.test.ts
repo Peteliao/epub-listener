@@ -69,6 +69,9 @@ describe('P2 acoustic case planning', () => {
     const { assets, frontend, overlayText, records, helpers } = await setup()
     const item = records.find((entry: any) => entry.id === 'om-0008')
     const plan = await helpers.planAcousticCase(item, { assets, frontend, overlayText })
+    expect(plan.contexts[0].textChain.speechText).toContain('\u2061')
+    expect(plan.contexts[0].actualGroup.targetSpansSeam).toBe(true)
+    expect(plan.contexts[0].target.phones).toEqual(['xie4', 'tian1', 'xie4', 'di4'])
     const segmented = plan.contexts[0].variants.find((variant: any) => variant.id === 'segmented-pcm')
     expect(segmented.comparable).toBe(true)
     expect(segmented.segments.every((segment: any) => segment.tokens.length > 0)).toBe(true)
@@ -86,6 +89,18 @@ describe('P2 acoustic case planning', () => {
     ]
     expect(partStartsMs(pcm)).toEqual([0, 120])
     expect(Array.from(joinPcmParts(pcm))).toEqual([...Array(120).fill(0), 1, 2])
+  }, 20_000)
+
+  it('measures the actual second seamless part for the new 谢地 case', async () => {
+    const { assets, frontend, overlayText, records, helpers } = await setup()
+    const item = records.find((entry: any) => entry.id === 'om-0010')
+    const plan = await helpers.planAcousticCase(item, { assets, frontend, overlayText })
+    const context = plan.contexts[0]
+    expect(context.actualGroup.join).toBe('seamless')
+    expect(context.actualGroup.seamlessPartIndex).toBe(1)
+    expect(context.actualGroup.text).toContain('谢地')
+    expect(context.tokenStream.tokens.slice(0, 2)).toEqual(['xie4', 'di4'])
+    expect(context.target.phones).toEqual(['xie4', 'di4'])
   }, 20_000)
 
   it('expands by character, offset and phone while excluding other readings', async () => {
@@ -329,9 +344,9 @@ describe('P2 acoustic case CLI', () => {
         `--summary=${join(dir, 'summary.md')}`,
       ], { cwd: root, encoding: 'utf8', timeout: 120_000 })
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
-      expect(result.stdout).toContain('9 条案例 · 0 个错误')
+      expect(result.stdout).toContain('11 条案例 · 0 个错误')
       const report = JSON.parse(await readFile(out, 'utf8'))
-      expect(report.cases).toHaveLength(9)
+      expect(report.cases).toHaveLength(11)
       expect(report.listeningAccuracy).toBeNull()
     } finally {
       await rm(dir, { recursive: true, force: true })

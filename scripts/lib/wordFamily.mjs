@@ -24,7 +24,9 @@ import { sentenceCoverage } from './omission.mjs'
 
 export const WORD_BOUNDARY = '\u200b'
 export const UTTERANCE_RESET = '\u2060'
+export const SEAMLESS_UTTERANCE_RESET = '\u2061'
 export const HAN = /\p{Script=Han}/u
+const PUNCTUATION = /[\p{P}\p{S}]/u
 
 function codePointOffsets(text) {
   const offsets = []
@@ -175,9 +177,19 @@ export function loadWordLists() {
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'))
     .sort((a, b) => Array.from(b).length - Array.from(a).length || a.localeCompare(b, 'zh'))
+  const seamlessResets = readAsset('src/core/tts/seamlessUtteranceResets.v1.txt')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => {
+      const [word, after] = line.split(/\s+/)
+      return { word, after: Number(after) }
+    })
+    .sort((a, b) => Array.from(b.word).length - Array.from(a.word).length)
   return {
     protectedWords: read('src/core/tts/protectedWords.v1.txt'),
     resetWords: read('src/core/tts/utteranceResets.v1.txt'),
+    seamlessResets,
   }
 }
 
@@ -215,42 +227,92 @@ export function protectPronunciations(text, words) {
 export function applyUtteranceResets(text, protectedWords, resetWords) {
   const source = String(text)
   if (!source) return source
-  // Mirror the runtime's longest-first ordering so an explicitly supplied
-  // (dynamic) word list behaves identically.
   const sortedProtected = [...protectedWords].sort(
     (a, b) => Array.from(b).length - Array.from(a).length || a.localeCompare(b, 'zh'),
   )
-  const insertions = []
+  const insertions = new Set()
   const offsets = codePointOffsets(source)
   for (const index of offsets) {
-    if (source[index] !== WORD_BOUNDARY) continue
-    const longest = sortedProtected.find((word) => source.startsWith(word, index + 1))
+    const boundary = source[index] === WORD_BOUNDARY
+    const start = boundary ? index + 1 : index
+    const before = previousCodePoint(source, offsets, boundary ? index : start)
+    if (!boundary && !PUNCTUATION.test(before)) continue
+    const longest = sortedProtected.find((word) => source.startsWith(word, start))
     if (longest && !resetWords.includes(longest)) continue
-    if (!resetWords.some((word) => source.startsWith(word, index + 1))) continue
-    const before = previousCodePoint(source, offsets, index)
-    if (!before || before === UTTERANCE_RESET) continue
-    insertions.push(index)
+    const resetWord = resetWords.find((word) => source.startsWith(word, start))
+    if (!resetWord) continue
+    if (!boundary && sortedProtected.includes(resetWord)) continue
+    if (!before || before === UTTERANCE_RESET || before === SEAMLESS_UTTERANCE_RESET) continue
+    insertions.add(boundary ? index : start)
   }
   let result = source
-  for (const index of insertions.reverse()) {
+  for (const index of [...insertions].sort((a, b) => b - a)) {
     result = `${result.slice(0, index)}${UTTERANCE_RESET}${result.slice(index)}`
+  }
+  return result
+}
+
+export function applySeamlessUtteranceResets(text, rules) {
+  const source = String(text)
+  if (!source) return source
+  const insertions = []
+  const covered = []
+  const offsets = codePointOffsets(source)
+  const sorted = [...rules].sort((a, b) => Array.from(b.word).length - Array.from(a.word).length)
+  for (const rule of sorted) {
+    if (!rule.word || rule.after <= 0 || rule.after >= Array.from(rule.word).length) continue
+    for (const index of offsets) {
+      if (source[index] === WORD_BOUNDARY || source[index] === UTTERANCE_RESET || source[index] === SEAMLESS_UTTERANCE_RESET) continue
+      if (!source.startsWith(rule.word, index)) continue
+      if (covered.some(([start, end]) => index >= start && index < end)) continue
+      covered.push([index, index + rule.word.length])
+      const split = index + Array.from(rule.word).slice(0, rule.after).join('').length
+      if (source[split] !== SEAMLESS_UTTERANCE_RESET) insertions.push(split)
+    }
+  }
+  let result = source
+  for (const index of insertions.sort((a, b) => b - a)) {
+    result = `${result.slice(0, index)}${SEAMLESS_UTTERANCE_RESET}${result.slice(index)}`
   }
   return result
 }
 
 /** Mirror of preparePronunciationText(). */
 export function prepareRuntimeText(text, lists = loadWordLists()) {
-  return applyUtteranceResets(
-    protectPronunciations(text, lists.protectedWords),
-    lists.protectedWords,
-    lists.resetWords,
+  const punctuationResets = applyUtteranceResets(text, lists.protectedWords, lists.resetWords)
+  return applySeamlessUtteranceResets(
+    applyUtteranceResets(
+      protectPronunciations(punctuationResets, lists.protectedWords),
+      lists.protectedWords,
+      lists.resetWords,
+    ),
+    lists.seamlessResets,
   )
 }
 
-/** Mirror of worker.utteranceParts(): returns null when no split is needed. */
+/** Mirror of worker.utteranceParts(): returns null when no U+2060 split is needed. */
 export function utteranceParts(text) {
   const parts = String(text).split(UTTERANCE_RESET).map((part) => part.trim()).filter(Boolean)
   return parts.length > 1 ? parts : null
+}
+
+/** Worker synthesis segments, including the join type before each part. */
+export function utteranceSegments(text) {
+  const source = String(text)
+  const segments = []
+  let start = 0
+  let joinBefore = null
+  for (let index = 0; index < source.length; index += 1) {
+    const sentinel = source[index]
+    if (sentinel !== UTTERANCE_RESET && sentinel !== SEAMLESS_UTTERANCE_RESET) continue
+    const part = source.slice(start, index).trim()
+    if (part) segments.push({ text: part, joinBefore: segments.length ? joinBefore : null })
+    joinBefore = sentinel === UTTERANCE_RESET ? 'gap' : 'seamless'
+    start = index + 1
+  }
+  const part = source.slice(start).trim()
+  if (part) segments.push({ text: part, joinBefore: segments.length ? joinBefore : null })
+  return segments.length > 1 ? segments : null
 }
 
 /**
@@ -262,10 +324,14 @@ export function utteranceParts(text) {
  */
 export function appSegments(sentence, word, lists = loadWordLists()) {
   const prepared = prepareRuntimeText(sentence, lists)
-  const parts = utteranceParts(prepared)
+  const parts = utteranceSegments(prepared)
   if (!parts) return [{ label: '整句一次合成', text: prepared, split: false }]
   return parts
-    .map((part, index) => ({ label: `第 ${index + 1} 段（语句重置）`, text: part, split: true }))
+    .map((part, index) => ({
+      label: `第 ${index + 1} 段（${part.joinBefore === 'seamless' ? '无缝拼接' : '语句重置'}）`,
+      text: part.text,
+      split: true,
+    }))
     .filter((part) => part.text.includes(word))
 }
 
@@ -710,19 +776,27 @@ export function overlayProtectedWords(overlayEntries, staticWords = []) {
 /** Prepare text exactly like SherpaDriver does for the current overlay. */
 export function prepareRuntimeTextWithOverlay(text, assets, lists = loadWordLists()) {
   const words = overlayProtectedWords(assets.overlay.entries, lists.protectedWords)
-  return applyUtteranceResets(
-    protectPronunciations(text, words),
-    words,
-    lists.resetWords,
+  const punctuationResets = applyUtteranceResets(text, words, lists.resetWords)
+  return applySeamlessUtteranceResets(
+    applyUtteranceResets(
+      protectPronunciations(punctuationResets, words),
+      words,
+      lists.resetWords,
+    ),
+    lists.seamlessResets,
   )
 }
 
 /** appSegments() with the real overlay-derived protected-word list. */
 export function appSegmentsWithOverlay(sentence, word, assets, lists = loadWordLists()) {
   const prepared = prepareRuntimeTextWithOverlay(sentence, assets, lists)
-  const parts = utteranceParts(prepared)
+  const parts = utteranceSegments(prepared)
   if (!parts) return [{ label: '整句一次合成', text: prepared, split: false }]
   return parts
-    .map((part, index) => ({ label: `第 ${index + 1} 段（语句重置）`, text: part, split: true }))
+    .map((part, index) => ({
+      label: `第 ${index + 1} 段（${part.joinBefore === 'seamless' ? '无缝拼接' : '语句重置'}）`,
+      text: part.text,
+      split: true,
+    }))
     .filter((part) => part.text.includes(word))
 }

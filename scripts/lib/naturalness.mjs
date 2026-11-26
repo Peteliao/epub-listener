@@ -121,7 +121,7 @@ export function buildTokenStream(text, entries, tokenInventory, options = {}) {
       tokens.push('.', '.', '.')
     } else if (char === '；' || char === ';') {
       omitted.push({ text: char, charOffset: span.start, reason: 'sentence-boundary-no-token' })
-    } else if (char === '\u200b' || char === '\u2060') {
+    } else if (char === '\u200b' || char === '\u2060' || char === '\u2061') {
       omitted.push({ text: char, charOffset: span.start, reason: 'word-boundary-no-token' })
     } else if (Object.hasOwn(RUNTIME_PUNCTUATION, char)) {
       tokens.push(RUNTIME_PUNCTUATION[char])

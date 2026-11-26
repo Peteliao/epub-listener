@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { overlayProtectedWords, preparePronunciationText, protectPronunciations, WORD_BOUNDARY } from '@/core/tts/pronunciationGuard'
+import { overlayProtectedWords, preparePronunciationText, protectPronunciations, SEAMLESS_UTTERANCE_RESET, UTTERANCE_RESET, WORD_BOUNDARY } from '@/core/tts/pronunciationGuard'
 // @ts-ignore -- dev-only ESM helper has no type declarations
 import { loadMatchaAssets, parseOverlay, readingAt } from '../scripts/lib/reading.mjs'
 // @ts-ignore -- dev-only ESM helper has no type declarations
@@ -10,12 +10,15 @@ import { sentenceTokens } from '../scripts/lib/fusionRisk.mjs'
 const root = process.cwd()
 const overlayText = readFileSync(resolve(root, 'src/core/tts/polyphones.v1.txt'), 'utf8')
 const overlay = parseOverlay(overlayText).entries as Map<string, string>
+const S3_FULL = '她涂上薄薄的酱汁，对折，再以咖啡色纸包起来，说声‘好了”，把饼递给笹垣。'
+const S4_FULL = '“谢天谢地，得救了。”草薙直起身子，拍打了两下腰际。'
 
 describe('2026-11-25 第十一轮朗读反馈', () => {
   it('钉住四词的读音和经过验证的静音边界', () => {
     expect(overlay.get('一倒')).toBe('yi4 dao3 "')
     expect(overlay.get('谢天谢地')).toBe('" xie4 tian1 xie4 di4')
     expect(overlay.get('递给')).toBe('di4 gei3')
+    expect(overlay.get('谢地')).toBe('xie4 di4')
     expect(overlay.get('笹垣')).toBe('ti4 yuan2 "')
   })
 
@@ -26,6 +29,9 @@ describe('2026-11-25 第十一轮朗读反馈', () => {
     expect(readingAt('说声“好了”，把饼递给笹垣。', '递', 1, assets.effective).phone).toBe('di4')
     expect(readingAt('说声“好了”，把饼递给笹垣。', '笹', 1, assets.effective).phone).toBe('ti4')
     expect(readingAt('“谢天谢地，得救了。”', '地', 1, assets.effective).phone).toBe('di4')
+    expect(readingAt(S3_FULL, '递', 1, assets.effective).phone).toBe('di4')
+    expect(readingAt(S4_FULL, '地', 1, assets.effective).phone).toBe('di4')
+    expect(readingAt('谢地', '地', 1, assets.effective).phone).toBe('di4')
   })
 
   it('四个多字词都进入动态整词保护且保持幂等', () => {
@@ -36,6 +42,24 @@ describe('2026-11-25 第十一轮朗读反馈', () => {
     const once = preparePronunciationText('把饼递给笹垣。', dynamic)
     expect(once).toContain(`${WORD_BOUNDARY}递给`)
     expect(preparePronunciationText(once, dynamic)).toBe(once)
+  })
+
+  it('第3句在自然逗号处重置谓语，递给不加静音边界', () => {
+    const prepared = preparePronunciationText(S3_FULL, ['递给', '笹垣'])
+    expect(prepared).toBe(
+      `她涂上薄薄的酱汁，对折，再以咖啡色纸包起来，说声‘好了”，${UTTERANCE_RESET}把饼${WORD_BOUNDARY}递给${WORD_BOUNDARY}笹垣。`,
+    )
+    expect(prepared).not.toContain(SEAMLESS_UTTERANCE_RESET)
+    expect(preparePronunciationText(prepared, ['递给', '笹垣'])).toBe(prepared)
+  })
+
+  it('第4句只拆谢天与谢地并做无缝拼接，不插入词内停顿', () => {
+    const prepared = preparePronunciationText(S4_FULL, ['谢天谢地', '谢地'])
+    expect(prepared).toBe(
+      `“谢天${SEAMLESS_UTTERANCE_RESET}谢地，得救了。”草薙直起身子，拍打了两下腰际。`,
+    )
+    expect(prepared).not.toContain(UTTERANCE_RESET)
+    expect(preparePronunciationText(prepared, ['谢天谢地', '谢地'])).toBe(prepared)
   })
 
   it('不把万一倒闭误拆成万一 + 一倒 + 闭', async () => {
@@ -64,5 +88,18 @@ describe('2026-11-25 第十一轮朗读反馈', () => {
     })
     expect(item.sentences).toHaveLength(3)
     expect(item.contexts).toEqual(item.sentences)
+  })
+
+  it('第十二轮两条完整反馈句登记为待复听，不冒充已确认', () => {
+    const source = readFileSync(resolve(root, 'src/core/tts/omissionCases.v1.jsonl'), 'utf8')
+    const cases = source.split(/\r?\n/).filter((line) => line.trim().startsWith('{')).map((line) => JSON.parse(line))
+    expect(cases.find((entry) => entry.id === 'om-0009')).toMatchObject({
+      status: 'needs-listening', word: '递给', phone: 'di4', measureAppSegment: true,
+      repair: { kind: 'none', reading: 'di4 gei3' },
+    })
+    expect(cases.find((entry) => entry.id === 'om-0010')).toMatchObject({
+      status: 'needs-listening', word: '谢地', phone: 'di4', measureAppSegment: true,
+      repair: { kind: 'none', reading: 'xie4 di4' },
+    })
   })
 })

@@ -152,6 +152,69 @@ export function joinPcmParts(results, gapMs = 120) {
   return samples
 }
 
+function trimForSeamlessJoin(samples, sampleRate) {
+  const frame = Math.max(1, Math.round(sampleRate * 0.01))
+  const count = Math.floor(samples.length / frame)
+  const rms = new Float32Array(count)
+  let peak = 0
+  for (let index = 0; index < count; index += 1) {
+    let sum = 0
+    const offset = index * frame
+    for (let i = 0; i < frame; i += 1) sum += samples[offset + i] ** 2
+    const value = Math.sqrt(sum / frame)
+    rms[index] = value
+    if (value > peak) peak = value
+  }
+  if (!count || peak < 1e-6) return samples
+  const floor = peak * 0.02
+  let first = -1
+  let last = -1
+  for (let index = 0; index < count; index += 1) {
+    if (rms[index] < floor) continue
+    if (first < 0) first = index
+    last = index
+  }
+  if (first < 0) return samples
+  const margin = Math.round(sampleRate * 0.02)
+  const from = Math.max(0, first * frame - margin)
+  const to = Math.min(samples.length, (last + 1) * frame + margin)
+  return samples.subarray(from, to)
+}
+
+/** Mirror of the worker's registered U+2061 seam: trim + 20ms equal-power crossfade. */
+export function joinSeamlessPcmParts(results, fadeMs = 20) {
+  if (!results.length) return new Float32Array(0)
+  const sampleRate = results[0].sampleRate
+  const prepared = results.map((item) => trimForSeamlessJoin(item.samples, sampleRate))
+    .filter((samples) => samples.length > 0)
+  if (!prepared.length) return new Float32Array(0)
+  if (prepared.length === 1) return prepared[0]
+  const fade = Math.min(
+    Math.max(0, Math.round(sampleRate * fadeMs / 1000)),
+    Math.floor(Math.min(...prepared.map((samples) => samples.length)) / 2),
+  )
+  const total = prepared.reduce((sum, samples) => sum + samples.length, 0)
+    - fade * (prepared.length - 1)
+  const samples = new Float32Array(total)
+  let offset = 0
+  prepared.forEach((part, index) => {
+    if (index === 0) {
+      samples.set(part, 0)
+      offset = part.length
+      return
+    }
+    const overlapStart = offset - fade
+    for (let i = 0; i < fade; i += 1) {
+      const t = fade <= 1 ? 1 : i / (fade - 1)
+      samples[overlapStart + i] = samples[overlapStart + i] * Math.cos(t * Math.PI / 2)
+        + part[i] * Math.sin(t * Math.PI / 2)
+    }
+    samples.set(part.subarray(fade), offset)
+    offset += part.length - fade
+  })
+  return samples
+}
+
 /** Start time of each worker part in the joined PCM. */
 export function partStartsMs(results, gapMs = 120) {
   const sampleRate = results[0]?.sampleRate ?? 0

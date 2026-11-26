@@ -41,6 +41,18 @@ describe('feedback sentence reconstruction', () => {
     expect(stream.phones).toEqual(['zhan4', 'pian2', 'yi'])
   }, 20_000)
 
+  it('locates a seamless subword inside a longer lexicon range', async () => {
+    const { caseStream, sentenceCoverage } = await loadOmission()
+    const { loadMatchaAssets } = await loadReading()
+    const assets = await loadMatchaAssets()
+    const sentence = '“谢天谢地，得救了。”'
+    const stream = caseStream(sentence, '谢地', assets)
+    expect(stream).not.toBeNull()
+    expect(stream.range.coveredBy).toBe('谢天谢地')
+    expect(stream.tokens.slice(stream.range.start, stream.range.end)).toEqual(['xie4', 'di4'])
+    expect(sentenceCoverage(stream, sentence).ok).toBe(true)
+  }, 20_000)
+
   it('enumerates the word-initial slot as well as tail, mid and both ends', async () => {
     // The winning repair for 占便宜 is the LEADING boundary: it puts the
     // swallowed syllable back at the start of a phrase (便 221 → 337ms). The

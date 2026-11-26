@@ -6,7 +6,7 @@ import {
   buildTokenStream, planPcmSegments,
 } from './naturalness.mjs'
 import { prepareFrontendSpeechText } from './frontendSpeech.mjs'
-import { UTTERANCE_RESET, WORD_BOUNDARY } from './wordFamily.mjs'
+import { SEAMLESS_UTTERANCE_RESET, UTTERANCE_RESET, WORD_BOUNDARY } from './wordFamily.mjs'
 import { isIFinalPhone } from './vowelReduction.mjs'
 
 export const ACOUSTIC_CASE_PROTOCOL = 'acoustic-cases-v1'
@@ -40,6 +40,70 @@ export function planTokenStream(text, assets, word = '') {
     : stream.tokens.filter((token) => !NON_PHONE.has(token))
   const nativeManaged = stream.omitted.filter((item) => item.reason === 'native-managed-text')
   return { ...stream, coverage, range, phones, count: phones.length, nativeManaged }
+}
+
+function planTargetGroup(text, word, assets) {
+  const parts = String(text).split(SEAMLESS_UTTERANCE_RESET).map((part) => part.trim()).filter(Boolean)
+  if (parts.length <= 1) {
+    return {
+      stream: planTokenStream(text, assets, word), text,
+      seamlessPartIndex: null, targetSpansSeam: false, seamlessParts: [text],
+    }
+  }
+  const directIndex = parts.findIndex((part) => part.replaceAll(WORD_BOUNDARY, '').includes(word))
+  if (directIndex >= 0) {
+    return {
+      stream: planTokenStream(parts[directIndex], assets, word), text: parts[directIndex],
+      seamlessPartIndex: directIndex, targetSpansSeam: false, seamlessParts: parts,
+    }
+  }
+  const combinedText = parts.join('')
+  const streams = parts.map((part) => planTokenStream(part, assets))
+  const tokens = []
+  const ranges = []
+  const omitted = []
+  const nativeManaged = []
+  let charOffset = 0
+  let tokenOffset = 0
+  streams.forEach((stream, index) => {
+    tokens.push(...stream.tokens)
+    for (const range of stream.ranges) {
+      ranges.push({
+        ...range,
+        start: range.start + tokenOffset,
+        end: range.end + tokenOffset,
+        charOffset: range.charOffset + charOffset,
+        endCharOffset: range.endCharOffset + charOffset,
+        startChar: range.charOffset + charOffset,
+        endChar: range.endCharOffset + charOffset,
+      })
+    }
+    omitted.push(...stream.omitted.map((item) => ({ ...item, charOffset: item.charOffset + charOffset })))
+    nativeManaged.push(...stream.nativeManaged)
+    tokenOffset += stream.tokens.length
+    charOffset += parts[index].length
+  })
+  const wordStart = combinedText.indexOf(word)
+  const wordEnd = wordStart + Array.from(word).join('').length
+  const covering = ranges.filter((range) => range.startChar < wordEnd && range.endChar > wordStart)
+  if (wordStart < 0 || !covering.length || combinedText.slice(wordStart, wordEnd) !== word) {
+    throw new Error(`无法跨无缝拼接定位「${word}」`)
+  }
+  const start = Math.min(...covering.map((range) => range.start))
+  const end = Math.max(...covering.map((range) => range.end))
+  const phones = tokens.slice(start, end).filter((token) => !NON_PHONE.has(token))
+  if (phones.length !== Array.from(word).length) throw new Error(`「${word}」跨拼接音素数不一致`)
+  const range = { word, start, end, startChar: wordStart, endChar: wordEnd }
+  return {
+    stream: {
+      tokens, ranges, omitted, range, phones, count: phones.length, nativeManaged,
+      coverage: sentenceCoverage({ tokens }, combinedText),
+    },
+    text: combinedText,
+    seamlessPartIndex: null,
+    targetSpansSeam: true,
+    seamlessParts: parts,
+  }
 }
 
 /** Keep punctuation-only reset parts as zero-sample segments, matching the worker join. */
@@ -132,7 +196,7 @@ export function locateFamilyTarget(part, occurrence, c, assets) {
   const targets = []
   const sourceChars = Array.from(part)
   for (let offset = occurrence.start; offset < occurrence.end; offset += 1) {
-    if (sourceChars[offset] === WORD_BOUNDARY) continue
+    if (sourceChars[offset] === WORD_BOUNDARY || sourceChars[offset] === SEAMLESS_UTTERANCE_RESET) continue
     const target = charPhones.get(offset)
     if (!target) return { ok: false, reason: `${occurrence.word} 缺少连续字符 token` }
     targets.push(target)
@@ -264,11 +328,13 @@ export async function planAcousticCase(c, { assets, frontend, overlayText }) {
         throw new Error(`${c.id}：完整原句 token 覆盖不全（${full.coverage.phones}/${full.coverage.han}）`)
       }
       const parts = prepared.speechText.split(UTTERANCE_RESET).map((part) => part.trim()).filter(Boolean)
-      const targetPartIndex = parts.findIndex((part) => part.replaceAll(WORD_BOUNDARY, '').includes(c.word))
+      const targetPartIndex = parts.findIndex((part) =>
+        part.replaceAll(WORD_BOUNDARY, '').replaceAll(SEAMLESS_UTTERANCE_RESET, '').includes(c.word))
       if (targetPartIndex < 0) throw new Error(`${c.id}：实际组块中无法定位「${c.word}」`)
-      const text = parts[targetPartIndex]
-      const stream = planTokenStream(text, assets, c.word)
-      const range = stream.ranges.find((item) => item.word === c.word)
+      const group = planTargetGroup(parts[targetPartIndex], c.word, assets)
+      const text = group.text
+      const stream = group.stream
+      const range = stream.range
       if (!range) throw new Error(`${c.id}：token 流中无法定位「${c.word}」`)
       if (stream.phones[c.offset] !== c.phone) {
         throw new Error(`${c.id}：目标音素漂移，期望 ${c.phone}，实际 ${stream.phones[c.offset]}`)
@@ -307,7 +373,12 @@ export async function planAcousticCase(c, { assets, frontend, overlayText }) {
           partCount: parts.length,
           text,
           parts: parts.map((part, index) => ({ partIndex: index, text: part, target: index === targetPartIndex })),
-          split: parts.length > 1,
+          split: parts.length > 1 || group.seamlessParts.length > 1,
+          join: group.seamlessParts.length > 1 ? 'seamless' : parts.length > 1 ? 'gap' : null,
+          seamlessPartIndex: group.seamlessPartIndex,
+          seamlessPartCount: group.seamlessParts.length,
+          seamlessParts: group.seamlessParts,
+          targetSpansSeam: group.targetSpansSeam,
         },
         tokenStream: {
           tokens: stream.tokens,
@@ -362,6 +433,10 @@ export function planWordFamily(c, assets) {
   }
 }
 
+export function nativeAgreementText(text) {
+  return String(text).replace(/[“”‘’]/gu, '')
+}
+
 export function compareNativeTokens(context, nativeTokenization) {
   if (!nativeTokenization?.captured) {
     return { ok: false, captured: false, status: 'unmeasurable', reason: '原生前端未返回 token 调试日志' }
@@ -374,7 +449,13 @@ export function compareNativeTokens(context, nativeTokenization) {
     && sentences.every((tokens) => Array.isArray(tokens))
   const loggedTokens = sentencesValid ? sentences.flat() : []
   const tokensMatchLog = JSON.stringify(actual) === JSON.stringify(loggedTokens)
-  const match = sentencesValid && tokensMatchLog && JSON.stringify(expected) === JSON.stringify(actual)
+  // Native Matcha adds one silent token at sentence start; direct-token mode does not.
+  const comparableSentences = sentencesValid
+    ? sentences.map((tokens, index) =>
+      index === 0 && expected[0] !== '"' && tokens[0] === '"' ? tokens.slice(1) : tokens)
+    : []
+  const comparableTokens = comparableSentences.flat()
+  const match = sentencesValid && tokensMatchLog && JSON.stringify(expected) === JSON.stringify(comparableTokens)
   const reason = !sentencesValid
     ? '原生 token 日志句结构无效；停止声学比较'
     : !tokensMatchLog
@@ -385,10 +466,12 @@ export function compareNativeTokens(context, nativeTokenization) {
     captured: true,
     status: match ? 'match' : 'mismatch',
     expected,
-    actual,
+    actual: comparableTokens,
+    rawTokens: actual,
     expectedPhones: phoneCount(expected),
-    actualPhones: phoneCount(actual),
-    sentences,
+    actualPhones: phoneCount(comparableTokens),
+    sentences: comparableSentences,
+    rawSentences: sentences,
     reason,
   }
 }
@@ -594,7 +677,7 @@ export function renderAcousticCaseSummary(manifest) {
     '# 山岚统一声学案例报告（advisory）', '',
     `- 协议：${manifest.protocol}`,
     `- 案例 ${manifest.cases.length} · 上下文 ${manifest.cases.reduce((sum, item) => sum + item.contexts.length, 0)}`,
-    '- 顺序：完整原句 → 生产文本链与实际 U+2060 组块 → token 完整性 → 原生 token 一致性 → 六方案测量 → 字族/整书回归。',
+    '- 顺序：完整原句 → 生产文本链与实际 U+2060/U+2061 组块 → token 完整性 → 原生 token 一致性 → 六方案测量 → 字族/整书回归。',
     '- 贡献 <100ms 记为吞音，>350ms 记为合并；F2、包络和轻声只用于排序。所有候选仍须用户亲耳试听。',
     '', '| 案例 | 语境 | 原生 token | 当前贡献 ms | 声学排序（非听感结论） | 待复听 |',
     '| --- | --- | --- | --- | --- | --- |',

@@ -3,9 +3,11 @@ import { join, resolve } from 'node:path'
 import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import {
+  SEAMLESS_UTTERANCE_RESET,
   UTTERANCE_RESET,
   UTTERANCE_RESET_WORDS,
   WORD_BOUNDARY,
+  applySeamlessUtteranceResets,
   applyUtteranceResets,
   preparePronunciationText,
   protectPronunciations,
@@ -54,7 +56,7 @@ function loadWorker() {
   }
   vm.createContext(context)
   vm.runInContext(
-    `${workerSource}\n;globalThis.__probe = { utteranceParts, joinUtteranceAudio, UTTERANCE_RESET, synthesize, slots }`,
+    `${workerSource}\n;globalThis.__probe = { utteranceParts, utteranceSegments, joinUtteranceAudio, joinSeamlessUtteranceAudio, joinSegmentedAudio, UTTERANCE_RESET, SEAMLESS_UTTERANCE_RESET, synthesize, slots }`,
     context,
   )
   return { probe: (context as any).__probe, messages }
@@ -138,6 +140,74 @@ describe('worker 的语句重置', () => {
     expect(joined.samples[100]).toBe(0)
     expect(joined.samples[219]).toBe(0)
     expect(joined.samples[220]).toBeCloseTo(-0.5)
+  })
+
+  it('无缝拼接规则按登记字数插入且保持幂等', () => {
+    const rules = [{ word: '谢天谢地', after: 2 }]
+    const prepared = applySeamlessUtteranceResets('谢天谢地', rules)
+    expect(prepared).toBe(`谢天${SEAMLESS_UTTERANCE_RESET}谢地`)
+    expect(applySeamlessUtteranceResets(prepared, rules)).toBe(prepared)
+    expect(applySeamlessUtteranceResets(`${WORD_BOUNDARY}谢天谢地`, rules))
+      .toBe(`${WORD_BOUNDARY}谢天${SEAMLESS_UTTERANCE_RESET}谢地`)
+  })
+
+  it('U+2061 只标记无缝拼接段，交叉淡化不插入 120ms 静音', () => {
+    const { probe } = loadWorker()
+    expect(probe.SEAMLESS_UTTERANCE_RESET).toBe(SEAMLESS_UTTERANCE_RESET)
+    const segments = probe.utteranceSegments(`谢天${SEAMLESS_UTTERANCE_RESET}谢地`, true)
+    expect(segments).toEqual([
+      { text: '谢天', joinBefore: null },
+      { text: '谢地', joinBefore: 'seamless' },
+    ])
+    const joined = probe.joinSeamlessUtteranceAudio(
+      [{ samples: new Float32Array(100).fill(0.25), sampleRate: 1000 },
+        { samples: new Float32Array(70).fill(-0.5), sampleRate: 1000 }],
+      1000,
+    )
+    expect(joined.samples).toHaveLength(150)
+    expect(joined.samples[0]).toBeCloseTo(0.25)
+    expect(joined.samples.at(-1)).toBeCloseTo(-0.5)
+    expect([...joined.samples].every(Number.isFinite)).toBe(true)
+  })
+
+  it('整句只有无缝拼接时不额外加入 120ms 静音', () => {
+    const { probe } = loadWorker()
+    const results = [
+      { samples: new Float32Array(100).fill(0.25), sampleRate: 1000 },
+      { samples: new Float32Array(70).fill(-0.5), sampleRate: 1000 },
+    ]
+    const segments = probe.utteranceSegments(
+      `谢天${SEAMLESS_UTTERANCE_RESET}谢地，得救了。`,
+      true,
+    )
+    const joined = probe.joinSegmentedAudio(results, 1000, segments)
+    expect(joined.samples).toHaveLength(150)
+    expect(joined.samples.slice(80, 100).every((sample: number) => sample === 0)).toBe(false)
+  })
+
+  it('真实 synth 任务对「谢天谢地」调用两次合成并无停顿拼接', async () => {
+    const { probe, messages } = loadWorker()
+    const slot = probe.slots.zh
+    slot.ready = true
+    slot.modelType = 'matcha'
+    slot.sampleRate = 22050
+    slot.numSpeakers = 1
+    slot.speakerId = 0
+    const calls: string[] = []
+    slot.tts = {
+      generateWithConfig: (text: string) => {
+        calls.push(text)
+        return { samples: new Float32Array(2205).fill(0.1), sampleRate: 22050 }
+      },
+    }
+    const prepared = preparePronunciationText('“谢天谢地，得救了。”', ['谢天谢地', '谢地'])
+    await probe.synthesize({ type: 'synth', jobId: 'seamless', lang: 'zh', epoch: 1, text: prepared, speed: 1 })
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toContain('谢天')
+    expect(calls[1]).toContain('谢地')
+    expect(calls.every((text) => !text.includes(SEAMLESS_UTTERANCE_RESET))).toBe(true)
+    const result = messages.find((message) => message.type === 'result')
+    expect(result.samples.byteLength / 4).toBe(2205 * 2 - Math.round(22050 * 0.02))
   })
 
   it('真实 synth 任务对含「地盘」的句子调用两次合成，普通句子仍只调用一次', async () => {

@@ -10,11 +10,13 @@ import { summarizeContributions } from './lib/acousticScoring.mjs'
 import { analyzeEnvelope, evaluateTarget, voicedBounds } from './lib/envelope.mjs'
 import { alignPrefix, joinPcmParts, partStartsMs } from './lib/alignment.mjs'
 import { auditIFinalSyllables } from './lib/vowelReduction.mjs'
-import { buildRuntimeLexicon, readAsset, UTTERANCE_RESET, WORD_BOUNDARY } from './lib/wordFamily.mjs'
+import {
+  buildRuntimeLexicon, readAsset, SEAMLESS_UTTERANCE_RESET, UTTERANCE_RESET, WORD_BOUNDARY,
+} from './lib/wordFamily.mjs'
 import { loadCorpus, splitSentences } from './lib/corpus.mjs'
 import {
   ACOUSTIC_CASE_PROTOCOL, ACOUSTIC_CASE_VARIANTS, compareNativeTokens,
-  findFamilyOccurrences, locateFamilyTarget, planAcousticCase, planFamilyExclusions,
+  findFamilyOccurrences, locateFamilyTarget, nativeAgreementText, planAcousticCase, planFamilyExclusions,
   planTokenStream, planUtteranceReset, rankAcousticVariants,
   renderAcousticCaseSummary, sha256, validateAcousticCaseManifest,
 } from './lib/acousticCases.mjs'
@@ -219,7 +221,7 @@ export async function measureContext(synth, item, context, contextIndex, options
   if (nativeManaged.length) {
     throw new Error(`${item.id} ${context.sentence}：含原生托管文本 ${nativeManaged.map((entry) => JSON.stringify(entry.text)).join('')}，无法进行完整声学测量`)
   }
-  const native = await nativeProbe(context.actualGroup.text, options.lexiconPath)
+  const native = await nativeProbe(nativeAgreementText(context.actualGroup.text), options.lexiconPath)
   context.nativeComparison = { ...compareNativeTokens(context, native), nativeDurationMs: native.durationMs }
   if (!context.nativeComparison.ok) {
     throw new Error(`${item.id} ${context.sentence}：${context.nativeComparison.reason}`)
@@ -273,7 +275,7 @@ function stripWordBoundaryView(text) {
   const chars = []
   const offsets = []
   Array.from(String(text)).forEach((char, offset) => {
-    if (char === WORD_BOUNDARY) return
+    if (char === WORD_BOUNDARY || char === SEAMLESS_UTTERANCE_RESET) return
     chars.push(char)
     offsets.push(offset)
   })
@@ -352,7 +354,7 @@ export async function familyRegression(item, options, corpusText) {
   const rows = []
   for (const { sentence, target, validatedOccurrences } of selected) {
     if (options.synth) {
-      const native = await probeNativeTokens(target.group, options.lexiconPath)
+      const native = await probeNativeTokens(nativeAgreementText(target.group), options.lexiconPath)
       const nativeComparison = compareNativeTokens({ tokenStream: { tokens: target.tokens } }, native)
       if (!nativeComparison.ok) {
         failures.push(`${sentence}：字族实测原生 token 不一致：${nativeComparison.reason}`)

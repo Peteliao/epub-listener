@@ -14,6 +14,7 @@ const SOURCES = [
   'src/core/tts/pronunciationGuard.ts',
   'src/core/tts/protectedWords.v1.txt',
   'src/core/tts/utteranceResets.v1.txt',
+  'src/core/tts/seamlessUtteranceResets.v1.txt',
 ]
 
 const cache = new Map()

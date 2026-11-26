@@ -21,12 +21,14 @@ const BASE_LEXICON = `# Static longest-match fixture
 银行 yin2 hang2
 世 shi4
 界 jie4
+谢天 xie4 tian1
+谢地 xie4 di4
 `
 const OVERLAY = '重庆 chong2 qing4\n会计 kuai4 ji4\n'
 const PATCHED_LEXICON = `${BASE_LEXICON}${OVERLAY}`
 const TOKEN_SYMBOLS = [
   'ni3', 'hao3', 'xue2', 'hui4', 'ji4', 'kuai4', 'zhong4', 'chong2', 'qing4',
-  'yin2', 'xing2', 'hang2', 'shi4', 'jie4', ',', '.', '!', '?', '"',
+  'yin2', 'xing2', 'hang2', 'shi4', 'jie4', 'xie4', 'tian1', 'di4', ',', '.', '!', '?', '"',
 ]
 const TOKENS_TEXT = TOKEN_SYMBOLS.map((symbol, id) => `${symbol} ${id}`).join('\n')
 const MODEL_PARTS = [
@@ -515,6 +517,15 @@ describe('Sherpa worker Matcha frontend', () => {
     })
   })
 
+  it('restarts Matcha lexicon lookup at U+2061 without emitting a token', () => {
+    const result = frontendWith(
+      '谢天\u2061谢地。',
+      '谢天 xie4 tian1\n谢地 xie4 di4\n',
+      'xie4 1\ntian1 2\ndi4 3\n. 4\n',
+    )
+    expect(result).toMatchObject({ supported: true, tokens: ['xie4', 'tian1', 'xie4', 'di4', '.'] })
+  })
+
   it('keeps native U+2060 splitting and the 120ms PCM join', async () => {
     const worker = runtime()
     await ready(worker)
@@ -568,6 +579,22 @@ describe('Sherpa worker Matcha frontend', () => {
       tokenCount: 4,
     })
     expect(new Float32Array(result(worker, 'g2p-parts').samples as ArrayBuffer)).toHaveLength(2 + 2646 + 2)
+  })
+
+  it('pre-converts U+2061 parts and crossfades instead of adding the 120ms gap', async () => {
+    const worker = runtime()
+    await ready(worker)
+    worker.send(synth('g2p-seam', '谢天\u2061谢地。', { frontendVersion: 'matcha-g2p-v1' }))
+    await worker.drain()
+
+    expect(worker.generateWithConfig.mock.calls.map(([input, config]) => [input, config.tokens])).toEqual([
+      ['', [['xie4', 'tian1']]],
+      ['', [['xie4', 'di4', '.']]],
+    ])
+    expect(result(worker, 'g2p-seam')).toMatchObject({
+      frontend: 'matcha-g2p-v1', tokenCount: 5,
+    })
+    expect(new Float32Array(result(worker, 'g2p-seam').samples as ArrayBuffer)).toHaveLength(3)
   })
 
   it('keeps punctuation-only reset parts as zero-sample PCM with the 120ms join', async () => {

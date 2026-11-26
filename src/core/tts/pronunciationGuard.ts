@@ -1,5 +1,6 @@
 import protectedWordsRaw from './protectedWords.v1.txt?raw'
 import utteranceResetsRaw from './utteranceResets.v1.txt?raw'
+import seamlessUtteranceResetsRaw from './seamlessUtteranceResets.v1.txt?raw'
 
 /**
  * Zero-width boundary. sherpa-onnx's Matcha front end skips unknown characters
@@ -18,6 +19,14 @@ export const WORD_BOUNDARY = '\u200b'
  */
 export const UTTERANCE_RESET = '\u2060'
 
+/** Word-internal synthesis seam joined with a short crossfade, not a pause. */
+export const SEAMLESS_UTTERANCE_RESET = '\u2061'
+
+export interface SeamlessUtteranceResetRule {
+  readonly word: string
+  readonly after: number
+}
+
 export const UTTERANCE_RESET_WORDS: readonly string[] = Object.freeze(
   utteranceResetsRaw
     .split(/\r?\n/)
@@ -26,7 +35,20 @@ export const UTTERANCE_RESET_WORDS: readonly string[] = Object.freeze(
     .sort((left, right) => Array.from(right).length - Array.from(left).length),
 )
 
+export const SEAMLESS_UTTERANCE_RESET_RULES: readonly SeamlessUtteranceResetRule[] = Object.freeze(
+  seamlessUtteranceResetsRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => {
+      const [word, after] = line.split(/\s+/)
+      return Object.freeze({ word: word!, after: Number(after) })
+    })
+    .sort((left, right) => Array.from(right.word).length - Array.from(left.word).length),
+)
+
 const HAN = /\p{Script=Han}/u
+const PUNCTUATION = /[\p{P}\p{S}]/u
 
 /** UTF-16 offsets of every Unicode code point, for astral-safe scanning. */
 function codePointOffsets(text: string): number[] {
@@ -127,20 +149,55 @@ export function applyUtteranceResets(
       Array.from(right).length - Array.from(left).length ||
       left.localeCompare(right, 'zh'),
   )
-  const insertions: number[] = []
+  const insertions = new Set<number>()
   const offsets = codePointOffsets(source)
   for (const index of offsets) {
-    if (source[index] !== WORD_BOUNDARY) continue
-    const longest = sortedProtected.find((word) => source.startsWith(word, index + 1))
+    const boundary = source[index] === WORD_BOUNDARY
+    const start = boundary ? index + 1 : index
+    const before = previousCodePoint(source, offsets, boundary ? index : start)
+    if (!boundary && !PUNCTUATION.test(before)) continue
+    const longest = sortedProtected.find((word) => source.startsWith(word, start))
     if (longest && !words.includes(longest)) continue
-    if (!words.some((word) => source.startsWith(word, index + 1))) continue
-    const before = previousCodePoint(source, offsets, index)
-    if (!before || before === UTTERANCE_RESET) continue
-    insertions.push(index)
+    const resetWord = words.find((word) => source.startsWith(word, start))
+    if (!resetWord) continue
+    if (!boundary && sortedProtected.includes(resetWord)) continue
+    if (!before || before === UTTERANCE_RESET || before === SEAMLESS_UTTERANCE_RESET) continue
+    insertions.add(boundary ? index : start)
   }
   let result = source
-  for (const index of insertions.reverse()) {
+  for (const index of [...insertions].sort((left, right) => right - left)) {
     result = `${result.slice(0, index)}${UTTERANCE_RESET}${result.slice(index)}`
+  }
+  return result
+}
+
+/** Splits registered fused words for independent synthesis without a pause. */
+export function applySeamlessUtteranceResets(
+  text: string,
+  rules: readonly SeamlessUtteranceResetRule[] = SEAMLESS_UTTERANCE_RESET_RULES,
+): string {
+  const source = String(text)
+  if (!source) return source
+  const insertions: number[] = []
+  const covered: Array<[number, number]> = []
+  const offsets = codePointOffsets(source)
+  const sorted = [...rules].sort(
+    (left, right) => Array.from(right.word).length - Array.from(left.word).length,
+  )
+  for (const rule of sorted) {
+    if (!rule.word || rule.after <= 0 || rule.after >= Array.from(rule.word).length) continue
+    for (const index of offsets) {
+      if (source[index] === WORD_BOUNDARY || source[index] === UTTERANCE_RESET || source[index] === SEAMLESS_UTTERANCE_RESET) continue
+      if (!source.startsWith(rule.word, index)) continue
+      if (covered.some(([start, end]) => index >= start && index < end)) continue
+      covered.push([index, index + rule.word.length])
+      const split = index + Array.from(rule.word).slice(0, rule.after).join('').length
+      if (source[split] !== SEAMLESS_UTTERANCE_RESET) insertions.push(split)
+    }
+  }
+  let result = source
+  for (const index of insertions.sort((left, right) => right - left)) {
+    result = `${result.slice(0, index)}${SEAMLESS_UTTERANCE_RESET}${result.slice(index)}`
   }
   return result
 }
@@ -150,9 +207,8 @@ export function applyUtteranceResets(
  *
  * `protectedWords` may be extended with per-book words derived from the
  * runtime lexicon overlay (see SherpaDriver); that only adds U+200B word
- * boundaries. Utterance resets (U+2060) deliberately keep using the static,
- * listening-confirmed tables: feeding the dynamic list into the longest-match
- * check would change which phrases get split into two syntheses.
+ * boundaries. Utterance resets (U+2060/U+2061) deliberately keep using the
+ * static tables: dynamic words must not change which phrases are re-synthesised.
  *
  * With no arguments both parameters default to the static tables, so the
  * audit mirror and all existing tests see exactly the same text as before.
@@ -161,10 +217,17 @@ export function preparePronunciationText(
   text: string,
   protectedWords?: readonly string[],
   resetWords?: readonly string[],
+  seamlessRules?: readonly SeamlessUtteranceResetRule[],
 ): string {
-  return applyUtteranceResets(
-    protectPronunciations(text, protectedWords),
-    resetWords,
+  const resetProtectedWords = protectedWords ?? PROTECTED_WORDS
+  const punctuationResets = applyUtteranceResets(text, resetWords, resetProtectedWords)
+  return applySeamlessUtteranceResets(
+    applyUtteranceResets(
+      protectPronunciations(punctuationResets, protectedWords),
+      resetWords,
+      resetProtectedWords,
+    ),
+    seamlessRules,
   )
 }
 

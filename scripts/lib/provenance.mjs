@@ -20,6 +20,7 @@ const LEXICON_FILES = [
   'src/core/tts/trainedNeutrals.v1.txt',
   'src/core/tts/approvedOverrides.v1.ts',
   'src/core/tts/utteranceResets.v1.txt',
+  'src/core/tts/seamlessUtteranceResets.v1.txt',
   'src/core/tts/protectedWords.v1.txt',
   'src/core/tts/readingRules.v1.jsonl',
   'src/core/tts/acousticExceptions.v1.jsonl',

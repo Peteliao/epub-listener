@@ -239,6 +239,7 @@ describe('C1 生产文本链与 C3 冻结包', () => {
     expect(frontend.version.sources['src/core/text/TextNormalizer.ts']).toMatch(/^[a-f0-9]{64}$/)
     expect(frontend.version.sources['src/core/text/SpeechPhrasing.ts']).toMatch(/^[a-f0-9]{64}$/)
     expect(frontend.version.sources['src/core/tts/pronunciationGuard.ts']).toMatch(/^[a-f0-9]{64}$/)
+    expect(frontend.version.sources['src/core/tts/seamlessUtteranceResets.v1.txt']).toMatch(/^[a-f0-9]{64}$/)
   })
 
   it('固定 v1 语料全部 48 条逐条等于 normalize -> phrasing -> overlay guard', async () => {

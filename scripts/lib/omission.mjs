@@ -49,12 +49,41 @@ export function caseStream(sentence, word, assets) {
     assets.effective,
     assets.maxLength,
   )
-  const range = ranges.find((item) => item.word === word)
-  if (!range) return null
-  const reading = assets.effective.get(word) ?? ''
-  const phones = phoneticPhones(reading)
-  if (!phones.length || phones.length !== Array.from(word).length) return null
-  return { tokens, range, phones, count: phones.length, reading }
+  const exact = ranges.find((item) => item.word === word)
+  if (exact) {
+    const reading = assets.effective.get(word) ?? ''
+    const phones = phoneticPhones(reading)
+    if (!phones.length || phones.length !== Array.from(word).length) return null
+    return { tokens, range: exact, phones, count: phones.length, reading }
+  }
+  // A seamless target such as 谢地 can sit inside the longer 谢天谢地 range.
+  const chars = Array.from(sentence)
+  const target = Array.from(word)
+  const startChar = chars.findIndex((_, index) =>
+    target.every((char, offset) => chars[index + offset] === char))
+  if (startChar < 0) return null
+  const covering = ranges.find((range) =>
+    range.startChar <= startChar && range.endChar >= startChar + target.length)
+  if (!covering) return null
+  const rawTokens = String(assets.effective.get(covering.word) ?? '').split(/\s+/).filter(Boolean)
+  const charTokenIndices = []
+  rawTokens.forEach((token, index) => {
+    if (token !== BOUNDARY_PHONE) charTokenIndices.push(covering.start + index)
+  })
+  if (charTokenIndices.length !== Array.from(covering.word).length) return null
+  const offset = startChar - covering.startChar
+  const start = charTokenIndices[offset]
+  const end = charTokenIndices[offset + target.length - 1] + 1
+  if (!Number.isInteger(start) || !Number.isInteger(end)) return null
+  const phones = tokens.slice(start, end).filter((token) => token !== BOUNDARY_PHONE)
+  if (phones.length !== target.length) return null
+  return {
+    tokens,
+    range: { word, start, end, startChar, endChar: startChar + target.length, coveredBy: covering.word },
+    phones,
+    count: phones.length,
+    reading: phones.join(' '),
+  }
 }
 
 /**

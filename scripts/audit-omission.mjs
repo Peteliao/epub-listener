@@ -35,7 +35,7 @@ import {
   parseOmissionCases, replayOmission, sentenceCoverage,
 } from './lib/omission.mjs'
 import {
-  loadWordLists, prepareRuntimeText, utteranceParts,
+  appSegments, loadWordLists,
 } from './lib/wordFamily.mjs'
 
 const CASES = resolve(ROOT, 'src/core/tts/omissionCases.v1.jsonl')
@@ -126,10 +126,7 @@ const WORD_LISTS = loadWordLists()
  * actually synthesises for this word.
  */
 function appMeasurementText(sentence, word) {
-  const prepared = prepareRuntimeText(sentence, WORD_LISTS)
-  const parts = utteranceParts(prepared)
-  if (!parts) return prepared
-  return parts.find((part) => part.includes(word)) ?? prepared
+  return appSegments(sentence, word, WORD_LISTS)[0]?.text ?? sentence
 }
 
 function measureStream(synth, tokens, start, count, cache) {
