@@ -54,6 +54,7 @@ const ROMAN_LOWER = 'ⅰⅱⅲⅳⅴⅵⅶⅷⅸⅹⅺⅻ'
  */
 function normalizeNumeralChars(input: string): string {
   return input
+    .replace(/\u3007/g, '零')
     .replace(/[\uff10-\uff19]/g, (char) =>
       String(char.charCodeAt(0) - 0xff10),
     )

@@ -15,6 +15,8 @@ export interface StoredBookLexicon {
   curatedHash: string
   /** Fingerprint of the compiled approved-reading whitelist. */
   approvedHash?: string
+  /** Candidates omitted by the per-book overlay cap. */
+  truncated?: number
   createdAt: number
 }
 

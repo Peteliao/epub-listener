@@ -76,6 +76,7 @@ const MATCHA_PUNCTUATION = {
 }
 const OOV_PUNCTUATION = /[\p{P}\p{S}\p{Z}\p{C}]/u
 const UNSUPPORTED_TEXT = /[\p{Script=Han}\p{L}\p{N}\p{M}]/u
+const HAN_CHAR = /^\p{Script=Han}$/u
 
 function utteranceParts(text, enabled) {
   if (!enabled || !text.includes(UTTERANCE_RESET)) return null
@@ -650,8 +651,10 @@ function createMatchaFrontend(lexiconText, tokensText) {
  * Longest-match only. U+200B/U+2060 force a fresh lookup; punctuation is mapped
  * or dropped. Any uncovered Han, letter, number or mark makes the whole result
  * unsupported so synthesize() can retry the complete request as native text.
+ * Coverage-only scans ignore native-managed non-Han text and punctuation.
  */
-function matchaTextToTokens(text, frontend) {
+function matchaTextToTokens(text, frontend, options = {}) {
+  const coverageOnly = options.coverageOnly === true
   const unsupported = (reason, index) => ({ supported: false, tokens: [], reason, index })
   if (!frontend || typeof text !== 'string') return unsupported('frontend-unavailable', 0)
   const chars = Array.from(text)
@@ -673,9 +676,11 @@ function matchaTextToTokens(text, frontend) {
       const char = chars[index]
       const punctuation = MATCHA_PUNCTUATION[char]
       if (punctuation) {
-        for (const token of punctuation) {
-          const failure = appendToken(token, index)
-          if (failure) return failure
+        if (!coverageOnly) {
+          for (const token of punctuation) {
+            const failure = appendToken(token, index)
+            if (failure) return failure
+          }
         }
         index += 1
         continue
@@ -701,13 +706,19 @@ function matchaTextToTokens(text, frontend) {
       }
       if (!phones) {
         if (matchedLength > 0) return unsupported('invalid-lexicon-entry', index)
+        if (coverageOnly && !HAN_CHAR.test(char)) {
+          index += 1
+          continue
+        }
         return UNSUPPORTED_TEXT.test(char)
           ? unsupported('uncovered-text', index)
           : unsupported('unsupported-character', index)
       }
-      for (const phone of phones) {
-        const failure = appendToken(phone, index)
-        if (failure) return failure
+      if (!coverageOnly) {
+        for (const phone of phones) {
+          const failure = appendToken(phone, index)
+          if (failure) return failure
+        }
       }
       index += matchedLength
     }
@@ -723,6 +734,7 @@ function matchaTextToTokens(text, frontend) {
   }
   const failure = appendRange(rangeStart, chars.length)
   if (failure) return failure
+  if (coverageOnly) return { supported: true, tokens: [] }
   return tokens.length > 0
     ? { supported: true, tokens }
     : unsupported('empty', 0)
@@ -869,6 +881,25 @@ async function synthesize(data) {
     let tokenCount = null
     let directTokens = null
     let parts = null
+
+    if (data.tokens === undefined && canUseMatchaFrontend && slot.frontend) {
+      const coverage = matchaTextToTokens(text, slot.frontend, { coverageOnly: true })
+      if (!coverage.supported) {
+        const char = Array.from(text)[coverage.index] ?? ''
+        const invalid = coverage.reason === 'invalid-lexicon-entry'
+        post({
+          type: 'error',
+          lang,
+          epoch: data.epoch,
+          jobId: data.jobId,
+          code: coverage.reason,
+          message: invalid
+            ? `山岚词典中“${char}”的读音无效，已停止离线朗读。`
+            : `山岚词典缺少“${char}”的读音，已停止离线朗读。`,
+        })
+        return
+      }
+    }
 
     if (data.tokens !== undefined) {
       if (!canUseMatchaFrontend) {

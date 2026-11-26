@@ -25,6 +25,7 @@ export interface BookLexiconStatus {
   phase: BookLexiconPhase
   entries: number
   message: string | null
+  truncated?: number
 }
 
 export interface BookLexiconReportInfo {
@@ -32,6 +33,7 @@ export interface BookLexiconReportInfo {
   version: number
   enabled: boolean
   entries: number
+  truncated: number
 }
 
 type CollectText = (signal: AbortSignal) => Promise<BookTextData>
@@ -141,6 +143,7 @@ export class BookLexiconService {
         phase: 'ready',
         entries: countEntries(this.overlay),
         message: null,
+        truncated: this.status.truncated ?? 0,
       })
     }
     return true
@@ -157,6 +160,7 @@ export class BookLexiconService {
       version: BOOK_LEXICON_VERSION,
       enabled: this.enabled,
       entries: this.status.entries,
+      truncated: this.status.truncated ?? 0,
     }
   }
 
@@ -260,6 +264,7 @@ export class BookLexiconService {
           phase: 'ready',
           entries: countEntries(this.overlay),
           message: null,
+          truncated: this.status.truncated ?? 0,
         })
         return this.overlay
       }
@@ -270,15 +275,23 @@ export class BookLexiconService {
       const cached = await this.readCache(key)
       if (this.disposed || !this.enabled) return this.overlay
       let scanned = cached?.overlay ?? ''
+      let truncated = cached?.truncated ?? 0
       if (!cached && chunks.some((chunk) => chunk.trim())) {
-        scanned = await this.generate(assets, chunks, controller)
+        const generated = await this.generate(assets, chunks, controller)
+        scanned = generated.overlay
+        truncated = generated.truncated
       }
       if (this.disposed) return this.overlay
       // Static MIT phrase readings sit below the whole-book scan; the cache
       // only stores the scan result, so both are composed here.
       this.baseOverlay = mergeOverlaySources(phraseReadings, scanned)
       this.recompose()
-      this.setStatus({ phase: 'ready', entries: countEntries(this.overlay), message: null })
+      this.setStatus({
+        phase: 'ready',
+        entries: countEntries(this.overlay),
+        message: null,
+        truncated,
+      })
       if (!cached && scanned) {
         const record: StoredBookLexicon = {
           bookId: this.bookId,
@@ -291,6 +304,7 @@ export class BookLexiconService {
           lexiconName: assets.lexiconName,
           curatedHash,
           approvedHash: APPROVED_OVERRIDES_HASH,
+          truncated,
           createdAt: Date.now(),
         }
         void saveBookLexicon(record).catch(() => undefined)
@@ -333,8 +347,8 @@ export class BookLexiconService {
     assets: AiLexiconAssets,
     chunks: string[],
     controller: AbortController,
-  ): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
+  ): Promise<{ overlay: string; truncated: number }> {
+    return new Promise<{ overlay: string; truncated: number }>((resolve, reject) => {
       let settled = false
       let worker: Worker
       try {
@@ -362,7 +376,10 @@ export class BookLexiconService {
         const data = event.data
         if (!data || data.jobId !== jobId) return
         if (data.type === 'done') {
-          finish(() => resolve(data.overlay))
+          finish(() => resolve({
+            overlay: data.overlay,
+            truncated: data.stats?.truncated ?? 0,
+          }))
           return
         }
         if (data.type === 'error') {

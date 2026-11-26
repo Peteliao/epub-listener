@@ -16,6 +16,7 @@ vi.mock('@/core/db/LibraryDB', () => ({
 
 class FakeScanWorker {
   static instances: FakeScanWorker[] = []
+  static truncated = 0
   listeners = new Map<string, Array<(event: any) => void>>()
   terminate = vi.fn()
 
@@ -32,7 +33,15 @@ class FakeScanWorker {
   postMessage(message: any): void {
     queueMicrotask(() => {
       for (const listener of this.listeners.get('message') ?? []) {
-        listener({ data: { type: 'done', jobId: message.jobId, overlay: '铺开 pu1 kai1' } })
+        listener({
+          data: {
+            type: 'done',
+            jobId: message.jobId,
+            overlay: '铺开 pu1 kai1',
+            entries: 1,
+            stats: { truncated: FakeScanWorker.truncated },
+          },
+        })
       }
     })
   }
@@ -64,6 +73,7 @@ describe('2026-11-23 第十六轮：整书词典缓存指纹与生命周期', ()
 
   beforeEach(() => {
     FakeScanWorker.instances = []
+    FakeScanWorker.truncated = 0
     vi.clearAllMocks()
     vi.stubGlobal('Worker', FakeScanWorker)
     currentAssets = { ...baseAssets }
@@ -133,6 +143,25 @@ describe('2026-11-23 第十六轮：整书词典缓存指纹与生命周期', ()
     await start(instance, ['内容更新后又有新的句子。'])
     expect(FakeScanWorker.instances).toHaveLength(3)
     expect(saved.fingerprint).not.toBe(secondKey)
+    instance.dispose()
+  })
+
+  it('保留 overlay 截断数，并在缓存命中与即时纠错后继续报告', async () => {
+    FakeScanWorker.truncated = 4
+    const instance = service('book-a')
+    await start(instance, ['他把信纸铺开。'])
+
+    expect(instance.getStatus().truncated).toBe(4)
+    expect(instance.getReportInfo().truncated).toBe(4)
+    expect(saved.truncated).toBe(4)
+
+    instance.invalidate()
+    await start(instance, ['他把信纸铺开。'])
+    expect(FakeScanWorker.instances).toHaveLength(1)
+    expect(instance.getStatus().truncated).toBe(4)
+
+    instance.setLiveOverlay('乙 yi3', 'hash-b')
+    expect(instance.getStatus().truncated).toBe(4)
     instance.dispose()
   })
 

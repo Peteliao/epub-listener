@@ -248,6 +248,15 @@ function frontendWith(text: string, lexicon: string, tokensText: string): Fronte
 function frontend(text: string): FrontendResult {
   return frontendWith(text, PATCHED_LEXICON, TOKENS_TEXT)
 }
+function coverage(text: string): FrontendResult {
+  pureContext.input = text
+  pureContext.lexicon = PATCHED_LEXICON
+  pureContext.tokens = TOKENS_TEXT
+  return runInContext(
+    'matchaTextToTokens(input, createMatchaFrontend(lexicon, tokens), { coverageOnly: true })',
+    pureContext,
+  ) as FrontendResult
+}
 
 describe('Matcha shadow frontend golden tokens', () => {
   it('uses the longest lexicon match', () => {
@@ -293,6 +302,15 @@ describe('Matcha shadow frontend golden tokens', () => {
       expect(frontend(text)).toMatchObject({ supported: false, tokens: [] })
     },
   )
+
+  it('coverage scans reject unknown Han but leave native-managed numbers alone', () => {
+    expect(coverage('你好2，v1.2.3。')).toEqual({ supported: true, tokens: [] })
+    expect(coverage('你好\u2060龘')).toMatchObject({
+      supported: false,
+      reason: 'uncovered-text',
+      index: 3,
+    })
+  })
 
   it('rejects empty/punctuation-only input', () => {
     expect(frontend(' \t—《》')).toMatchObject({ supported: false, reason: 'empty' })
@@ -438,6 +456,51 @@ describe('Sherpa worker Matcha frontend', () => {
     expect(result(worker, 'native')).not.toHaveProperty('tokens')
   })
 
+  it.each([undefined, 'matcha-g2p-v1'])(
+    'stops before generation when native text contains an uncovered Han: %s',
+    async (frontendVersion) => {
+      const worker = runtime()
+      await ready(worker)
+      worker.send(synth('missing-han', '你好\u2060龘', { frontendVersion }))
+      await worker.drain()
+
+      expect(worker.generateWithConfig).not.toHaveBeenCalled()
+      expect(worker.generate).not.toHaveBeenCalled()
+      expect(worker.messages.at(-1)).toMatchObject({
+        type: 'error',
+        jobId: 'missing-han',
+        code: 'uncovered-text',
+        message: expect.stringContaining('龘'),
+      })
+    },
+  )
+
+  it('keeps native number handling outside the Han coverage guard', async () => {
+    const worker = runtime()
+    await ready(worker)
+    worker.send(synth('native-number', '你好2，v1.2.3。'))
+    await worker.drain()
+
+    expect(worker.generateWithConfig.mock.calls[0]![0]).toBe('你好2，v1.2.3。')
+    expect(result(worker, 'native-number')).toMatchObject({ frontend: 'native' })
+  })
+
+  it('reports an invalid effective lexicon entry instead of synthesizing around it', async () => {
+    const worker = runtime({
+      lexicon: '你 ni3\n好 hao3\n你好 ni3 unknown-phone\n',
+    })
+    await ready(worker)
+    worker.send(synth('invalid-reading', '你好'))
+    await worker.drain()
+
+    expect(worker.generateWithConfig).not.toHaveBeenCalled()
+    expect(worker.messages.at(-1)).toMatchObject({
+      type: 'error',
+      code: 'invalid-lexicon-entry',
+      message: expect.stringContaining('读音无效'),
+    })
+  })
+
   it('keeps native U+2060 splitting and the 120ms PCM join', async () => {
     const worker = runtime()
     await ready(worker)
@@ -496,13 +559,13 @@ describe('Sherpa worker Matcha frontend', () => {
   it('falls back the entire request to native text when any part is unsupported', async () => {
     const worker = runtime()
     await ready(worker)
-    worker.send(synth('fallback', '你好\u2060龘', { frontendVersion: 'matcha-g2p-v1' }))
+    worker.send(synth('fallback', '你好\u2060 2', { frontendVersion: 'matcha-g2p-v1' }))
     await worker.drain()
 
     // No first-part token synthesis may happen before the second part fails.
     expect(worker.generateWithConfig.mock.calls.map(([input, config]) => [input, config.tokens])).toEqual([
       ['你好', undefined],
-      ['龘', undefined],
+      ['2', undefined],
     ])
     expect(result(worker, 'fallback')).toMatchObject({
       frontend: 'native-fallback',

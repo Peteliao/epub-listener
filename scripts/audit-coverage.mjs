@@ -12,19 +12,32 @@ import JSZip from 'jszip'
 import { JSDOM, VirtualConsole } from 'jsdom'
 import { OutputFormat, pinyin, segment } from 'pinyin-pro'
 import {
+  findUncoveredHan,
   loadMatchaAssets,
+  parseOverlay,
   tokenizeSpans,
   phoneticPhones,
   TRAINED_NEUTRAL_PHONES,
   ROOT,
 } from './lib/reading.mjs'
+import { loadFrontendSpeech, prepareFrontendSpeechText } from './lib/frontendSpeech.mjs'
 
 const args = process.argv.slice(2)
 const corpusArg = args.find((arg) => !arg.startsWith('--')) ?? 'public/sample.epub'
 const topFlag = args.find((arg) => arg.startsWith('--top='))
 const top = Number(topFlag?.slice(6) ?? 25)
+const overlayArg = args.find((arg) => arg.startsWith('--overlay='))?.slice(10)
+const strict = args.includes('--strict')
 const corpusPath = resolve(ROOT, corpusArg)
 const assets = await loadMatchaAssets()
+if (overlayArg) {
+  const extraOverlay = await readFile(resolve(ROOT, overlayArg), 'utf8')
+  const curatedWords = new Set(assets.overlay.entries.keys())
+  for (const [word, reading] of parseOverlay(extraOverlay).entries) {
+    if (!curatedWords.has(word)) assets.effective.set(word, reading)
+  }
+  assets.overlayText = `${assets.overlayText}\n${extraOverlay}`
+}
 const virtualConsole = new VirtualConsole()
 
 async function readCorpus(path) {
@@ -54,6 +67,12 @@ function splitPhone(phone) {
 
 const HAN = /^\p{Script=Han}+$/u
 const text = await readCorpus(corpusPath)
+const frontend = await loadFrontendSpeech()
+const speechText = prepareFrontendSpeechText(text, assets.overlayText, frontend).speechText
+const singleGaps = new Map()
+for (const item of findUncoveredHan(speechText, assets.effective)) {
+  record(singleGaps, item.char, `${item.charOffset} 字起 · ${item.context}`)
+}
 const sentences = text
   .split(/(?<=[。！？!?；;…\n])/u)
   .map((part) => part.replace(/\s+/g, ' ').trim())
@@ -148,11 +167,11 @@ for (const sentence of sentences) {
   }
 }
 
-function print(title, map, limit = top) {
+function print(title, map, limit = top, unit = '词') {
   const sorted = [...map.entries()].sort(
     (a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0], 'zh'),
   )
-  console.log(`\n${title}：${sorted.length} 个词 / ${sorted.reduce((n, [, v]) => n + v.count, 0)} 次`)
+  console.log(`\n${title}：${sorted.length} 个${unit} / ${sorted.reduce((n, [, v]) => n + v.count, 0)} 次`)
   for (const [word, entry] of sorted.slice(0, limit)) {
     console.log(`  ${String(entry.count).padStart(3)}× ${word}  ${entry.detail}`)
   }
@@ -166,7 +185,12 @@ console.log(
     `（${wordTokens ? (((wordTokens - fallbackTokens) / wordTokens) * 100).toFixed(1) : '0.0'}%），` +
     `单字兜底 ${fallbackTokens}`,
 )
+print('单字缺条（原生前端会静默丢字）', singleGaps, top, '字')
 print('词库缺条（pinyin-pro 能分词，最长匹配仍按单字读）', oov)
 print('词库标全调、参考为轻声（高可信候选）', neutralGaps)
 print('模型未训练的轻声（保持全调，勿补齐）', untrainableNeutralGaps)
 print('音节不一致（需人工确认，多数是参考词典错）', syllableDiffs)
+if (strict && singleGaps.size > 0) {
+  console.error(`\n严格检查失败：发现 ${singleGaps.size} 个缺条汉字。`)
+  process.exitCode = 1
+}

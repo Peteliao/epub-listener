@@ -199,6 +199,9 @@ const bookLexiconNote = computed(() => {
   if (!status || status.phase === 'idle') return '使用开源音色时自动生成'
   if (status.phase === 'generating') return '正在分析本书，可先直接朗读'
   if (status.phase === 'ready') {
+    if (status.truncated) {
+      return `已补充 ${status.entries} 条，${status.truncated} 条候选超限`
+    }
     return status.entries
       ? `已补充 ${status.entries} 条读音`
       : '本书暂无需补充的词'

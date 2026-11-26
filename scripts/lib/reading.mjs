@@ -110,6 +110,40 @@ export function tokenizeSpans(text, entries, maxLength = maxWordLength(entries))
   return spans
 }
 
+const HAN_CHAR = /^\p{Script=Han}$/u
+
+/** Han characters that reach Matcha's single-character fallback without a reading. */
+export function findUncoveredHan(text, entries) {
+  const chars = Array.from(String(text))
+  const maxLength = maxWordLength(entries)
+  const uncovered = []
+  const scan = (start, end) => {
+    for (const span of tokenizeSpans(chars.slice(start, end).join(''), entries, maxLength)) {
+      if (Array.from(span.word).length !== 1 || !HAN_CHAR.test(span.word)) continue
+      if (entries.has(span.word)) continue
+      const charOffset = start + span.start
+      uncovered.push({
+        char: span.word,
+        charOffset,
+        context: chars
+          .slice(Math.max(0, charOffset - 18), Math.min(chars.length, charOffset + 19))
+          .join('')
+          .replace(/\s+/g, ' ')
+          .trim(),
+      })
+    }
+  }
+
+  let rangeStart = 0
+  for (let index = 0; index < chars.length; index += 1) {
+    if (chars[index] !== '\u200b' && chars[index] !== '\u2060') continue
+    scan(rangeStart, index)
+    rangeStart = index + 1
+  }
+  scan(rangeStart, chars.length)
+  return uncovered
+}
+
 /** Resolves the reading of the nth occurrence of `char` in `text`. */
 export function readingAt(text, char, occurrence, entries) {
   const chars = Array.from(text)

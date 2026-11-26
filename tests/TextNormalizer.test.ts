@@ -66,6 +66,20 @@ describe('normalizeSpeechText', () => {
     expect(normalizeSpeechText('6,500 years ago')).toBe('6,500 years ago')
   })
 
+  it('normalizes the ideographic zero used in Chinese years', () => {
+    expect(normalizeSpeechText('一九八〇年')).toBe('一九八零年')
+    expect(normalizeSpeechText('一九九〇年夏天')).toBe('一九九零年夏天')
+    expect(normalizeSpeechText('九〇年')).toBe('九零年')
+    expect(normalizeSpeechText('“一九八〇年冬月，高考恢复了几年，政策彻底变了，平反的红头文件下来了。'))
+      .toBe('“一九八零年冬月，高考恢复了几年，政策彻底变了，平反的红头文件下来了。')
+    expect(normalizeSpeechText('那笔钱，整整供了许南高中三年，一直到一九九〇年夏天她高中毕业。'))
+      .toBe('那笔钱，整整供了许南高中三年，一直到一九九零年夏天她高中毕业。')
+    expect(normalizeSpeechText('“九〇年许南高中毕业，在县城的印刷厂打了两年半零工。'))
+      .toBe('“九零年许南高中毕业，在县城的印刷厂打了两年半零工。')
+    expect(normalizeSpeechText('三封信的邮戳分别是一九八八年、一九八九年、一九九〇年。'))
+      .toBe('三封信的邮戳分别是一九八八年、一九八九年、一九九零年。')
+  })
+
   it('reads numeric dates as Chinese numerals', () => {
     expect(normalizeSpeechText('2026-09-12')).toBe('二零二六年九月十二日')
     expect(normalizeSpeechText('2026/09/12')).toBe('二零二六年九月十二日')
