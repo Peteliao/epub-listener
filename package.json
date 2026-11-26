@@ -46,6 +46,7 @@
     "blind:render:full": "node scripts/render-blind.mjs --full",
     "naturalness:render": "node scripts/render-naturalness.mjs",
     "naturalness:smoke": "node scripts/render-naturalness.mjs --smoke",
+    "naturalness:score": "node scripts/naturalness-score.mjs",
     "blind:score": "node scripts/blind-score.mjs",
     "blind:ab": "node scripts/blind-ab.mjs",
     "explain:reading": "node scripts/explain-reading.mjs",

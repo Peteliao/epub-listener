@@ -168,8 +168,9 @@ tests/           Vitest 测试与固定语料
 | `npm run health` | 读音资产沉淀量与收敛趋势 |
 | `npm run quality:report` | 汇总门禁、包络、OOV、盲听与版本指纹 |
 | `npm run blind:render` / `blind:ab` / `blind:score` | 双盲 A/B 建包、评分与解盲 |
+| `npm run naturalness:score -- --rater=姓名` | 直接用冻结的 C2/C4 WAV 生成本地评分页与 JSON 评分表 |
 
-这些脚本全部是开发期工具：不进入应用包，不需要后端；整书语料默认只在本机使用。
+这些脚本全部是开发期工具：不进入应用包，不需要后端；整书语料默认只在本机使用。自然度评分命令只生成和校验个人评分表，不替代真人试听，也不据此自动改动生产参数。
 
 ### 评测原则
 
@@ -208,7 +209,7 @@ tests/           Vitest 测试与固定语料
 
 ## 测试与部署
 
-- 测试：`npm test`，当前 **85 个测试文件 / 740 项通过**
+- 测试：`npm test`，当前 **93 个测试文件 / 863 项通过**
 - 读音门禁：`npm run audit:all`（新鲜 checkout 可运行，不依赖全书语料；声学冒烟可用 `--strict` 设为必需）
 - 构建：`npm run build`（`vue-tsc --noEmit` + vite）
 - CI：推送到 `main` 后，[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) 会依次执行 `npm ci`、`npm test`、`npm run audit:all`、`npm run build`，然后发布到 GitHub Pages
